@@ -8,6 +8,7 @@ let actionBusy = false;
 let isPulling = false;
 let fightAnim = null;
 let fightStats = { greenTime: 0, totalTime: 0 };
+let fightEnding = false;
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -290,27 +291,23 @@ function startFight() {
   fightStats = { greenTime: 0, totalTime: 0 };
   let fishPhase = Math.random() * Math.PI * 2;
   let last = performance.now();
-  let graceLeft = 2.2;
 
-  const fishPull = cast.fishPull || 0.35;
-  const playerPull = 0.48;
-  const greenHalf = cast.greenHalf || 0.2;
-  const progressRate = cast.progressRate || 0.22;
+  const fishPull = cast.fishPull || 0.45;
+  const playerPull = 0.58;
+  const greenHalf = cast.greenHalf || 0.18;
+  const progressRate = cast.progressRate || 0.16;
 
   function tick(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     fightStats.totalTime += dt;
-    graceLeft = Math.max(0, graceLeft - dt);
 
-    fishPhase += dt * (1.8 + fishPull * 1.8);
-    const surge = Math.max(0, Math.sin(fishPhase)) * fishPull * 0.55;
-    const steadyDrift = fishPull * 0.22;
-    const fishForce = steadyDrift + surge;
+    fishPhase += dt * (2.2 + fishPull * 2.5);
+    const struggle = Math.sin(fishPhase) * 0.38 + Math.sin(fishPhase * 2.1) * 0.14;
+    const fishForce = fishPull * (0.65 + struggle);
     const playerForce = isPulling ? playerPull : 0;
 
-    tension += (playerForce - fishForce) * dt;
-    tension += (0.5 - tension) * 0.35 * dt;
+    tension += (playerForce - fishForce) * dt * 1.2;
     tension = Math.max(0, Math.min(1, tension));
 
     const inGreen = Math.abs(tension - 0.5) <= greenHalf;
@@ -318,23 +315,21 @@ function startFight() {
       fightStats.greenTime += dt;
       progress += progressRate * dt;
     } else {
-      progress = Math.max(0, progress - 0.03 * dt);
+      progress = Math.max(0, progress - 0.05 * dt);
     }
 
     updateFightUI(tension, progress);
 
-    if (graceLeft <= 0) {
-      if (tension <= 0.05) {
-        endFight('escaped');
-        return;
-      }
-      if (tension >= 0.95) {
-        endFight('snapped');
-        return;
-      }
-    }
     if (progress >= 1) {
       endFight('caught');
+      return;
+    }
+    if (tension <= 0.06) {
+      endFight('escaped');
+      return;
+    }
+    if (tension >= 0.94) {
+      endFight('snapped');
       return;
     }
 
@@ -354,6 +349,9 @@ function updateFightUI(tension, progress) {
 }
 
 async function endFight(outcome) {
+  if (fightEnding) return;
+  fightEnding = true;
+
   cancelAnimationFrame(fightAnim);
   fightAnim = null;
   isPulling = false;
@@ -401,5 +399,7 @@ async function endFight(outcome) {
     }
   } catch (e) {
     Arcade.toast(e.message, 'lose');
+  } finally {
+    fightEnding = false;
   }
 }

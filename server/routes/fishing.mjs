@@ -102,7 +102,9 @@ export function handleReel(req, res) {
   let fish = null;
   let misfortune = null;
   if (result.grade !== 'fail') {
-    misfortune = rollFishingMisfortune(result);
+    if (outcome !== 'caught') {
+      misfortune = rollFishingMisfortune(result);
+    }
     if (!misfortune) {
       fish = getFishById(cast.fishId);
       addInventory(session, fish.id, 1);
