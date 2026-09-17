@@ -117,92 +117,166 @@ export class BoardAnimator {
     setTimeout(() => el.remove(), 900);
   }
 
-  async energyStrike(fromR, fromC, color, damage, monsterEl, big = false) {
-    if (!this.fxLayer || !monsterEl) return;
-    const from = this.cellCenter(fromR, fromC);
+  /** Silver energy gathers at matched cells, then streaks rush to the monster. */
+  async energyStrike(sourceCells, damage, monsterEl, big = false) {
+    if (!this.fxLayer || !monsterEl || !sourceCells?.length) return;
+
     const toRect = monsterEl.getBoundingClientRect();
-    const toX = toRect.left + toRect.width / 2;
-    const toY = toRect.top + toRect.height / 2;
-    const orbColor = COLOR_BEAM[color] ?? '#ff6bcb';
-    const duration = big ? 260 : 175;
-    const arc = big ? 90 : 55;
+    const target = {
+      x: toRect.left + toRect.width / 2,
+      y: toRect.top + toRect.height / 2,
+    };
+    const sources = this._sampleCells(sourceCells, big ? 14 : 10);
+    const points = sources.map(({ r, c }) => this.cellCenter(r, c));
 
-    const orb = document.createElement('div');
-    orb.className = `magic-orb${big ? ' magic-orb-big' : ''}`;
-    orb.style.setProperty('--orb-color', orbColor);
-    orb.style.left = `${from.x}px`;
-    orb.style.top = `${from.y}px`;
-    this.fxLayer.appendChild(orb);
+    for (const pt of points) {
+      this._spawnSilverGather(pt, big);
+    }
+    this.sounds?.play('match', { volume: big ? 0.35 : 0.25 });
+    await sleep(big ? 110 : 85);
 
-    this.sounds?.play('projectile', { volume: big ? 0.42 : 0.3 });
+    this.sounds?.play('projectile', { volume: big ? 0.38 : 0.28 });
+    const duration = big ? 240 : 190;
+    await Promise.all(
+      points.map((from, i) =>
+        this._flySilverBeam(from, target, i * (big ? 22 : 16), duration, big)
+      )
+    );
 
-    await new Promise((resolve) => {
-      const start = performance.now();
-      let lastTrail = 0;
+    this._silverImpact(target.x, target.y, big);
+    monsterEl.classList.add('monster-hit');
+    setTimeout(() => monsterEl.classList.remove('monster-hit'), 420);
+    this.sounds?.play('hit', { volume: 0.45 });
+    if (window.ArcadeFX) {
+      ArcadeFX.floatText(target.x, target.y - 24, `-${damage}`, '#e8f4ff');
+    }
+    await sleep(big ? 60 : 40);
+  }
 
-      const tick = (now) => {
-        const t = Math.min(1, (now - start) / duration);
-        const eased = 1 - (1 - t) ** 3;
-        const x = from.x + (toX - from.x) * eased;
-        const y = from.y + (toY - from.y) * eased - Math.sin(t * Math.PI) * arc;
-        orb.style.left = `${x}px`;
-        orb.style.top = `${y}px`;
+  _sampleCells(cells, max) {
+    const seen = new Set();
+    const unique = [];
+    for (const { r, c } of cells) {
+      const key = `${r},${c}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push({ r, c });
+    }
+    if (unique.length <= max) return unique;
+    const out = [];
+    for (let i = 0; i < max; i++) {
+      out.push(unique[Math.floor((i * unique.length) / max)]);
+    }
+    return out;
+  }
 
-        if (now - lastTrail > 22) {
-          lastTrail = now;
-          this._spawnTrail(x, y, orbColor, big);
-        }
+  _spawnSilverGather(pt, big) {
+    const core = document.createElement('div');
+    core.className = `silver-gather${big ? ' silver-gather-big' : ''}`;
+    core.style.left = `${pt.x}px`;
+    core.style.top = `${pt.y}px`;
+    this.fxLayer.appendChild(core);
+    setTimeout(() => core.remove(), 220);
 
-        if (t < 1) requestAnimationFrame(tick);
-        else {
-          orb.remove();
-          this._impactBurst(toX, toY, orbColor, big);
-          monsterEl.classList.add('monster-hit');
-          setTimeout(() => monsterEl.classList.remove('monster-hit'), 420);
-          this.sounds?.play('hit', { volume: 0.45 });
-          if (window.ArcadeFX) {
-            ArcadeFX.floatText(toX, toY - 24, `-${damage}`, orbColor);
+    for (let i = 0; i < (big ? 4 : 2); i++) {
+      const mote = document.createElement('div');
+      mote.className = 'silver-mote';
+      mote.style.left = `${pt.x + (Math.random() - 0.5) * 18}px`;
+      mote.style.top = `${pt.y + (Math.random() - 0.5) * 18}px`;
+      mote.style.setProperty('--lift', `${-8 - Math.random() * 14}px`);
+      mote.style.animationDelay = `${i * 0.04}s`;
+      this.fxLayer.appendChild(mote);
+      setTimeout(() => mote.remove(), 320);
+    }
+  }
+
+  _flySilverBeam(from, to, delayMs, durationMs, big) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const wrap = document.createElement('div');
+        wrap.className = `silver-beam${big ? ' silver-beam-big' : ''}`;
+        const head = document.createElement('div');
+        head.className = 'silver-beam-head';
+        const tail = document.createElement('div');
+        tail.className = 'silver-beam-tail';
+        const glow = document.createElement('div');
+        glow.className = 'silver-beam-glow';
+        wrap.appendChild(glow);
+        wrap.appendChild(tail);
+        wrap.appendChild(head);
+        this.fxLayer.appendChild(wrap);
+
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        const start = performance.now();
+        let lastSpark = 0;
+
+        const tick = (now) => {
+          const t = Math.min(1, (now - start) / durationMs);
+          const rush = t < 0.12 ? (t / 0.12) ** 2 * 0.06 : 0.06 + ((t - 0.12) / 0.88) ** 1.6 * 0.94;
+          const x = from.x + (to.x - from.x) * rush;
+          const y = from.y + (to.y - from.y) * rush;
+
+          wrap.style.left = `${x}px`;
+          wrap.style.top = `${y}px`;
+          wrap.style.transform = `rotate(${angle}rad)`;
+
+          if (now - lastSpark > 28) {
+            lastSpark = now;
+            this._spawnSilverSpark(x, y, big);
           }
-          resolve();
-        }
-      };
-      requestAnimationFrame(tick);
+
+          if (t < 1) requestAnimationFrame(tick);
+          else {
+            wrap.remove();
+            resolve();
+          }
+        };
+        requestAnimationFrame(tick);
+      }, delayMs);
     });
   }
 
-  _spawnTrail(x, y, color, big) {
-    const p = document.createElement('div');
-    p.className = 'magic-trail';
-    p.style.setProperty('--trail-color', color);
-    p.style.left = `${x}px`;
-    p.style.top = `${y}px`;
-    p.style.width = p.style.height = `${big ? 10 : 7}px`;
-    this.fxLayer.appendChild(p);
-    setTimeout(() => p.remove(), 280);
+  _spawnSilverSpark(x, y, big) {
+    const spark = document.createElement('div');
+    spark.className = 'silver-spark';
+    spark.style.left = `${x}px`;
+    spark.style.top = `${y}px`;
+    spark.style.width = spark.style.height = `${big ? 5 : 3}px`;
+    this.fxLayer.appendChild(spark);
+    setTimeout(() => spark.remove(), 180);
   }
 
-  _impactBurst(x, y, color, big) {
+  _silverImpact(x, y, big) {
     const burst = document.createElement('div');
-    burst.className = `magic-impact${big ? ' magic-impact-big' : ''}`;
-    burst.style.setProperty('--orb-color', color);
+    burst.className = `silver-impact${big ? ' silver-impact-big' : ''}`;
     burst.style.left = `${x}px`;
     burst.style.top = `${y}px`;
     this.fxLayer.appendChild(burst);
-    const count = big ? 14 : 8;
+
+    const ring = document.createElement('div');
+    ring.className = 'silver-impact-ring';
+    ring.style.left = `${x}px`;
+    ring.style.top = `${y}px`;
+    this.fxLayer.appendChild(ring);
+
+    const count = big ? 16 : 10;
     for (let i = 0; i < count; i++) {
-      const spark = document.createElement('div');
-      spark.className = 'magic-spark';
-      spark.style.setProperty('--orb-color', color);
-      spark.style.left = `${x}px`;
-      spark.style.top = `${y}px`;
-      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
-      const dist = (big ? 48 : 32) + Math.random() * 24;
-      spark.style.setProperty('--sx', `${Math.cos(angle) * dist}px`);
-      spark.style.setProperty('--sy', `${Math.sin(angle) * dist}px`);
-      this.fxLayer.appendChild(spark);
-      setTimeout(() => spark.remove(), 420);
+      const shard = document.createElement('div');
+      shard.className = 'silver-shard';
+      shard.style.left = `${x}px`;
+      shard.style.top = `${y}px`;
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.35;
+      const dist = (big ? 52 : 36) + Math.random() * 20;
+      shard.style.setProperty('--sx', `${Math.cos(angle) * dist}px`);
+      shard.style.setProperty('--sy', `${Math.sin(angle) * dist}px`);
+      this.fxLayer.appendChild(shard);
+      setTimeout(() => shard.remove(), 450);
     }
-    setTimeout(() => burst.remove(), 380);
+
+    setTimeout(() => {
+      burst.remove();
+      ring.remove();
+    }, 420);
   }
 
   showBuyinBonus(x, y, amount) {

@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
   document.querySelector('.top-bar a').href = `/?token=${Arcade.token}&player=${Arcade.player}`;
   sounds = new CandySounds();
+  setupSoundToggle();
   document.body.addEventListener('pointerdown', () => sounds.unlock(), { once: true });
 
   manifest = await fetch('/candy-battle/assets/manifest.json').then((r) => r.json());
@@ -66,6 +67,29 @@ async function init() {
 }
 
 let dragStart = null;
+
+function setupSoundToggle() {
+  const btn = document.getElementById('btn-sound');
+  if (!btn) return;
+
+  const sync = () => {
+    const muted = sounds.isMuted();
+    btn.textContent = muted ? '🔇' : '🔊';
+    btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    btn.setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
+    btn.title = muted ? 'Turn sound on' : 'Turn sound off';
+  };
+
+  sync();
+  btn.addEventListener('click', () => {
+    sounds.toggleMuted();
+    sync();
+    if (!sounds.isMuted()) {
+      sounds.unlock();
+      sounds.play('swap', { volume: 0.25 });
+    }
+  });
+}
 
 function setupBoardInput(board) {
   board.addEventListener('pointerdown', (e) => {
@@ -342,15 +366,10 @@ async function runFullCascadeTurn() {
       if (fx.kind === 'colBlast') await animator.rowColBlast(0, fx.col, false, fx.color);
     }
 
-    await animator.popCells(cells, combo);
-
     const colorWipeFx = effects.find((e) => e.kind === 'colorWipe');
     const wipeBonus = colorWipeFx ? Math.min(22, Math.round((colorWipeFx.count || 0) * 1.2)) : 0;
     let waveDamage = 0;
-    let strikeFrom = groups[0].cells[Math.floor(groups[0].cells.length / 2)];
-    let strikeColor = groups[0].color ?? 0;
     let strikeBig = false;
-    let largestSize = groups[0].size;
     let wipeBonusApplied = false;
 
     for (const g of groups) {
@@ -362,11 +381,6 @@ async function runFullCascadeTurn() {
       }
       const dmg = estimateDamage(g.size, combo, bonus);
       waveDamage += dmg;
-      if (g.size >= largestSize) {
-        largestSize = g.size;
-        strikeFrom = center;
-        strikeColor = g.color ?? 0;
-      }
       if (g.hasEnergy || g.size >= 5) strikeBig = true;
 
       waves.push({
@@ -384,9 +398,9 @@ async function runFullCascadeTurn() {
       }
     }
 
-    if (waveDamage > 0) {
-      await animator.energyStrike(strikeFrom.r, strikeFrom.c, strikeColor, waveDamage, monsterEl, strikeBig);
-    }
+    const strikeFx =
+      waveDamage > 0 ? animator.energyStrike(cells, waveDamage, monsterEl, strikeBig) : Promise.resolve();
+    await Promise.all([animator.popCells(cells, combo), strikeFx]);
 
     const createKeys = new Set(creates.map((c) => `${c.r},${c.c}`));
     const toClear = cells.filter(({ r, c }) => !createKeys.has(`${r},${c}`));

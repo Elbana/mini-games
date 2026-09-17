@@ -81,92 +81,201 @@
   100% { transform: scale(0) rotate(25deg); opacity: 0; }
 }
 
-.magic-orb {
+.silver-gather {
   position: fixed;
-  width: 18px;
-  height: 18px;
-  margin: -9px 0 0 -9px;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 212;
-  background: radial-gradient(circle at 35% 35%, #fff 0%, var(--orb-color) 45%, transparent 72%);
-  box-shadow:
-    0 0 12px var(--orb-color),
-    0 0 28px var(--orb-color),
-    inset 0 0 6px rgba(255, 255, 255, 0.9);
-  animation: orb-pulse 0.12s ease-in-out infinite alternate;
-}
-
-.magic-orb-big {
-  width: 28px;
-  height: 28px;
-  margin: -14px 0 0 -14px;
-  box-shadow:
-    0 0 18px var(--orb-color),
-    0 0 42px var(--orb-color),
-    0 0 64px color-mix(in srgb, var(--orb-color) 60%, transparent);
-}
-
-@keyframes orb-pulse {
-  from { transform: scale(0.92); }
-  to { transform: scale(1.08); }
-}
-
-.magic-trail {
-  position: fixed;
-  margin: -3px 0 0 -3px;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
   border-radius: 50%;
   pointer-events: none;
   z-index: 211;
-  background: var(--trail-color);
-  opacity: 0.75;
-  animation: trail-fade 0.28s ease forwards;
-  filter: blur(1px);
+  background: radial-gradient(circle at 40% 35%, #fff 0%, #dceeff 45%, transparent 72%);
+  box-shadow:
+    0 0 10px #fff,
+    0 0 22px rgba(200, 220, 255, 0.95),
+    0 0 36px rgba(160, 190, 255, 0.55);
+  animation: silver-gather-pulse 0.18s ease-out forwards;
 }
 
-@keyframes trail-fade {
-  to { transform: scale(0.2); opacity: 0; }
+.silver-gather-big {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  box-shadow:
+    0 0 14px #fff,
+    0 0 30px rgba(210, 230, 255, 1),
+    0 0 48px rgba(170, 200, 255, 0.7);
 }
 
-.magic-impact {
+@keyframes silver-gather-pulse {
+  0% { transform: scale(0.35); opacity: 0.4; }
+  45% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.85; }
+}
+
+.silver-mote {
   position: fixed;
-  width: 36px;
-  height: 36px;
-  margin: -18px 0 0 -18px;
+  width: 5px;
+  height: 5px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 210;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(220, 235, 255, 0.95);
+  animation: silver-mote-rise 0.28s ease-out forwards;
+}
+
+@keyframes silver-mote-rise {
+  0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translate(0, var(--lift)) scale(0.2); opacity: 0; }
+}
+
+.silver-beam {
+  position: fixed;
+  pointer-events: none;
+  z-index: 212;
+  transform-origin: center center;
+  margin: 0;
+}
+
+.silver-beam-head {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0%, #e8f2ff 55%, #b8d0ff 100%);
+  box-shadow:
+    0 0 6px #fff,
+    0 0 14px rgba(220, 235, 255, 0.95),
+    0 0 24px rgba(180, 210, 255, 0.7);
+}
+
+.silver-beam-tail {
+  position: absolute;
+  right: 50%;
+  top: 50%;
+  width: 52px;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(180, 205, 255, 0.25) 25%,
+    rgba(230, 240, 255, 0.85) 70%,
+    #fff 100%
+  );
+  filter: blur(0.4px);
+  transform-origin: right center;
+}
+
+.silver-beam-glow {
+  position: absolute;
+  right: 50%;
+  top: 50%;
+  width: 64px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, transparent, rgba(200, 220, 255, 0.35), rgba(255, 255, 255, 0.5));
+  filter: blur(3px);
+  transform-origin: right center;
+  opacity: 0.75;
+}
+
+.silver-beam-big .silver-beam-head {
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+}
+
+.silver-beam-big .silver-beam-tail {
+  width: 72px;
+  height: 4px;
+  margin-top: -2px;
+}
+
+.silver-beam-big .silver-beam-glow {
+  width: 88px;
+  height: 14px;
+  margin-top: -7px;
+}
+
+.silver-spark {
+  position: fixed;
+  margin: -1px 0 0 -1px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 211;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(220, 235, 255, 0.9);
+  animation: silver-spark-fade 0.18s ease-out forwards;
+}
+
+@keyframes silver-spark-fade {
+  to { opacity: 0; transform: scale(0.2); }
+}
+
+.silver-impact {
+  position: fixed;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
   border-radius: 50%;
   pointer-events: none;
   z-index: 213;
-  background: radial-gradient(circle, #fff 0%, var(--orb-color) 35%, transparent 70%);
-  animation: impact-flash 0.36s ease forwards;
+  background: radial-gradient(circle, #fff 0%, rgba(220, 235, 255, 0.85) 35%, transparent 72%);
+  animation: silver-impact-flash 0.38s ease forwards;
 }
 
-.magic-impact-big {
-  width: 56px;
-  height: 56px;
-  margin: -28px 0 0 -28px;
+.silver-impact-big {
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
 }
 
-@keyframes impact-flash {
-  0% { transform: scale(0.3); opacity: 1; }
-  60% { transform: scale(1.4); opacity: 0.85; }
-  100% { transform: scale(2); opacity: 0; }
-}
-
-.magic-spark {
+.silver-impact-ring {
   position: fixed;
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
   border-radius: 50%;
   pointer-events: none;
   z-index: 212;
-  background: var(--orb-color);
-  box-shadow: 0 0 8px var(--orb-color);
-  animation: magic-spark-burst 0.42s ease-out forwards;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 12px rgba(200, 220, 255, 0.8);
+  animation: silver-ring-expand 0.42s ease-out forwards;
 }
 
-@keyframes magic-spark-burst {
-  to { transform: translate(var(--sx), var(--sy)); opacity: 0; scale: 0.1; }
+@keyframes silver-impact-flash {
+  0% { transform: scale(0.25); opacity: 1; }
+  55% { transform: scale(1.35); opacity: 0.9; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes silver-ring-expand {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+
+.silver-shard {
+  position: fixed;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 212;
+  background: linear-gradient(135deg, #fff, #c8dcff);
+  box-shadow: 0 0 6px rgba(220, 235, 255, 0.95);
+  animation: silver-shard-burst 0.45s ease-out forwards;
+}
+
+@keyframes silver-shard-burst {
+  to { transform: translate(var(--sx), var(--sy)); opacity: 0; scale: 0.15; }
 }
 
 .color-field-wipe {
@@ -493,3 +602,16 @@
 
 .top-bar a { text-decoration: none; }
 .top-bar h1 { font-family: 'Fredoka', sans-serif; font-size: 0.95rem; }
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sound-toggle {
+  min-width: 36px;
+  padding: 4px 8px;
+  font-size: 1rem;
+  line-height: 1;
+}

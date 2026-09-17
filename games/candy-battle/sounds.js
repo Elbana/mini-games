@@ -1,11 +1,27 @@
+const STORAGE_KEY = 'candy-battle-sound';
+
 /** Candy Battle audio — loads files when present, synthesizes otherwise. */
 export class CandySounds {
   constructor(base = '/candy-battle/assets/sounds') {
     this.base = base;
     this.ctx = null;
     this.cache = new Map();
-    this.muted = false;
+    this.muted = localStorage.getItem(STORAGE_KEY) === 'off';
     this._ready = this._init();
+  }
+
+  isMuted() {
+    return this.muted;
+  }
+
+  setMuted(muted) {
+    this.muted = muted;
+    localStorage.setItem(STORAGE_KEY, muted ? 'off' : 'on');
+  }
+
+  toggleMuted() {
+    this.setMuted(!this.muted);
+    return this.muted;
   }
 
   async _init() {
@@ -76,7 +92,7 @@ export class CandySounds {
       win: { f: 523, f2: 784, dur: 0.35, type: 'triangle' },
       invalid: { f: 200, f2: 160, dur: 0.07, type: 'square' },
     };
-    const p = presets[name] || presets.click;
+    const p = presets[name] || presets.match;
     osc.type = p.type;
     osc.frequency.setValueAtTime(p.f, t);
     osc.frequency.exponentialRampToValueAtTime(p.f2, t + p.dur);
