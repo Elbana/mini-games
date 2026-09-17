@@ -1,9 +1,11 @@
 let gear = { bait: 0 };
 let activeCast = null;
-let pointerPos = 0;
-let pointerDir = 1;
-let animFrame = null;
 let config = {};
+let gameState = 'idle'; // idle | waiting | fighting
+let actionBusy = false;
+let isPulling = false;
+let fightAnim = null;
+let fightStats = { greenTime: 0, totalTime: 0 };
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -11,12 +13,39 @@ async function init() {
   document.querySelector('.top-bar a').href = `/?token=${Arcade.token}&player=${Arcade.player}`;
   setupFishToasts();
   initOceanAmbient();
+  bindCastAndFightInput();
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/fishing/config');
   await refreshState();
   document.getElementById('btn-bait').addEventListener('click', buyBait);
-  document.getElementById('btn-cast').addEventListener('click', castLine);
-  document.getElementById('btn-reel').addEventListener('click', reelIn);
+}
+
+function bindCastAndFightInput() {
+  const scene = document.getElementById('ocean-scene');
+
+  scene.addEventListener('pointerup', (e) => {
+    if (gameState !== 'idle' || actionBusy) return;
+    if (e.target.closest('.fish-hud, .top-bar, .fight-panel, button, a')) return;
+
+    const rect = scene.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    if (y > 0.88) return;
+    castAt(x, y);
+  });
+
+  const pullStart = (e) => {
+    if (gameState !== 'fighting') return;
+    if (e.target.closest('button, a')) return;
+    isPulling = true;
+  };
+  const pullEnd = () => {
+    isPulling = false;
+  };
+
+  window.addEventListener('pointerdown', pullStart);
+  window.addEventListener('pointerup', pullEnd);
+  window.addEventListener('pointercancel', pullEnd);
 }
 
 function setupFishToasts() {
@@ -40,7 +69,6 @@ function setupFishToasts() {
   };
 }
 
-/** Calm fish shadows gliding under the boat + soft ripples */
 function initOceanAmbient() {
   const shadowRoot = document.getElementById('fish-shadows');
   const rippleRoot = document.getElementById('ripple-field');
@@ -49,15 +77,12 @@ function initOceanAmbient() {
   for (let i = 0; i < 2; i += 1) {
     spawnFishShadow(shadowRoot, { big: true, underBoat: true, delayRatio: i / 2 });
   }
-
   for (let i = 0; i < 22; i += 1) {
     spawnFishShadow(shadowRoot, { underBoat: true, delayRatio: i / 22 });
   }
-
   for (let i = 0; i < 10; i += 1) {
     spawnFishShadow(shadowRoot, { underBoat: false, delayRatio: i / 10 });
   }
-
   for (let i = 0; i < 5; i += 1) {
     spawnRipple(rippleRoot, i < 3);
   }
@@ -127,7 +152,6 @@ function spawnFishShadow(container, { big = false, underBoat = true, delayRatio 
   el.style.setProperty('--y0', y0);
   el.style.setProperty('--dx', dx);
   el.style.setProperty('--dy', dy);
-
   container.appendChild(el);
 }
 
@@ -165,72 +189,191 @@ async function buyBait() {
   }
 }
 
-async function castLine() {
+function placeCastVisuals(xPct, yPct) {
+  const scene = document.getElementById('ocean-scene');
+  const rect = scene.getBoundingClientRect();
+  const rodX = rect.width * 0.44;
+  const rodY = rect.height * 0.44;
+  const bx = rect.width * xPct;
+  const by = rect.height * yPct;
+  const len = Math.hypot(bx - rodX, by - rodY);
+  const angle = (Math.atan2(by - rodY, bx - rodX) * 180) / Math.PI;
+
+  const line = document.getElementById('cast-line');
+  line.style.left = `${rodX}px`;
+  line.style.top = `${rodY}px`;
+  line.style.height = `${len}px`;
+  line.style.transform = `rotate(${angle + 90}deg)`;
+  line.classList.remove('hidden');
+
+  const bobber = document.getElementById('bobber');
+  bobber.style.left = `${xPct * 100}%`;
+  bobber.style.top = `${yPct * 100}%`;
+  bobber.classList.remove('hidden');
+
+  document.querySelector('.boat-wrap')?.classList.add('casting');
+}
+
+function clearCastVisuals() {
+  document.getElementById('cast-line').classList.add('hidden');
+  document.getElementById('bobber').classList.add('hidden');
+  document.getElementById('bobber').classList.remove('biting');
+  document.querySelector('.boat-wrap')?.classList.remove('casting');
+}
+
+async function castAt(x, y) {
+  if (gameState !== 'idle' || actionBusy) return;
+  actionBusy = true;
+
   try {
-    const r = await Arcade.post('/api/fishing/cast');
+    const r = await Arcade.post('/api/fishing/cast', { x, y });
     activeCast = r.cast;
     gear = r.gear;
     document.getElementById('bait-count').textContent = gear.bait;
     Arcade.refreshBalance(document.getElementById('balance'));
-    startReelGame();
+
+    placeCastVisuals(x, y);
+    gameState = 'waiting';
+    document.getElementById('ocean-scene').classList.add('waiting-bite');
+    document.getElementById('cast-hint').textContent = 'Waiting for a bite…';
+
+    const biteMs = activeCast.biteDelay;
+    const waitTimer = setTimeout(() => {
+      if (!activeCast || gameState !== 'waiting') return;
+      gameState = 'fighting';
+      document.getElementById('cast-hint').textContent = 'Tap the sea to cast your line';
+      document.getElementById('bobber').classList.add('biting');
+      startFight();
+    }, biteMs);
+
+    setTimeout(() => {
+      if (gameState === 'waiting') {
+        document.getElementById('cast-hint').textContent = 'Something might be nibbling…';
+      }
+    }, biteMs * 0.55);
+
+    activeCast._waitTimer = waitTimer;
   } catch (e) {
+    actionBusy = false;
     Arcade.toast(e.message, 'lose');
   }
 }
 
-function startReelGame() {
-  const overlay = document.getElementById('reel-overlay');
-  const zone = document.getElementById('reel-zone');
-  const track = zone.parentElement;
-  const trackW = track.offsetWidth;
-  const zoneW = activeCast.targetWidth * trackW;
-  const zoneLeft = activeCast.targetCenter * trackW - zoneW / 2;
-  zone.style.width = `${zoneW}px`;
-  zone.style.left = `${Math.max(0, zoneLeft)}px`;
-  overlay.classList.remove('hidden');
-  document.querySelector('.boat-wrap')?.classList.add('casting');
-  pointerPos = 0;
-  pointerDir = 1;
-  const speed = 0.012 + Math.random() * 0.008;
-  function tick() {
-    pointerPos += pointerDir * speed;
-    if (pointerPos >= 1) {
-      pointerPos = 1;
-      pointerDir = -1;
+function startFight() {
+  const cast = activeCast;
+  if (!cast) return;
+
+  document.getElementById('fight-tier').textContent = cast.tierLabel;
+  document.getElementById('fight-sub').textContent = cast.tierSub;
+  document.getElementById('fight-banner').style.color = cast.tierColor;
+  document.getElementById('fight-panel').classList.remove('hidden');
+  document.getElementById('ocean-scene').classList.add('fighting');
+
+  let tension = 0.5;
+  let progress = 0;
+  fightStats = { greenTime: 0, totalTime: 0 };
+  let fishPhase = Math.random() * Math.PI * 2;
+  let last = performance.now();
+
+  const fishPull = cast.fishPull || 0.45;
+  const playerPull = 0.58;
+  const greenHalf = cast.greenHalf || 0.18;
+  const progressRate = cast.progressRate || 0.16;
+
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    fightStats.totalTime += dt;
+
+    fishPhase += dt * (2.2 + fishPull * 2.5);
+    const struggle = Math.sin(fishPhase) * 0.38 + Math.sin(fishPhase * 2.1) * 0.14;
+    const fishForce = fishPull * (0.65 + struggle);
+    const playerForce = isPulling ? playerPull : 0;
+
+    tension += (playerForce - fishForce) * dt * 1.2;
+    tension = Math.max(0, Math.min(1, tension));
+
+    const inGreen = Math.abs(tension - 0.5) <= greenHalf;
+    if (inGreen) {
+      fightStats.greenTime += dt;
+      progress += progressRate * dt;
+    } else {
+      progress = Math.max(0, progress - 0.05 * dt);
     }
-    if (pointerPos <= 0) {
-      pointerPos = 0;
-      pointerDir = 1;
+
+    updateFightUI(tension, progress);
+
+    if (tension <= 0.06) {
+      endFight('escaped');
+      return;
     }
-    document.getElementById('reel-pointer').style.left = `calc(${pointerPos * 100}% - 2px)`;
-    animFrame = requestAnimationFrame(tick);
+    if (tension >= 0.94) {
+      endFight('snapped');
+      return;
+    }
+    if (progress >= 1) {
+      endFight('caught');
+      return;
+    }
+
+    fightAnim = requestAnimationFrame(tick);
   }
-  cancelAnimationFrame(animFrame);
-  tick();
+
+  cancelAnimationFrame(fightAnim);
+  fightAnim = requestAnimationFrame(tick);
 }
 
-async function reelIn() {
-  cancelAnimationFrame(animFrame);
-  document.getElementById('reel-overlay').classList.add('hidden');
-  document.querySelector('.boat-wrap')?.classList.remove('casting');
+function updateFightUI(tension, progress) {
+  const marker = document.getElementById('tension-marker');
+  marker.style.left = `${tension * 100}%`;
+  marker.classList.toggle('danger-left', tension < 0.12);
+  marker.classList.toggle('danger-right', tension > 0.88);
+  document.getElementById('progress-runner').style.left = `${Math.min(100, progress * 100)}%`;
+}
+
+async function endFight(outcome) {
+  cancelAnimationFrame(fightAnim);
+  fightAnim = null;
+  isPulling = false;
+  gameState = 'idle';
+
+  const cast = activeCast;
+  const greenRatio = fightStats.totalTime > 0 ? fightStats.greenTime / fightStats.totalTime : 0;
+
+  document.getElementById('fight-panel').classList.add('hidden');
+  document.getElementById('ocean-scene').classList.remove('fighting', 'waiting-bite');
+  document.getElementById('cast-hint').textContent = 'Tap the sea to cast your line';
+  clearCastVisuals();
+
+  activeCast = null;
+  actionBusy = false;
+
+  if (!cast) return;
+
   try {
     const r = await Arcade.post('/api/fishing/reel', {
-      castId: activeCast.id,
-      pointer: pointerPos,
+      castId: cast.id,
+      outcome,
+      greenRatio,
     });
-    activeCast = null;
+
+    if (outcome === 'escaped') {
+      Arcade.toast('Fish got away — too much slack!', 'lose');
+      return;
+    }
+    if (outcome === 'snapped') {
+      Arcade.toast('Line snapped — you pulled too hard!', 'lose');
+      return;
+    }
+
     if (r.fish) {
-      const grade =
-        r.result.grade === 'perfect'
-          ? 'PERFECT!'
-          : r.result.grade === 'good'
-            ? 'Good catch'
-            : 'Small catch';
-      Arcade.toast(`${r.fish.icon} ${r.fish.name} — ${grade}`, 'win');
-      ArcadeFX.confetti(6);
-      ArcadeFX.burst(window.innerWidth / 2, window.innerHeight * 0.45, r.fish.icon, 4);
+      const tierMsg = r.tierLabel || 'Caught';
+      Arcade.toast(`${tierMsg} ${r.fish.icon} ${r.fish.name}!`, 'win');
+      const burst = r.tierKey === 'monster' || r.tierKey === 'super' ? 10 : 6;
+      ArcadeFX.confetti(burst);
+      ArcadeFX.burst(window.innerWidth / 2, window.innerHeight * 0.4, r.fish.icon, burst - 2);
     } else {
-      const msg = r.misfortune?.message || (r.result.grade === 'fail' ? 'Fish got away!' : 'Nothing on the line…');
+      const msg = r.misfortune?.message || 'The fish got away…';
       Arcade.toast(msg, 'lose');
     }
   } catch (e) {

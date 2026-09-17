@@ -69,11 +69,18 @@
   color: #ffd6dc;
 }
 
-/* ── Ocean scene — full screen ── */
+/* ── Ocean scene — full screen, tap to cast ── */
 .ocean-scene {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+
+.ocean-scene.fighting,
+.ocean-scene.waiting-bite {
+  cursor: default;
 }
 
 /* Still water — no scroll */
@@ -198,6 +205,7 @@
   z-index: 5;
   animation: boat-bob 5.5s ease-in-out infinite;
   filter: drop-shadow(0 10px 20px rgba(0, 30, 50, 0.22));
+  pointer-events: none;
 }
 
 .boat-art {
@@ -242,93 +250,230 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-size: 0.82rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
 }
 
-.cast-btn {
-  width: 100%;
-  font-size: 0.95rem;
+.cast-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.88rem;
   font-weight: 700;
-  padding: 13px;
-  background: linear-gradient(135deg, rgba(103, 232, 249, 0.85), rgba(8, 145, 178, 0.9));
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 16px rgba(8, 145, 178, 0.25);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.02em;
 }
 
-.cast-btn:active {
-  transform: scale(0.98);
-  box-shadow: 0 2px 10px rgba(8, 145, 178, 0.2);
+/* ── Cast line + bobber on the sea ── */
+.cast-line {
+  position: absolute;
+  z-index: 4;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.35));
+  transform-origin: top center;
+  pointer-events: none;
 }
 
-/* ── Reel overlay — softer burst ── */
-.reel-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(2, 50, 75, 0.65);
-  backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  padding-bottom: max(28px, env(safe-area-inset-bottom, 28px));
-  z-index: 40;
-  padding-left: 24px;
-  padding-right: 24px;
+.cast-line.hidden { display: none; }
+
+.bobber {
+  position: absolute;
+  z-index: 6;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
-.reel-overlay.hidden { display: none; }
+.bobber.hidden { display: none; }
 
-.reel-title {
+.bobber-float {
+  width: 16px;
+  height: 16px;
+  margin: 0 auto;
+  border-radius: 50% 50% 45% 45%;
+  background: radial-gradient(circle at 35% 30%, #fff, #ef4444 55%, #b91c1c);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  animation: bobber-bob 1.2s ease-in-out infinite;
+}
+
+.bobber.biting .bobber-float {
+  animation: bobber-bite 0.25s ease-in-out infinite;
+}
+
+.bobber-ripple {
+  position: absolute;
+  inset: -8px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-radius: 50%;
+  animation: bobber-ripple 2s ease-out infinite;
+}
+
+@keyframes bobber-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes bobber-bite {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(4px) scale(0.92); }
+}
+
+@keyframes bobber-ripple {
+  0% { transform: scale(0.6); opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+/* ── Fight panel (tension + progress) ── */
+.fight-panel {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  z-index: 30;
+  padding: 14px 14px 12px;
+  background: rgba(0, 25, 45, 0.72);
+  backdrop-filter: blur(12px);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.fight-panel.hidden { display: none; }
+
+.fight-banner {
+  text-align: center;
+  margin-bottom: 12px;
+  animation: fight-pop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.fight-tier {
+  display: block;
   font-family: 'Fredoka', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: rgba(255, 240, 210, 0.95);
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-  margin-bottom: 20px;
-  letter-spacing: 0.04em;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.35);
 }
 
-.reel-track {
-  width: min(100%, 320px);
-  height: 48px;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 999px;
+.fight-sub {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+@keyframes fight-pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Tension bar — red | orange | green | orange | red */
+.tension-wrap {
   position: relative;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  margin-bottom: 20px;
+  margin-bottom: 10px;
+  padding-top: 14px;
 }
 
-.reel-zone {
+.tension-bar {
+  position: relative;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #dc2626 0%,
+    #f97316 14%,
+    #22c55e 32%,
+    #22c55e 68%,
+    #f97316 86%,
+    #dc2626 100%
+  );
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.25);
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0 50%);
+}
+
+.tension-marker {
   position: absolute;
-  top: 5px;
-  bottom: 5px;
-  background: linear-gradient(90deg, rgba(147, 230, 200, 0.25), rgba(147, 230, 200, 0.55), rgba(147, 230, 200, 0.25));
-  border-radius: 999px;
-  border: 1.5px solid rgba(147, 230, 200, 0.6);
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: left 0.05s linear;
+  z-index: 2;
 }
 
-.reel-pointer {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  width: 4px;
-  background: rgba(255, 255, 255, 0.85);
-  border-radius: 2px;
-  left: 0;
+.marker-bobber {
+  display: block;
+  width: 18px;
+  height: 22px;
+  background: radial-gradient(circle at 40% 35%, #fff, #ef4444 60%);
+  border-radius: 50% 50% 40% 40%;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  border: 2px solid rgba(255,255,255,0.5);
 }
 
-#btn-reel {
-  min-width: 160px;
+.tension-marker.danger-left .marker-bobber,
+.tension-marker.danger-right .marker-bobber {
+  animation: marker-shake 0.15s linear infinite;
+}
+
+@keyframes marker-shake {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(2px); }
+}
+
+/* Progress bar — fish pulled toward goal */
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.progress-fish-start {
   font-size: 1rem;
-  padding: 14px 32px;
-  background: linear-gradient(135deg, rgba(255, 220, 150, 0.9), rgba(230, 170, 80, 0.9));
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  opacity: 0.45;
+  flex-shrink: 0;
 }
+
+.progress-bar {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  background: rgba(56, 189, 248, 0.35);
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.2);
+  overflow: visible;
+}
+
+.progress-runner {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+  font-size: 1.1rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  transition: left 0.08s linear;
+}
+
+.progress-goal {
+  color: #ffd56e;
+  font-size: 1rem;
+  font-weight: 900;
+  flex-shrink: 0;
+  text-shadow: 0 0 8px rgba(255, 213, 110, 0.6);
+}
+
+.fight-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.fish-hud.hidden { display: none; }
 
 .top-bar a { text-decoration: none; }

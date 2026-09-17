@@ -12,7 +12,7 @@
 </head>
 <body>
   <div class="arcade-shell fish-shell">
-    <div class="ocean-scene">
+    <div class="ocean-scene" id="ocean-scene">
       <header class="top-bar fish-top-bar">
         <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
         <h1>Deep Cast</h1>
@@ -26,11 +26,8 @@
 
       <div class="boat-wrap">
         <svg class="boat-art" viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <!-- hull -->
           <path d="M100 8 L168 72 L158 228 L42 228 L32 72 Z" fill="#f8fafc" stroke="#cbd5e1" stroke-width="3"/>
-          <!-- deck -->
           <path d="M100 48 L148 88 L142 210 L58 210 L52 88 Z" fill="#d4a574"/>
-          <!-- deck planks -->
           <g stroke="#b8895a" stroke-width="1.2" opacity="0.45">
             <line x1="62" y1="100" x2="138" y2="100"/>
             <line x1="60" y1="120" x2="140" y2="120"/>
@@ -39,33 +36,31 @@
             <line x1="58" y1="180" x2="142" y2="180"/>
             <line x1="58" y1="200" x2="142" y2="200"/>
           </g>
-          <!-- cabin / windshield -->
           <rect x="72" y="108" width="56" height="52" rx="6" fill="#1e3a5f"/>
           <rect x="78" y="114" width="44" height="38" rx="4" fill="#38bdf8" opacity="0.35"/>
-          <!-- life ring -->
           <circle cx="100" cy="62" r="16" fill="none" stroke="#ef4444" stroke-width="7"/>
           <circle cx="100" cy="62" r="16" fill="none" stroke="#fff" stroke-width="7" stroke-dasharray="14 14"/>
-          <!-- cooler -->
           <rect x="62" y="168" width="22" height="16" rx="3" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
-          <!-- bucket -->
           <ellipse cx="136" cy="176" rx="10" ry="8" fill="#f97316"/>
           <ellipse cx="136" cy="172" rx="10" ry="4" fill="#fb923c"/>
-          <!-- fisherman -->
           <circle cx="88" cy="198" r="11" fill="#fde68a"/>
           <ellipse cx="88" cy="186" rx="13" ry="10" fill="#2563eb"/>
           <rect x="78" y="206" width="20" height="14" rx="4" fill="#1d4ed8"/>
-          <!-- main fishing rod -->
           <line x1="88" y1="200" x2="28" y2="130" stroke="#78350f" stroke-width="3" stroke-linecap="round"/>
           <line x1="28" y1="130" x2="18" y2="118" stroke="#78350f" stroke-width="2.5" stroke-linecap="round"/>
           <path id="main-line" d="M18 118 Q 8 100 14 78" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="1.2" stroke-dasharray="3 3"/>
-          <!-- stern rods -->
           <line x1="48" y1="218" x2="22" y2="180" stroke="#78350f" stroke-width="2.5" stroke-linecap="round"/>
           <line x1="152" y1="218" x2="178" y2="180" stroke="#78350f" stroke-width="2.5" stroke-linecap="round"/>
           <line x1="22" y1="180" x2="14" y2="168" stroke="rgba(255,255,255,0.6)" stroke-width="1" stroke-dasharray="2 3"/>
           <line x1="178" y1="180" x2="186" y2="168" stroke="rgba(255,255,255,0.6)" stroke-width="1" stroke-dasharray="2 3"/>
-          <!-- boat shadow -->
           <ellipse cx="100" cy="238" rx="62" ry="10" fill="rgba(0,40,60,0.25)"/>
         </svg>
+      </div>
+
+      <div id="cast-line" class="cast-line hidden" aria-hidden="true"></div>
+      <div id="bobber" class="bobber hidden" aria-hidden="true">
+        <div class="bobber-float"></div>
+        <div class="bobber-ripple"></div>
       </div>
 
       <div class="fish-hud card">
@@ -73,19 +68,34 @@
           <span>Bait: <strong id="bait-count">0</strong></span>
           <button class="btn btn-ghost btn-sm" id="btn-bait">+ Bait Pack</button>
         </div>
-        <button class="btn btn-primary cast-btn" id="btn-cast">Cast line 🎣</button>
+        <p class="cast-hint" id="cast-hint">Tap the sea to cast your line</p>
+      </div>
+
+      <div id="fight-panel" class="fight-panel hidden">
+        <div class="fight-banner" id="fight-banner">
+          <span class="fight-tier" id="fight-tier">BIG FISH!</span>
+          <span class="fight-sub" id="fight-sub">Hang on tight!</span>
+        </div>
+
+        <div class="tension-wrap">
+          <div class="tension-bar">
+            <div class="tension-marker" id="tension-marker">
+              <span class="marker-bobber"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="progress-wrap">
+          <span class="progress-fish-start">🐟</span>
+          <div class="progress-bar">
+            <div class="progress-runner" id="progress-runner">🐟</div>
+          </div>
+          <span class="progress-goal">▶</span>
+        </div>
+
+        <p class="fight-hint">Hold anywhere to reel · Release when it pulls hard</p>
       </div>
     </div>
-
-    <div id="reel-overlay" class="reel-overlay hidden">
-      <p class="reel-title">Something's biting…</p>
-      <div class="reel-track">
-        <div class="reel-zone" id="reel-zone"></div>
-        <div class="reel-pointer" id="reel-pointer"></div>
-      </div>
-      <button class="btn btn-gold" id="btn-reel">Reel in</button>
-    </div>
-
   </div>
 </body>
 </html>

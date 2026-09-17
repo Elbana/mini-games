@@ -7,8 +7,8 @@ import {
   BAIT_PACK_SIZE,
   FISH_TABLE,
   createCastSession,
-  evaluateReel,
-  pickFish,
+  evaluateFight,
+  getFishById,
 } from '../games/fishing-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
@@ -77,7 +77,8 @@ export async function handleCast(req, res) {
       reason: 'Fishing cast',
     });
     session.arcade.fishing.bait -= 1;
-    const cast = createCastSession();
+    const { x, y } = req.body || {};
+    const cast = createCastSession({ x, y });
     session.arcade.pendingCast = cast;
     savePlayerData(ctx, session);
     res.json({ cast, balance: debit.balance, gear: session.arcade.fishing });
@@ -90,20 +91,20 @@ export function handleReel(req, res) {
   const operator = requireGameAccess(req, res, SLUG);
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
-  const { castId, pointer } = req.body || {};
+  const { castId, outcome, greenRatio } = req.body || {};
   const session = getPlayerData(ctx);
   const cast = session.arcade.pendingCast;
   if (!cast || cast.id !== castId || Date.now() > cast.expiresAt) {
     return res.status(400).json({ error: 'Cast expired' });
   }
-  const result = evaluateReel(cast, Number(pointer));
+  const result = evaluateFight(cast, { outcome, greenRatio });
   session.arcade.pendingCast = null;
   let fish = null;
   let misfortune = null;
   if (result.grade !== 'fail') {
     misfortune = rollFishingMisfortune(result);
     if (!misfortune) {
-      fish = pickFish(result.accuracy);
+      fish = getFishById(cast.fishId);
       addInventory(session, fish.id, 1);
       session.arcade.stats.fishCaught += 1;
       addScore(SLUG, ctx.playerId, ctx.playerId, result.grade === 'perfect' ? 30 : 15, {
@@ -116,6 +117,8 @@ export function handleReel(req, res) {
     result,
     fish,
     misfortune,
+    tierKey: cast.tierKey,
+    tierLabel: cast.tierLabel,
     inventory: session.arcade.inventory,
   });
 }

@@ -10,9 +10,74 @@ export const FISH_TABLE = [
   { id: 'fish_leviathan', name: 'Leviathan', weight: 4, minSkill: 0.88, icon: '🐋' },
 ];
 
+/** Motivating bite tiers — shown when the fight starts */
+export const FIGHT_TIERS = {
+  common: {
+    label: 'Something bit!',
+    sub: 'Steady… keep it in the green',
+    color: '#93e6c8',
+    pull: 0.38,
+    greenHalf: 0.2,
+    progressRate: 0.22,
+    fishIds: ['fish_sardine', 'fish_bass'],
+  },
+  nice: {
+    label: 'Nice Fish!',
+    sub: "Don't let this one go",
+    color: '#6ecbff',
+    pull: 0.46,
+    greenHalf: 0.17,
+    progressRate: 0.18,
+    fishIds: ['fish_bass', 'fish_tuna'],
+  },
+  big: {
+    label: 'BIG FISH!',
+    sub: 'Hang on — this is a fighter',
+    color: '#ffd56e',
+    pull: 0.54,
+    greenHalf: 0.15,
+    progressRate: 0.15,
+    fishIds: ['fish_tuna', 'fish_shark'],
+  },
+  super: {
+    label: 'SUPER FISH!!',
+    sub: 'Huge catch — reel carefully!',
+    color: '#ff9f43',
+    pull: 0.62,
+    greenHalf: 0.13,
+    progressRate: 0.12,
+    fishIds: ['fish_shark', 'fish_leviathan'],
+  },
+  monster: {
+    label: 'MONSTER!!',
+    sub: 'Legendary beast on the line!',
+    color: '#ff6bcb',
+    pull: 0.72,
+    greenHalf: 0.11,
+    progressRate: 0.1,
+    fishIds: ['fish_leviathan'],
+  },
+};
+
+export function rollFightTier() {
+  const r = Math.random();
+  if (r < 0.4) return 'common';
+  if (r < 0.65) return 'nice';
+  if (r < 0.82) return 'big';
+  if (r < 0.93) return 'super';
+  return 'monster';
+}
+
+export function pickFishForTier(tierKey) {
+  const tier = FIGHT_TIERS[tierKey] || FIGHT_TIERS.common;
+  const ids = tier.fishIds;
+  const pool = FISH_TABLE.filter((f) => ids.includes(f.id));
+  if (!pool.length) return FISH_TABLE[0];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 export function skillFromTiming(accuracy) {
-  const a = Math.max(0, Math.min(1, accuracy));
-  return a;
+  return Math.max(0, Math.min(1, accuracy));
 }
 
 export function pickFish(skill) {
@@ -27,22 +92,45 @@ export function pickFish(skill) {
   return eligible[eligible.length - 1];
 }
 
-export function createCastSession() {
-  const targetCenter = 0.15 + Math.random() * 0.7;
-  const targetWidth = 0.08 + Math.random() * 0.12;
+export function createCastSession({ x = 0.5, y = 0.5 } = {}) {
+  const tierKey = rollFightTier();
+  const tier = FIGHT_TIERS[tierKey];
+  const fish = pickFishForTier(tierKey);
+  const biteDelay = 3500 + Math.floor(Math.random() * 4500);
+
   return {
     id: `cast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    targetCenter,
-    targetWidth,
-    expiresAt: Date.now() + 15000,
+    castX: Math.max(0.08, Math.min(0.92, Number(x) || 0.5)),
+    castY: Math.max(0.12, Math.min(0.88, Number(y) || 0.5)),
+    tierKey,
+    tierLabel: tier.label,
+    tierSub: tier.sub,
+    tierColor: tier.color,
+    fishPull: tier.pull + (Math.random() - 0.5) * 0.06,
+    greenHalf: tier.greenHalf,
+    progressRate: tier.progressRate,
+    biteDelay,
+    fishId: fish.id,
+    expiresAt: Date.now() + 90000,
   };
 }
 
-export function evaluateReel(session, pointer) {
-  const half = session.targetWidth / 2;
-  const dist = Math.abs(pointer - session.targetCenter);
-  if (dist <= half * 0.4) return { grade: 'perfect', accuracy: 1 - dist / half };
-  if (dist <= half) return { grade: 'good', accuracy: 1 - dist / (half * 1.5) };
-  if (dist <= half * 2) return { grade: 'miss', accuracy: Math.max(0, 0.3 - dist) };
-  return { grade: 'fail', accuracy: 0 };
+export function evaluateFight(_session, { outcome, greenRatio = 0 } = {}) {
+  const g = Math.max(0, Math.min(1, Number(greenRatio) || 0));
+  if (outcome === 'escaped') {
+    return { grade: 'fail', accuracy: 0, reason: 'escaped' };
+  }
+  if (outcome === 'snapped') {
+    return { grade: 'fail', accuracy: 0, reason: 'snapped' };
+  }
+  if (outcome !== 'caught') {
+    return { grade: 'fail', accuracy: 0, reason: 'unknown' };
+  }
+  if (g >= 0.55) return { grade: 'perfect', accuracy: g };
+  if (g >= 0.3) return { grade: 'good', accuracy: g };
+  return { grade: 'miss', accuracy: g };
+}
+
+export function getFishById(id) {
+  return FISH_TABLE.find((f) => f.id === id) || FISH_TABLE[0];
 }
