@@ -202,33 +202,44 @@ html, body {
   cursor: pointer;
 }
 
-/* 3×3 plot grid — isometric tiles overlap vertically */
+/* 3×3 plot grid — tight rows, reliable tap targets */
 .farm-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: 38% 28% 28%;
+  grid-template-rows: 1fr 0.88fr 0.88fr;
   gap: 0;
-  align-content: start;
+  align-content: stretch;
   height: 100%;
 }
 
 .plot-cell {
   position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   overflow: visible;
   cursor: pointer;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  min-height: 0;
 }
 
-/* Top row stays put; pull middle & bottom rows up into the dead space */
-.plot-cell:nth-child(n+4):nth-child(-n+6) {
-  transform: translateY(-26%);
+.plot-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
 }
 
-.plot-cell:nth-child(n+7) {
-  transform: translateY(-48%);
+.plot-cell:nth-child(n+4):nth-child(-n+6) .plot-stack {
+  transform: translateY(-22%);
 }
 
-.plot-cell:active { opacity: 0.92; }
+.plot-cell:nth-child(n+7) .plot-stack {
+  transform: translateY(-40%);
+}
+
+.plot-cell:active .plot-stack { opacity: 0.9; }
 
 .plot-cell.needs-care {
   animation: plot-urgent 0.7s ease-in-out infinite;
@@ -543,41 +554,45 @@ html, body {
   z-index: 8;
 }
 
-/* Toasts — top of field, never over plots */
+/* Toasts — pinned under top bar, stack downward, never over plots */
 .farm-toast-zone {
   position: absolute;
-  top: calc(var(--field-top) - clamp(36px, 8vh, 48px));
+  top: calc(max(12px, env(safe-area-inset-top, 12px)) + 46px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 25;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: min(92%, 380px);
+  gap: 4px;
+  width: min(88%, 340px);
+  max-height: 72px;
+  overflow: hidden;
   pointer-events: none;
 }
 
 .farm-toast {
-  padding: 8px 16px;
+  padding: 4px 12px;
   border-radius: 999px;
   font-family: 'Fredoka', 'Nunito', sans-serif;
-  font-size: clamp(0.78rem, 3vw, 0.9rem);
+  font-size: clamp(0.68rem, 2.6vw, 0.78rem);
   font-weight: 600;
-  color: #fff;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.95);
   text-align: center;
-  background: rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   opacity: 0;
-  transform: translateY(-8px) scale(0.92);
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transform: translateY(-6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  flex-shrink: 0;
 }
 
 .farm-toast.show {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateY(0);
 }
 
 .farm-toast.win {
@@ -590,8 +605,6 @@ html, body {
   color: #ffb3c4;
 }
 
-.farm-toast.float.green { border-color: rgba(93, 255, 176, 0.5); color: #b9ffd9; }
-.farm-toast.float.blue { border-color: rgba(110, 203, 255, 0.5); color: #b8e4ff; }
 
 /* Bottom sheets */
 .farm-sheet {
@@ -1222,8 +1235,8 @@ html, body {
 
 @media (max-height: 640px) {
   .farm-screen { --field-top: 36%; }
-  .plot-cell:nth-child(n+4):nth-child(-n+6) { transform: translateY(-22%); }
-  .plot-cell:nth-child(n+7) { transform: translateY(-40%); }
+  .plot-cell:nth-child(n+4):nth-child(-n+6) .plot-stack { transform: translateY(-18%); }
+  .plot-cell:nth-child(n+7) .plot-stack { transform: translateY(-34%); }
 }
 
 @media (min-height: 820px) {

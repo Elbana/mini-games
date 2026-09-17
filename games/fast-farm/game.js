@@ -8,6 +8,8 @@ let careCosts = { fertilize: 4, heal: 6 };
 let careRules = { stepsToHarvest: 10, careWindowSec: 6.5 };
 let activePlot = null;
 let tickTimer = null;
+let actionBusy = false;
+let skipPlotRender = false;
 const MARKET_TO_SEED = {
   crop_carrot: 'carrot',
   crop_potato: 'potato',
@@ -38,16 +40,21 @@ async function init() {
 
 function setupFarmToast() {
   const zone = document.getElementById('toast-zone');
+  const MAX_TOASTS = 2;
+
   Arcade.toast = (msg, type = '') => {
+    while (zone.children.length >= MAX_TOASTS) {
+      zone.lastElementChild?.remove();
+    }
     const el = document.createElement('div');
     el.className = `farm-toast ${type}`.trim();
     el.textContent = msg;
-    zone.appendChild(el);
+    zone.insertBefore(el, zone.firstChild);
     requestAnimationFrame(() => el.classList.add('show'));
     setTimeout(() => {
       el.classList.remove('show');
-      setTimeout(() => el.remove(), 280);
-    }, 1800);
+      setTimeout(() => el.remove(), 180);
+    }, 900);
   };
 }
 
@@ -55,6 +62,15 @@ function bindUi() {
   document.getElementById('btn-harvest').addEventListener('click', openBackpack);
   document.querySelectorAll('[data-close]').forEach((el) => {
     el.addEventListener('click', () => closeSheet(el.dataset.close));
+  });
+
+  const grid = document.getElementById('farm-grid');
+  grid.addEventListener('pointerup', (e) => {
+    if (actionBusy) return;
+    const cell = e.target.closest('.plot-cell');
+    if (!cell) return;
+    e.preventDefault();
+    handlePlotTap(Number(cell.dataset.plot));
   });
 }
 
@@ -80,7 +96,7 @@ async function refreshFarm() {
   if (st.careRules) careRules = st.careRules;
   await refreshWallet();
   renderHud();
-  renderPlots();
+  if (!skipPlotRender) renderPlots();
   if (activePlot != null && !document.getElementById('sheet-plot').classList.contains('hidden')) {
     openPlotSheet(activePlot, false);
   }
@@ -212,20 +228,19 @@ function renderPlots() {
           : '';
 
       return `<div class="${cls}" data-plot="${i}" role="gridcell">
-        <img class="plot-img" src="${plotBaseAsset(plot, seed)}" alt="">
-        ${cropHtml}
-        ${badge ? `<span class="plot-badge care">${badge}</span>` : ''}
-        ${progressHtml}
+        <div class="plot-stack">
+          <img class="plot-img" src="${plotBaseAsset(plot, seed)}" alt="">
+          ${cropHtml}
+          ${badge ? `<span class="plot-badge care">${badge}</span>` : ''}
+          ${progressHtml}
+        </div>
       </div>`;
     })
     .join('');
-
-  grid.querySelectorAll('.plot-cell').forEach((el) => {
-    el.addEventListener('click', () => handlePlotTap(Number(el.dataset.plot)));
-  });
 }
 
 async function handlePlotTap(index) {
+  if (actionBusy) return;
   const plot = farm.plots[index];
   if (!plot) return;
 
@@ -350,48 +365,46 @@ function buildPlotSheetContent(plot, seed) {
 }
 
 async function runPlotAction(action, index, seedId) {
-  if (action === 'plant') {
-    if (!seedId) return;
-    try {
-      await Arcade.post('/api/fast-farm/buy-seed', { seed_id: seedId, plot_index: index });
-      Arcade.toast('🌱 Planted — stay alert!', 'win');
-      closeSheet('sheet-plot');
-      await refreshFarm();
-    } catch (e) {
-      Arcade.toast(e.message || 'Failed to plant', 'lose');
-    }
-    return;
-  }
-
-  const routes = {
-    water: '/api/fast-farm/water',
-    fertilize: '/api/fast-farm/fertilize',
-    heal: '/api/fast-farm/heal',
-    clear: '/api/fast-farm/clear',
-    harvest: '/api/fast-farm/harvest',
-  };
+  if (actionBusy) return;
+  actionBusy = true;
+  skipPlotRender = true;
 
   try {
-    const r = await Arcade.post(routes[action], { plot_index: index });
-    if (action === 'water') {
-      addFloatEffect('💧', 'blue');
-      Arcade.toast('💧 Watered!', 'win');
+    if (action === 'plant') {
+      if (!seedId) return;
+      await Arcade.post('/api/fast-farm/buy-seed', { seed_id: seedId, plot_index: index });
+      Arcade.toast('🌱 Planted!', 'win');
+      closeSheet('sheet-plot');
+      return;
     }
+
+    const routes = {
+      water: '/api/fast-farm/water',
+      fertilize: '/api/fast-farm/fertilize',
+      heal: '/api/fast-farm/heal',
+      clear: '/api/fast-farm/clear',
+      harvest: '/api/fast-farm/harvest',
+    };
+
+    const r = await Arcade.post(routes[action], { plot_index: index });
+    if (action === 'water') Arcade.toast('💧 Watered!', 'win');
     if (action === 'fertilize') Arcade.toast('🌿 Fed!', 'win');
     if (action === 'heal') Arcade.toast('💊 Healed!', 'win');
     if (action === 'clear') {
-      Arcade.toast('Plot cleared', 'win');
+      Arcade.toast('Cleared', 'win');
       closeSheet('sheet-plot');
     }
     if (action === 'harvest') {
       const seed = seeds[farm.plots[index]?.seed_id];
-      addFloatEffect(`+${r.harvested?.amount || '?'} ${seed?.name || ''}`, 'green');
-      Arcade.toast('🌾 Harvested!', 'win');
+      Arcade.toast(`🌾 +${r.harvested?.amount || '?'} ${seed?.name || ''}`, 'win');
       closeSheet('sheet-plot');
     }
-    await refreshFarm();
   } catch (e) {
     Arcade.toast(e.message || 'Action failed', 'lose');
+  } finally {
+    skipPlotRender = false;
+    actionBusy = false;
+    await refreshFarm();
   }
 }
 
@@ -433,15 +446,3 @@ function closeSheet(id) {
   if (id === 'sheet-plot') activePlot = null;
 }
 
-function addFloatEffect(text, colorClass) {
-  const el = document.createElement('div');
-  el.className = `farm-toast float ${colorClass}`;
-  el.textContent = text;
-  const zone = document.getElementById('toast-zone');
-  zone.appendChild(el);
-  requestAnimationFrame(() => el.classList.add('show'));
-  setTimeout(() => {
-    el.classList.remove('show');
-    setTimeout(() => el.remove(), 280);
-  }, 1400);
-}
