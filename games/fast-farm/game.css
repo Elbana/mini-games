@@ -250,8 +250,7 @@ html, body {
 }
 
 .plot-cell.ready .plot-img {
-  filter: saturate(1.15) brightness(1.08);
-  animation: plot-ready 1.2s ease-in-out infinite;
+  animation: plot-ready-glow 1.2s ease-in-out infinite;
 }
 
 @keyframes plot-urgent {
@@ -259,9 +258,9 @@ html, body {
   50% { filter: brightness(1.12); }
 }
 
-@keyframes plot-ready {
-  0%, 100% { transform: scale(1); filter: brightness(1); }
-  50% { transform: scale(1.06); filter: brightness(1.15); }
+@keyframes plot-ready-glow {
+  0%, 100% { filter: saturate(1.15) brightness(1.08); }
+  50% { filter: saturate(1.22) brightness(1.14); }
 }
 
 /* Crop sprite on plot — sick states are obvious */
