@@ -104,8 +104,9 @@ async function reelIn() {
       ArcadeFX.confetti(16);
       ArcadeFX.burst(window.innerWidth / 2, window.innerHeight / 3, r.fish.icon, 10);
     } else {
-      Arcade.toast('Fish got away!', 'lose');
-      document.getElementById('fish-hint').textContent = 'Try again — time the green zone!';
+      const msg = r.misfortune?.message || (r.result.grade === 'fail' ? 'Fish got away!' : 'Nothing on the line…');
+      Arcade.toast(msg, 'lose');
+      document.getElementById('fish-hint').textContent = 'Bad luck happens — try again!';
     }
   } catch (e) {
     Arcade.toast(e.message, 'lose');

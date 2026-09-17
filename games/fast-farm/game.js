@@ -4,7 +4,6 @@ let seeds = {};
 let seedList = [];
 let farm = null;
 let walletBalance = 0;
-let careCosts = { fertilize: 4, heal: 6 };
 let careRules = { stepsToHarvest: 10, careWindowSec: 6.5 };
 let activePlot = null;
 let tickTimer = null;
@@ -29,7 +28,6 @@ async function init() {
   const cfg = await Arcade.get('/api/fast-farm/config');
   seedList = cfg.seeds || [];
   seeds = Object.fromEntries(seedList.map((s) => [s.id, s]));
-  if (cfg.careCosts) careCosts = cfg.careCosts;
   if (cfg.careRules) careRules = cfg.careRules;
 
   setupFarmToast();
@@ -86,13 +84,23 @@ function assetIcon(name) {
   return `/assets/farm/icon/${name}.webp`;
 }
 
+function fmtCoins(n) {
+  return Arcade.formatCoins(n);
+}
+
+function plotCareCosts(plot) {
+  if (plot?.care_costs) return plot.care_costs;
+  const seed = seeds[plot?.seed_id];
+  if (!seed) return { fertilize: 15, heal: 25 };
+  return { fertilize: seed.fertilizeCost, heal: seed.healCost };
+}
+
 async function refreshFarm() {
   const st = await Arcade.get('/api/fast-farm/state');
   farm = {
     plots: st.plots?.length ? st.plots : defaultPlots(),
     inventory: st.inventory || {},
   };
-  if (st.careCosts) careCosts = st.careCosts;
   if (st.careRules) careRules = st.careRules;
   await refreshWallet();
   renderHud();
@@ -316,16 +324,19 @@ function buildPlotSheetContent(plot, seed) {
           return `<button type="button" class="seed-quick-btn ${ok ? '' : 'disabled'}" data-action="plant" data-seed="${s.id}" ${ok ? '' : 'disabled'}>
             <img src="${assetSeed(s.assets.seed)}" alt="">
             <span class="seed-quick-name">${s.name}</span>
-            <span class="seed-quick-price">🪙${s.price}</span>
+            <span class="seed-quick-price">🪙${fmtCoins(s.price)}</span>
+            <span class="seed-quick-sell">→${fmtCoins(s.marketBase)}</span>
           </button>`;
         })
         .join('')}</div>`;
   }
 
   if (plot.state === 'dead') {
-    return `<p class="sheet-intro warn">Crop died. Heal to retry (same progress) or clear.</p>
+    const blight = plot.death_reason === 'blight';
+    const costs = plotCareCosts(plot);
+    return `<p class="sheet-intro warn">${blight ? '🌪️ Sudden blight — nothing you could do!' : 'Crop died from neglect.'} Heal to retry or clear.</p>
       <div class="action-row">
-        <button type="button" class="action-btn heal" data-action="heal">💊 Revive 🪙${careCosts.heal}</button>
+        <button type="button" class="action-btn heal" data-action="heal">💊 Revive 🪙${fmtCoins(costs.heal)}</button>
         <button type="button" class="action-btn clear" data-action="clear">🗑️ Clear plot</button>
       </div>`;
   }
@@ -347,6 +358,7 @@ function buildPlotSheetContent(plot, seed) {
 
   const careName =
     plot.care_type === 'fertilize' ? 'Fertilizer' : plot.care_type === 'sick' ? 'Medicine' : 'Water';
+  const costs = plotCareCosts(plot);
 
   let html = `<p class="sheet-intro">Round <strong>${step + 1}/${steps}</strong> — needs <strong>${careName}</strong> now!</p>
     <div class="action-row">`;
@@ -355,9 +367,9 @@ function buildPlotSheetContent(plot, seed) {
   if (action === 'water') {
     html += `<button type="button" class="action-btn water pulse" data-action="water">💧 Water</button>`;
   } else if (action === 'fertilize') {
-    html += `<button type="button" class="action-btn fert pulse" data-action="fertilize">🌿 Fertilize 🪙${careCosts.fertilize}</button>`;
+    html += `<button type="button" class="action-btn fert pulse" data-action="fertilize">🌿 Fertilize 🪙${fmtCoins(costs.fertilize)}</button>`;
   } else {
-    html += `<button type="button" class="action-btn heal pulse" data-action="heal">💊 Heal 🪙${careCosts.heal}</button>`;
+    html += `<button type="button" class="action-btn heal pulse" data-action="heal">💊 Heal 🪙${fmtCoins(costs.heal)}</button>`;
   }
 
   html += `</div><p class="care-tip">~${careRules.careWindowSec}s per round. Stagger planting so plots don't all scream at once.</p>`;
@@ -387,9 +399,11 @@ async function runPlotAction(action, index, seedId) {
     };
 
     const r = await Arcade.post(routes[action], { plot_index: index });
-    if (action === 'water') Arcade.toast('💧 Watered!', 'win');
-    if (action === 'fertilize') Arcade.toast('🌿 Fed!', 'win');
-    if (action === 'heal') Arcade.toast('💊 Healed!', 'win');
+    if (r.unfair_loss) {
+      Arcade.toast('🌪️ Sudden blight — crop died!', 'lose');
+    } else if (action === 'water') Arcade.toast('💧 Watered!', 'win');
+    else if (action === 'fertilize') Arcade.toast('🌿 Fed!', 'win');
+    else if (action === 'heal') Arcade.toast('💊 Healed!', 'win');
     if (action === 'clear') {
       Arcade.toast('Cleared', 'win');
       closeSheet('sheet-plot');

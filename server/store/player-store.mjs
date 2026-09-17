@@ -6,7 +6,7 @@ export function getPlayerData(ctx) {
     session.arcade = {
       inventory: {},
       candyBattle: null,
-      farm: { version: 5, plots: [] },
+      farm: { version: 6, plots: [] },
       fishing: { gear: { rod: 1, bait: 10 } },
       stats: { candyWins: 0, farmHarvests: 0, fishCaught: 0, marketEarnings: 0 },
     };

@@ -425,6 +425,10 @@ async function runFullCascadeTurn() {
       Arcade.toast(`+${r.buyinGained} buy-in candies!`, 'win');
     }
 
+    if (r.misfortune?.message) {
+      Arcade.toast(r.misfortune.message, 'lose');
+    }
+
     document.getElementById('battle-msg').textContent =
       `${waves.length} hit${waves.length > 1 ? 's' : ''} → ${r.totalDamage} dmg!` +
       (r.monsterAttack ? ` Monster -${r.monsterAttack}` : '') +

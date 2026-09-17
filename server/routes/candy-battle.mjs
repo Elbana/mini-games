@@ -12,6 +12,7 @@ import {
 } from '../games/candy-battle-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
+import { rollCandyMisfortune } from '../economy/unfair-loss.mjs';
 
 const SLUG = 'candy-battle';
 
@@ -166,7 +167,32 @@ export async function handleCandyTurn(req, res) {
     session.arcade.stats.candyWins += 1;
     addScore(SLUG, ctx.playerId, ctx.playerId, qty * 20, { win: true });
   } else {
+    const misfortune = rollCandyMisfortune();
+    if (misfortune?.instantLoss) {
+      fight.playerHp = 0;
+      lost = true;
+      fight.active = false;
+      monsterAttack = 0;
+      savePlayerData(ctx, session);
+      return res.json({
+        fight,
+        totalDamage,
+        waveDamage,
+        waveCount: waves.length,
+        monsterAttack: 0,
+        bonusCandies: 0,
+        rewards,
+        won: false,
+        lost: true,
+        misfortune,
+        buyInCandies: session.arcade.candyBuyIn,
+        buyinGained,
+      });
+    }
     monsterAttack = rollMonsterAttack(monster);
+    if (misfortune?.multiplier) {
+      monsterAttack = Math.round(monsterAttack * misfortune.multiplier);
+    }
     fight.playerHp = Math.max(0, fight.playerHp - monsterAttack);
     bonusCandies = rollBonusCandies(monster);
     if (bonusCandies > 0) session.arcade.candyBuyIn[tierId] += bonusCandies;
@@ -174,6 +200,21 @@ export async function handleCandyTurn(req, res) {
       lost = true;
       fight.active = false;
     }
+    savePlayerData(ctx, session);
+    return res.json({
+      fight,
+      totalDamage,
+      waveDamage,
+      waveCount: waves.length,
+      monsterAttack,
+      bonusCandies,
+      rewards,
+      won,
+      lost,
+      misfortune,
+      buyInCandies: session.arcade.candyBuyIn,
+      buyinGained,
+    });
   }
 
   savePlayerData(ctx, session);
@@ -187,6 +228,7 @@ export async function handleCandyTurn(req, res) {
     rewards,
     won,
     lost,
+    misfortune: null,
     buyInCandies: session.arcade.candyBuyIn,
     buyinGained,
   });

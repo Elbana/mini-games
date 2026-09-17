@@ -1,78 +1,53 @@
-/** Fast Farm v5 — care-step survival. 10 care rounds per crop; losses are expected. */
+/** Fast Farm v6 — tiered economy (200–100k) + unfair blight losses. */
+
+import {
+  rollFarmBlightAfterCare,
+  rollFarmBlightTick,
+  cropFertilizeCost,
+  cropHealCost,
+  cropMarketBase,
+} from '../economy/unfair-loss.mjs';
+
+function tier(price, harvestAmount, id, name, marketItem, desc, assets) {
+  return {
+    id,
+    name,
+    price,
+    harvestAmount,
+    marketItem,
+    description: desc,
+    assets,
+    fertilizeCost: cropFertilizeCost(price),
+    healCost: cropHealCost(price),
+    marketBase: cropMarketBase(price),
+  };
+}
 
 export const SEEDS = {
-  carrot: {
-    id: 'carrot',
-    name: 'Carrot',
-    price: 12,
-    harvestAmount: 1,
-    marketItem: 'crop_carrot',
-    description: 'Cheap starter — still easy to kill.',
-    assets: { seed: 'carrot', planted: 'carrot', icon: 'carrot' },
-  },
-  potato: {
-    id: 'potato',
-    name: 'Potato',
-    price: 14,
-    harvestAmount: 1,
-    marketItem: 'crop_potato',
-    description: 'Hardy look, not hardy care.',
-    assets: { seed: 'potato', planted: 'potato', icon: 'potato' },
-  },
-  beans: {
-    id: 'beans',
-    name: 'Beans',
-    price: 18,
-    harvestAmount: 1,
-    marketItem: 'crop_beans',
-    description: 'Extra fuss for a slim payout.',
-    assets: { seed: 'beans', planted: 'beans', icon: 'beans' },
-  },
-  corn: {
-    id: 'corn',
-    name: 'Corn',
-    price: 22,
-    harvestAmount: 1,
-    marketItem: 'crop_corn',
-    description: 'Mid stake, mid grief.',
-    assets: { seed: 'corn', planted: 'corn', icon: 'corn' },
-  },
-  cabbage: {
-    id: 'cabbage',
-    name: 'Cabbage',
-    price: 26,
-    harvestAmount: 1,
-    marketItem: 'crop_cabbage',
-    description: 'Slow care loop, tiny reward.',
-    assets: { seed: 'cabbage', planted: 'cabbage', icon: 'cabbage' },
-  },
-  berry: {
-    id: 'berry',
-    name: 'Berry',
-    price: 32,
-    harvestAmount: 2,
-    marketItem: 'crop_berry',
-    description: 'Rare double yield if you survive.',
-    assets: { seed: 'berry', planted: 'berry', icon: 'berry' },
-  },
-  pumpkin: {
-    id: 'pumpkin',
-    name: 'Pumpkin',
-    price: 40,
-    harvestAmount: 1,
-    marketItem: 'crop_pumpkin',
-    description: 'Big seed tax, small hope.',
-    assets: { seed: 'pumkin', planted: 'pumkin', icon: 'pumpkin' },
-  },
-  mushroom: {
-    id: 'mushroom',
-    name: 'Mushroom',
-    price: 48,
-    harvestAmount: 1,
-    marketItem: 'crop_mushroom',
-    description: 'Whale bait — usually a loss.',
-    assets: { seed: 'Mushrooms', planted: 'Mushrooms', icon: 'Mushrooms' },
-  },
+  carrot: tier(200, 1, 'carrot', 'Carrot', 'crop_carrot', 'Starter crop — cheap but fragile.', {
+    seed: 'carrot', planted: 'carrot', icon: 'carrot',
+  }),
+  potato: tier(600, 1, 'potato', 'Potato', 'crop_potato', 'Low stakes, low mercy.', {
+    seed: 'potato', planted: 'potato', icon: 'potato',
+  }),
+  beans: tier(1500, 1, 'beans', 'Beans', 'crop_beans', 'Mid grind begins here.', {
+    seed: 'beans', planted: 'beans', icon: 'beans',
+  }),
+  corn: tier(4000, 1, 'corn', 'Corn', 'crop_corn', 'Golden rows, thin margins.', {
+    seed: 'corn', planted: 'corn', icon: 'corn',
+  }),
+  cabbage: tier(10000, 1, 'cabbage', 'Cabbage', 'crop_cabbage', 'Heavy seed, heavy risk.', {
+    seed: 'cabbage', planted: 'cabbage', icon: 'cabbage',
+  }),
+  berry: tier(25000, 1, 'berry', 'Berry', 'crop_berry', 'High roller berries.', {
+    seed: 'berry', planted: 'berry', icon: 'berry',
+  }),
+  pumpkin: tier(55000, 1, 'pumpkin', 'Pumpkin', 'crop_pumpkin', 'Whale patch — expect losses.', {
+    seed: 'pumkin', planted: 'pumkin', icon: 'pumpkin',
+  }),
+  mushroom: tier(100000, 1, 'mushroom', 'Mushroom', 'crop_mushroom', '100k seed. Rare payday.', {
+    seed: 'Mushrooms', planted: 'Mushrooms', icon: 'Mushrooms',
+  }),
 };
 
 export const PLOT_COUNT = 9;
@@ -80,22 +55,17 @@ export const CARE_STEPS_TO_HARVEST = 10;
 export const CARE_WINDOW_SEC = 6.5;
 export const WILT_GRACE_SEC = 3.5;
 export const DEAD_AFTER_WILT_SEC = 5;
-export const FERTILIZE_COST = 4;
-export const HEAL_COST = 6;
 
-/** 10 rounds — mostly water, 2 fert + 1 sick so 3 plots is tense but doable. */
 export const CARE_SCHEDULE = [
-  'water',
-  'water',
-  'water',
-  'fertilize',
-  'water',
-  'water',
-  'sick',
-  'water',
-  'fertilize',
-  'water',
+  'water', 'water', 'water', 'fertilize', 'water',
+  'water', 'sick', 'water', 'fertilize', 'water',
 ];
+
+export function careCostsForSeed(seedId) {
+  const seed = SEEDS[seedId];
+  if (!seed) return { fertilize: 15, heal: 25 };
+  return { fertilize: seed.fertilizeCost, heal: seed.healCost };
+}
 
 export function defaultPlots() {
   return Array.from({ length: PLOT_COUNT }, (_, i) => ({
@@ -106,19 +76,21 @@ export function defaultPlots() {
     care_step: 0,
     care_due_at: null,
     care_type: null,
+    last_unfair_check: null,
+    death_reason: null,
   }));
 }
 
 export function createInitialFarm() {
-  return { version: 5, plots: defaultPlots() };
+  return { version: 6, plots: defaultPlots() };
 }
 
 export function normalizeFarm(raw) {
-  if (!raw?.plots?.length || raw.version !== 5) {
+  if (!raw?.plots?.length || raw.version !== 6) {
     return createInitialFarm();
   }
   const farm = {
-    version: 5,
+    version: 6,
     plots: raw.plots.map((p, i) => ({
       plot_index: p.plot_index ?? i,
       state: p.state === 'locked' ? 'empty' : (p.state ?? 'empty'),
@@ -127,6 +99,8 @@ export function normalizeFarm(raw) {
       care_step: p.care_step ?? 0,
       care_due_at: p.care_due_at ?? null,
       care_type: p.care_type ?? null,
+      last_unfair_check: p.last_unfair_check ?? null,
+      death_reason: p.death_reason ?? null,
     })),
   };
   while (farm.plots.length < PLOT_COUNT) {
@@ -138,6 +112,8 @@ export function normalizeFarm(raw) {
       care_step: 0,
       care_due_at: null,
       care_type: null,
+      last_unfair_check: null,
+      death_reason: null,
     });
   }
   return farm;
@@ -145,6 +121,16 @@ export function normalizeFarm(raw) {
 
 function dueMs(plot) {
   return plot.care_due_at ? new Date(plot.care_due_at).getTime() : null;
+}
+
+function applyBlight(plot, blight, now) {
+  if (!blight) return plot;
+  return {
+    ...plot,
+    state: 'dead',
+    death_reason: blight.type,
+    last_unfair_check: new Date(now).toISOString(),
+  };
 }
 
 export function currentCareType(plot) {
@@ -160,12 +146,8 @@ export function needsCare(plot, now = Date.now()) {
   return due != null && now >= due;
 }
 
-export function isCareOverdue(plot, now = Date.now()) {
-  return needsCare(plot, now);
-}
-
 export function applyGrowthState(plot, now = Date.now()) {
-  const p = { ...plot };
+  let p = { ...plot };
   if (!p.seed_id || p.state === 'empty') return p;
   if (p.state === 'dead') return p;
 
@@ -174,12 +156,17 @@ export function applyGrowthState(plot, now = Date.now()) {
     return p;
   }
 
+  const tickBlight = rollFarmBlightTick(p, now);
+  if (tickBlight) return applyBlight(p, tickBlight, now);
+  p.last_unfair_check = new Date(now).toISOString();
+
   const due = dueMs(p);
   if (!due) return p;
 
   const overdue = now - due;
   if (overdue > (WILT_GRACE_SEC + DEAD_AFTER_WILT_SEC) * 1000) {
     p.state = 'dead';
+    p.death_reason = p.death_reason || 'neglect';
   } else if (overdue > WILT_GRACE_SEC * 1000) {
     p.state = 'wilting';
   } else if (p.state !== 'wilting') {
@@ -224,8 +211,7 @@ export function canPerformCare(plot, action, now = Date.now()) {
   if (!plot.seed_id || plot.state === 'empty' || plot.state === 'ready' || plot.state === 'dead') {
     return false;
   }
-  const expected = careActionForPlot(plot);
-  if (action !== expected) return false;
+  if (action !== careActionForPlot(plot)) return false;
   return needsCare(plot, now) || plot.state === 'wilting';
 }
 
@@ -248,7 +234,7 @@ function scheduleNextCare(plot, now = Date.now()) {
 
 export function newPlantedPlot(plot, seedId, now = Date.now()) {
   const jitter = Math.floor(Math.random() * 3200);
-  const planted = {
+  return {
     ...plot,
     state: 'growing',
     seed_id: seedId,
@@ -256,19 +242,22 @@ export function newPlantedPlot(plot, seedId, now = Date.now()) {
     care_step: 0,
     care_type: CARE_SCHEDULE[0],
     care_due_at: new Date(now + CARE_WINDOW_SEC * 1000 + jitter).toISOString(),
+    last_unfair_check: new Date(now).toISOString(),
+    death_reason: null,
   };
-  return planted;
 }
 
 function advanceCare(plot, now = Date.now()) {
-  const next = {
+  let next = {
     ...plot,
     care_step: (plot.care_step || 0) + 1,
+    death_reason: null,
   };
   if (next.care_step >= CARE_STEPS_TO_HARVEST) {
     return { ...next, state: 'ready', care_due_at: null, care_type: null };
   }
-  return scheduleNextCare(next, now);
+  next = scheduleNextCare(next, now);
+  return applyBlight(next, rollFarmBlightAfterCare(), now);
 }
 
 export function afterWater(plot, now = Date.now()) {
@@ -290,7 +279,7 @@ export function afterFertilize(plot, now = Date.now()) {
 export function afterHeal(plot, now = Date.now()) {
   if (plot.state === 'dead') {
     return scheduleNextCare(
-      { ...plot, state: 'growing', care_step: plot.care_step || 0 },
+      { ...plot, state: 'growing', care_step: plot.care_step || 0, death_reason: null },
       now,
     );
   }
@@ -309,5 +298,7 @@ export function emptyPlot(plotIndex) {
     care_step: 0,
     care_due_at: null,
     care_type: null,
+    last_unfair_check: null,
+    death_reason: null,
   };
 }

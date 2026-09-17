@@ -757,11 +757,17 @@ html, body {
 }
 
 .seed-quick-price {
-  font-size: clamp(0.6rem, 2.2vw, 0.68rem);
+  font-size: clamp(0.58rem, 2vw, 0.66rem);
   font-weight: 800;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border-radius: 8px;
   background: linear-gradient(135deg, rgba(255, 143, 0, 0.85), rgba(255, 193, 7, 0.85));
+}
+
+.seed-quick-sell {
+  font-size: clamp(0.52rem, 1.8vw, 0.6rem);
+  color: rgba(180, 255, 200, 0.75);
+  font-weight: 700;
 }
 
 .seed-pick-list {

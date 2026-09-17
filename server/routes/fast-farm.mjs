@@ -6,8 +6,7 @@ import {
   PLOT_COUNT,
   CARE_STEPS_TO_HARVEST,
   CARE_WINDOW_SEC,
-  FERTILIZE_COST,
-  HEAL_COST,
+  careCostsForSeed,
   normalizeFarm,
   applyGrowthState,
   isReadyToHarvest,
@@ -36,7 +35,7 @@ function ensureFarm(session) {
 
 function serializePlot(p, now = Date.now()) {
   const plot = applyGrowthState(p, now);
-  const careType = currentCareType(plot);
+  const costs = plot.seed_id ? careCostsForSeed(plot.seed_id) : null;
   return {
     plot_index: plot.plot_index,
     state: plot.state,
@@ -44,7 +43,7 @@ function serializePlot(p, now = Date.now()) {
     planted_at: plot.planted_at,
     care_step: plot.care_step,
     care_due_at: plot.care_due_at,
-    care_type: careType,
+    care_type: currentCareType(plot),
     care_progress: careProgress(plot),
     needs_care: needsCare(plot, now),
     needs_water: needsWater(plot, now),
@@ -52,6 +51,8 @@ function serializePlot(p, now = Date.now()) {
     needs_heal: needsHeal(plot, now),
     can_fertilize: canFertilize(plot, now),
     ready: isReadyToHarvest(plot),
+    death_reason: plot.death_reason || null,
+    care_costs: costs,
   };
 }
 
@@ -61,7 +62,6 @@ function farmPayload(farm, session) {
     success: true,
     plots: farm.plots.map((p) => serializePlot(p, now)),
     inventory: session.arcade.inventory || {},
-    careCosts: { fertilize: FERTILIZE_COST, heal: HEAL_COST },
     careRules: {
       stepsToHarvest: CARE_STEPS_TO_HARVEST,
       careWindowSec: CARE_WINDOW_SEC,
@@ -73,7 +73,6 @@ export function handleGetFarmConfig(_req, res) {
   res.json({
     seeds: Object.values(SEEDS),
     plotCount: PLOT_COUNT,
-    careCosts: { fertilize: FERTILIZE_COST, heal: HEAL_COST },
     careRules: {
       stepsToHarvest: CARE_STEPS_TO_HARVEST,
       careWindowSec: CARE_WINDOW_SEC,
@@ -144,7 +143,12 @@ export async function handleWater(req, res) {
   try {
     farm.plots[plot_index] = afterWater(plot);
     savePlayerData(ctx, session);
-    res.json({ success: true, plot: serializePlot(farm.plots[plot_index]) });
+    const serialized = serializePlot(farm.plots[plot_index]);
+    res.json({
+      success: true,
+      plot: serialized,
+      unfair_loss: serialized.death_reason === 'blight',
+    });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
@@ -163,10 +167,11 @@ export async function handleFertilize(req, res) {
     return res.status(400).json({ success: false, error: 'This crop does not need fertilizer now' });
   }
 
+  const seed = SEEDS[plot.seed_id];
   const wallet = createWalletForOperator(operator);
   try {
     const debit = await wallet.debit(ctx, {
-      amount: FERTILIZE_COST,
+      amount: seed.fertilizeCost,
       game: SLUG,
       roundId: `fert_${plot_index}`,
       transactionId: txId('farm_fert'),
@@ -174,10 +179,12 @@ export async function handleFertilize(req, res) {
     });
     farm.plots[plot_index] = afterFertilize(plot);
     savePlayerData(ctx, session);
+    const serialized = serializePlot(farm.plots[plot_index]);
     res.json({
       success: true,
       balance: debit.balance,
-      plot: serializePlot(farm.plots[plot_index]),
+      plot: serialized,
+      unfair_loss: serialized.death_reason === 'blight',
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message, code: err.code });
@@ -197,10 +204,11 @@ export async function handleHeal(req, res) {
     return res.status(400).json({ success: false, error: 'This crop is not sick' });
   }
 
+  const seed = SEEDS[plot.seed_id];
   const wallet = createWalletForOperator(operator);
   try {
     const debit = await wallet.debit(ctx, {
-      amount: HEAL_COST,
+      amount: seed.healCost,
       game: SLUG,
       roundId: `heal_${plot_index}`,
       transactionId: txId('farm_heal'),
@@ -208,10 +216,12 @@ export async function handleHeal(req, res) {
     });
     farm.plots[plot_index] = afterHeal(plot);
     savePlayerData(ctx, session);
+    const serialized = serializePlot(farm.plots[plot_index]);
     res.json({
       success: true,
       balance: debit.balance,
-      plot: serializePlot(farm.plots[plot_index]),
+      plot: serialized,
+      unfair_loss: serialized.death_reason === 'blight',
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message, code: err.code });
@@ -257,7 +267,7 @@ export function handleHarvest(req, res) {
   const seed = SEEDS[plot.seed_id];
   addInventory(session, seed.marketItem, seed.harvestAmount);
   session.arcade.stats.farmHarvests += 1;
-  addScore(SLUG, ctx.playerId, ctx.playerId, seed.harvestAmount * 5, { win: true });
+  addScore(SLUG, ctx.playerId, ctx.playerId, Math.min(500, Math.round(seed.price / 50)), { win: true });
 
   farm.plots[plot_index] = emptyPlot(plot_index);
   savePlayerData(ctx, session);

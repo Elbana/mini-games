@@ -12,6 +12,7 @@ import {
 } from '../games/fishing-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
+import { rollFishingMisfortune } from '../economy/unfair-loss.mjs';
 
 const SLUG = 'fishing';
 
@@ -98,18 +99,23 @@ export function handleReel(req, res) {
   const result = evaluateReel(cast, Number(pointer));
   session.arcade.pendingCast = null;
   let fish = null;
+  let misfortune = null;
   if (result.grade !== 'fail') {
-    fish = pickFish(result.accuracy);
-    addInventory(session, fish.id, 1);
-    session.arcade.stats.fishCaught += 1;
-    addScore(SLUG, ctx.playerId, ctx.playerId, result.grade === 'perfect' ? 30 : 15, {
-      win: result.grade === 'perfect',
-    });
+    misfortune = rollFishingMisfortune(result);
+    if (!misfortune) {
+      fish = pickFish(result.accuracy);
+      addInventory(session, fish.id, 1);
+      session.arcade.stats.fishCaught += 1;
+      addScore(SLUG, ctx.playerId, ctx.playerId, result.grade === 'perfect' ? 30 : 15, {
+        win: result.grade === 'perfect',
+      });
+    }
   }
   savePlayerData(ctx, session);
   res.json({
     result,
     fish,
+    misfortune,
     inventory: session.arcade.inventory,
   });
 }
