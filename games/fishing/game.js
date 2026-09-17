@@ -449,8 +449,11 @@ async function castAt(x, y) {
     renderBaitRow();
 
     placeCastVisuals(x, y);
-    sounds?.play('cast', { volume: 0.35 });
-    setTimeout(() => sounds?.play('splash', { volume: 0.3 }), 120);
+    sounds?.play('cast', { volume: 0.38, duration: 0.65, offset: 0 });
+    setTimeout(() => {
+      sounds?.play('lure', { volume: 0.52 });
+      sounds?.startLureIdle();
+    }, 90);
     gameState = 'waiting';
     document.getElementById('ocean-scene').classList.add('waiting-bite');
     document.getElementById('cast-hint').textContent = 'Waiting for a bite…';
@@ -461,6 +464,7 @@ async function castAt(x, y) {
       gameState = 'bite';
       document.getElementById('cast-hint').textContent = 'Tap the sea to cast your line';
       document.getElementById('bobber').classList.add('biting');
+      sounds?.stopLureIdle();
       sounds?.play('bite', { volume: 0.45 });
 
       const hype = biteCallout(activeCast.tierKey);
@@ -616,6 +620,7 @@ async function endFight(outcome) {
   cancelAnimationFrame(fightAnim);
   fightAnim = null;
   sounds?.stopReel();
+  sounds?.stopLureIdle();
   isPulling = false;
   gameState = 'idle';
 

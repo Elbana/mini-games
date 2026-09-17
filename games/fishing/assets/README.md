@@ -38,8 +38,10 @@ Only files listed in `index.json` are loaded (no missing-file console errors).
 
 Default placeholders are included. Replace them with your own:
 
-- `cast.ogg` — line thrown
-- `splash.ogg` — bobber hits water
+- `cast.ogg` — line thrown through the air
+- `lure.ogg` — lure/bobber hits the water (real splash sample)
+- `splash.ogg` — alias for lure splash
+- `reel.ogg` — **real fishing reel crank** (loops while you hold to pull)
 - `bite.ogg` — fish bites
 - `fight.ogg` — reel fight starts
 - `reel.ogg` — while holding to reel

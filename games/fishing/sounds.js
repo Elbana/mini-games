@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'deep-cast-sound';
 
-/** Deep Cast audio — loads OGG files when present, synthesizes otherwise. */
+/** Deep Cast audio — real OGG samples when present, synth fallback otherwise. */
 export class FishingSounds {
   constructor(manifest) {
     this.base = `${manifest?.baseUrl || '/fishing/assets'}/sounds`;
@@ -8,7 +8,8 @@ export class FishingSounds {
     this.cache = new Map();
     this.muted = localStorage.getItem(STORAGE_KEY) === 'off';
     this._ready = this._init();
-    this._reelTimer = null;
+    this._reelLoop = null;
+    this._lureLoop = null;
   }
 
   isMuted() {
@@ -18,7 +19,10 @@ export class FishingSounds {
   setMuted(muted) {
     this.muted = muted;
     localStorage.setItem(STORAGE_KEY, muted ? 'off' : 'on');
-    if (muted) this.stopReel();
+    if (muted) {
+      this.stopReel();
+      this.stopLureIdle();
+    }
   }
 
   toggleMuted() {
@@ -47,7 +51,9 @@ export class FishingSounds {
         try {
           const res = await fetch(`${this.base}/${file}`);
           if (!res.ok) return;
-          const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
+          const data = await res.arrayBuffer();
+          if (data.byteLength < 256) return;
+          const buf = await this.ctx.decodeAudioData(data);
           this.cache.set(key, buf);
         } catch {
           /* synth fallback for this cue */
@@ -66,30 +72,109 @@ export class FishingSounds {
     this._ready.then(() => {
       const buf = this.cache.get(name);
       if (buf && this.ctx) {
-        const src = this.ctx.createBufferSource();
-        src.buffer = buf;
-        const g = this.ctx.createGain();
-        g.gain.value = opts.volume ?? 0.45;
-        src.connect(g).connect(this.ctx.destination);
-        src.start(0);
+        this._playBuffer(buf, opts);
         return;
       }
       this._synth(name, opts);
     });
   }
 
+  _playBuffer(buf, opts = {}) {
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    if (opts.rate) src.playbackRate.value = opts.rate;
+    if (opts.loop) src.loop = true;
+
+    const g = this.ctx.createGain();
+    g.gain.value = opts.volume ?? 0.45;
+    src.connect(g).connect(this.ctx.destination);
+
+    const offset = Math.max(0, opts.offset || 0);
+    const dur = opts.duration && opts.duration > 0 ? opts.duration : undefined;
+    src.start(0, offset, dur);
+    return { src, g };
+  }
+
+  /** Real fishing reel crank — loops while the player holds to pull. */
   startReel() {
-    if (this.muted) return;
-    this.stopReel();
-    this.play('reel', { volume: 0.22 });
-    this._reelTimer = setInterval(() => this.play('reel', { volume: 0.18 }), 280);
+    if (this.muted || this._reelLoop) return;
+    this._ready.then(() => {
+      const buf = this.cache.get('reel');
+      if (!buf || !this.ctx) {
+        this._reelSynthFallback();
+        return;
+      }
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.playbackRate.value = 1.05;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.42;
+      src.connect(g).connect(this.ctx.destination);
+      src.start(0);
+      this._reelLoop = { src, g };
+    });
   }
 
   stopReel() {
-    if (this._reelTimer) {
-      clearInterval(this._reelTimer);
-      this._reelTimer = null;
+    if (this._reelSynthTimer) {
+      clearInterval(this._reelSynthTimer);
+      this._reelSynthTimer = null;
     }
+    if (!this._reelLoop || !this.ctx) return;
+    const { src, g } = this._reelLoop;
+    const t = this.ctx.currentTime;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    setTimeout(() => {
+      try {
+        src.stop();
+      } catch {
+        /* already stopped */
+      }
+      this._reelLoop = null;
+    }, 80);
+  }
+
+  _reelSynthFallback() {
+    this.play('reel', { volume: 0.22 });
+    this._reelSynthTimer = setInterval(() => this.play('reel', { volume: 0.18 }), 280);
+  }
+
+  /** Gentle lure-in-water ambience while waiting for a bite. */
+  startLureIdle() {
+    if (this.muted || this._lureLoop) return;
+    this._ready.then(() => {
+      const buf = this.cache.get('lure') || this.cache.get('splash');
+      if (!buf || !this.ctx) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.playbackRate.value = 0.72;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.08;
+      src.connect(g).connect(this.ctx.destination);
+      src.start(0, 0.15);
+      this._lureLoop = { src, g };
+    });
+  }
+
+  stopLureIdle() {
+    if (!this._lureLoop || !this.ctx) return;
+    const { src, g } = this._lureLoop;
+    const t = this.ctx.currentTime;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    setTimeout(() => {
+      try {
+        src.stop();
+      } catch {
+        /* already stopped */
+      }
+      this._lureLoop = null;
+    }, 130);
   }
 
   _synth(name, opts) {
@@ -102,6 +187,7 @@ export class FishingSounds {
 
     const presets = {
       cast: { f: 420, f2: 260, dur: 0.14, type: 'triangle' },
+      lure: { f: 180, f2: 90, dur: 0.25, type: 'sine' },
       splash: { f: 180, f2: 90, dur: 0.2, type: 'sine' },
       bite: { f: 520, f2: 880, dur: 0.16, type: 'square' },
       fight: { f: 220, f2: 330, dur: 0.22, type: 'sawtooth' },
