@@ -1,14 +1,25 @@
-/** Fast Farm client — mirrors Riko Flutter farm_screen.dart */
+/** Fast Farm v5 — 10 care rounds per crop. No timer. Crops look sick when neglected. */
 
 let seeds = {};
 let seedList = [];
 let farm = null;
-let selectedSeed = null;
-let unlockPlotIndex = null;
-let sellQty = {};
+let walletBalance = 0;
+let careCosts = { fertilize: 4, heal: 6 };
+let careRules = { stepsToHarvest: 10, careWindowSec: 6.5 };
+let activePlot = null;
 let tickTimer = null;
+let plotLayout = { left: '6%', bottom: '10%', width: '74%' };
 
-const CIRC = 2 * Math.PI * 18;
+const MARKET_TO_SEED = {
+  crop_carrot: 'carrot',
+  crop_potato: 'potato',
+  crop_beans: 'beans',
+  crop_corn: 'corn',
+  crop_cabbage: 'cabbage',
+  crop_berry: 'berry',
+  crop_pumpkin: 'pumpkin',
+  crop_mushroom: 'mushroom',
+};
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -18,25 +29,28 @@ async function init() {
   const cfg = await Arcade.get('/api/fast-farm/config');
   seedList = cfg.seeds || [];
   seeds = Object.fromEntries(seedList.map((s) => [s.id, s]));
+  if (cfg.plotLayout) plotLayout = cfg.plotLayout;
+  if (cfg.careCosts) careCosts = cfg.careCosts;
+  if (cfg.careRules) careRules = cfg.careRules;
+  applyPlotLayout();
 
   bindUi();
   await refreshFarm();
-  tickTimer = setInterval(refreshFarm, 1000);
+  tickTimer = setInterval(refreshFarm, 800);
+}
+
+function applyPlotLayout() {
+  const scene = document.getElementById('farm-scene');
+  if (!scene) return;
+  scene.style.left = plotLayout.left;
+  scene.style.bottom = plotLayout.bottom;
+  scene.style.width = plotLayout.width;
 }
 
 function bindUi() {
-  document.getElementById('btn-shop').addEventListener('click', openShop);
-  document.getElementById('btn-backpack').addEventListener('click', () => openBackpack('inventory'));
-  document.getElementById('btn-sell').addEventListener('click', () => openBackpack('sell'));
-  document.getElementById('seed-banner-close').addEventListener('click', clearSelectedSeed);
-  document.getElementById('btn-unlock-confirm').addEventListener('click', confirmUnlock);
-
+  document.getElementById('btn-harvest').addEventListener('click', openBackpack);
   document.querySelectorAll('[data-close]').forEach((el) => {
     el.addEventListener('click', () => closeSheet(el.dataset.close));
-  });
-
-  document.querySelectorAll('.sheet-tab').forEach((tab) => {
-    tab.addEventListener('click', () => switchBackpackTab(tab.dataset.tab));
   });
 }
 
@@ -52,439 +66,357 @@ function assetIcon(name) {
   return `/assets/farm/icon/${name}.webp`;
 }
 
-function formatGrow(sec) {
-  if (sec >= 3600) return `${Math.round(sec / 3600)}h`;
-  return `${Math.round(sec / 60)}m`;
-}
-
-function formatRemaining(ms) {
-  if (ms <= 0) return '0s';
-  const totalSec = Math.ceil(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-}
-
 async function refreshFarm() {
   const st = await Arcade.get('/api/fast-farm/state');
-  farm = normalizeState(st);
+  farm = {
+    plots: st.plots?.length ? st.plots : defaultPlots(),
+    inventory: st.inventory || {},
+  };
+  if (st.careCosts) careCosts = st.careCosts;
+  if (st.careRules) careRules = st.careRules;
+  await refreshWallet();
   renderHud();
   renderPlots();
+  if (activePlot != null && !document.getElementById('sheet-plot').classList.contains('hidden')) {
+    openPlotSheet(activePlot, false);
+  }
 }
 
-/** Accept new API shape; reset if old session format is returned. */
-function normalizeState(st) {
-  if (st?.plots?.length && st.farm_coins != null) return st;
-  if (st?.farm?.plots?.length && st.farm.plots[0]?.crop !== undefined) {
-    return {
-      farm_coins: 100,
-      farm_xp: 0,
-      farm_level: 1,
-      plots: defaultPlotsFallback(),
-      inventory: [],
-    };
+async function refreshWallet() {
+  try {
+    const bal = await Arcade.get('/api/v1/balance');
+    walletBalance = bal.balance ?? 0;
+  } catch {
+    walletBalance = 0;
   }
-  return {
-    farm_coins: st?.farm_coins ?? 100,
-    farm_xp: st?.farm_xp ?? 0,
-    farm_level: st?.farm_level ?? 1,
-    plots: st?.plots?.length ? st.plots : defaultPlotsFallback(),
-    inventory: st?.inventory ?? [],
-  };
 }
 
-function defaultPlotsFallback() {
-  const plots = [];
-  for (let i = 0; i < 9; i++) {
-    if (i >= 6) {
-      plots.push({ plot_index: i, state: 'empty', seed_id: null, planted_at: null, unlock_price: 0 });
-    } else {
-      const costs = [100, 300, 1000, 3000, 10000, 30000];
-      plots.push({
-        plot_index: i,
-        state: 'locked',
-        seed_id: null,
-        planted_at: null,
-        unlock_price: costs[5 - i] ?? 50000,
-      });
-    }
-  }
-  return plots;
+function defaultPlots() {
+  return Array.from({ length: 9 }, (_, i) => ({
+    plot_index: i,
+    state: 'empty',
+    seed_id: null,
+    care_step: 0,
+    care_type: null,
+  }));
 }
 
 function renderHud() {
-  document.getElementById('farm-coins').textContent = farm.farm_coins ?? 0;
-  document.getElementById('farm-level').textContent = `Lv.${farm.farm_level ?? 1}`;
-  document.getElementById('shop-coins').textContent = farm.farm_coins ?? 0;
-  document.getElementById('bag-coins').textContent = farm.farm_coins ?? 0;
+  const inv = farm.inventory || {};
+  const entries = Object.entries(inv).filter(([, qty]) => qty > 0);
+  const total = entries.reduce((s, [, n]) => s + n, 0);
+  const chip = document.getElementById('btn-harvest');
+  const chipText = document.getElementById('harvest-chip-text');
 
-  const total = (farm.inventory || []).reduce((s, i) => s + i.quantity, 0);
-  const badge = document.getElementById('bag-badge');
   if (total > 0) {
-    badge.textContent = total;
-    badge.classList.remove('hidden');
+    chip.classList.remove('hidden');
+    const top = entries
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([itemId, qty]) => {
+        const seed = seeds[MARKET_TO_SEED[itemId]];
+        return seed ? `${seed.name} ×${qty}` : `×${qty}`;
+      });
+    const extra = entries.length > 2 ? ` +${entries.length - 2}` : '';
+    chipText.textContent = top.join(' · ') + extra;
   } else {
-    badge.classList.add('hidden');
+    chip.classList.add('hidden');
   }
 
-  document.getElementById('backpack-count').textContent = `${total} items collected`;
+  document.getElementById('backpack-count').textContent =
+    total > 0 ? `${total} crops harvested — sell in Hub` : '0 crops harvested';
 }
 
-function plotAsset(plot) {
-  if (isReady(plot) && plot.seed_id) {
-    const seed = seeds[plot.seed_id];
-    if (seed) return assetPlanted(seed.assets.planted);
-  }
-  switch (plot.state) {
-    case 'locked':
-      return '/assets/farm/plot-tile-green.webp';
-    case 'empty':
-      return '/assets/farm/plot-tile.webp';
-    case 'growing':
-    case 'ready':
-      return '/assets/farm/plot-seeded.webp';
-    default:
-      return '/assets/farm/plot-tile.webp';
-  }
+function plotBaseAsset(plot) {
+  if (plot.state === 'empty') return '/assets/farm/plot-tile.webp';
+  if (plot.state === 'dead') return '/assets/farm/plot-tile.webp';
+  return '/assets/farm/plot-seeded.webp';
 }
 
-function isReady(plot) {
-  if (!plot.seed_id || !plot.planted_at) return false;
-  if (plot.state !== 'growing' && plot.state !== 'ready') return false;
-  const seed = seeds[plot.seed_id];
-  if (!seed) return false;
-  const elapsed = (Date.now() - new Date(plot.planted_at).getTime()) / 1000;
-  return elapsed >= seed.growSeconds;
+function cropVisualClass(plot) {
+  if (plot.ready || plot.state === 'ready') return 'crop-ready';
+  if (plot.state === 'dead') return 'crop-dead';
+  if (plot.state === 'wilting') return 'crop-wilting';
+  if (plot.care_type === 'sick' && plot.needs_care) return 'crop-sick';
+  if (plot.needs_fertilize || plot.care_type === 'fertilize') return 'crop-hungry';
+  if (plot.needs_water || plot.care_type === 'water') return plot.needs_care ? 'crop-thirsty' : 'crop-ok';
+  return 'crop-ok';
 }
 
-function isGrowing(plot) {
-  return plot.state === 'growing' && plot.seed_id && !isReady(plot);
-}
-
-function growthProgress(plot) {
-  const seed = seeds[plot.seed_id];
-  if (!seed || !plot.planted_at) return 0;
-  const elapsed = (Date.now() - new Date(plot.planted_at).getTime()) / 1000;
-  return Math.min(1, Math.max(0, elapsed / seed.growSeconds));
+function careLabel(plot) {
+  if (plot.ready || plot.state === 'ready') return '⭐';
+  if (plot.state === 'dead') return '💀';
+  if (plot.state === 'wilting') return '⚠️';
+  if (plot.needs_heal || plot.care_type === 'sick') return '🤒';
+  if (plot.needs_fertilize || plot.care_type === 'fertilize') return '🌿';
+  if (plot.needs_water && plot.needs_care) return '💧';
+  return '';
 }
 
 function renderPlots() {
   const grid = document.getElementById('farm-grid');
   grid.innerHTML = (farm.plots || [])
     .map((plot, i) => {
-      const growing = isGrowing(plot);
-      const ready = isReady(plot);
-      let indicator = '';
+      const growing = plot.seed_id && plot.state !== 'empty' && plot.state !== 'dead';
+      const seed = plot.seed_id ? seeds[plot.seed_id] : null;
+      const cropCls = cropVisualClass(plot);
+      const badge = careLabel(plot);
+      const step = plot.care_step || 0;
+      const steps = careRules.stepsToHarvest || 10;
 
-      if (growing) {
-        const seed = seeds[plot.seed_id];
-        const progress = growthProgress(plot);
-        const offset = CIRC * (1 - progress);
-        indicator = `
-          <div class="grow-indicator">
-            <div class="grow-ring-wrap">
-              <svg viewBox="0 0 44 44" aria-hidden="true">
-                <circle class="track" cx="22" cy="22" r="18"></circle>
-                <circle class="progress" cx="22" cy="22" r="18"
-                  stroke-dasharray="${CIRC.toFixed(2)}"
-                  stroke-dashoffset="${offset.toFixed(2)}"></circle>
-              </svg>
-              <img class="grow-icon" src="${assetIcon(seed.assets.icon)}" alt="">
-            </div>
-            <div class="grow-connector"></div>
+      let cropHtml = '';
+      if (growing || plot.ready || plot.state === 'ready') {
+        const src = plot.ready || plot.state === 'ready'
+          ? assetPlanted(seed.assets.planted)
+          : assetIcon(seed.assets.icon);
+        cropHtml = `
+          <div class="plot-crop ${cropCls}">
+            <img class="crop-sprite" src="${src}" alt="">
+            ${plot.state !== 'ready' && !plot.ready ? '<span class="sick-veil"></span>' : ''}
+            ${cropCls === 'crop-sick' || cropCls === 'crop-wilting' ? '<span class="sick-bugs">🦠</span>' : ''}
           </div>`;
       }
 
-      const lockOverlay =
-        plot.state === 'locked'
-          ? '<div class="plot-lock" aria-hidden="true">🔒</div>'
+      const cls = [
+        'plot-cell',
+        plot.needs_care ? 'needs-care' : '',
+        cropCls,
+        plot.ready ? 'ready' : '',
+        plot.state === 'dead' ? 'dead' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      const progressHtml =
+        growing && !plot.ready
+          ? `<div class="care-pips">${Array.from({ length: steps }, (_, j) =>
+              `<span class="care-pip ${j < step ? 'done' : j === step && plot.needs_care ? 'now' : ''}"></span>`,
+            ).join('')}</div>`
           : '';
 
-      return `<div class="plot-cell" data-plot="${i}" role="gridcell">
-        <img class="plot-img" src="${plotAsset(plot)}" alt="">
-        ${lockOverlay}
-        ${indicator}
+      return `<div class="${cls}" data-plot="${i}" role="gridcell">
+        <img class="plot-img" src="${plotBaseAsset(plot)}" alt="">
+        ${cropHtml}
+        ${badge ? `<span class="plot-badge care">${badge}</span>` : ''}
+        ${progressHtml}
       </div>`;
     })
     .join('');
 
   grid.querySelectorAll('.plot-cell').forEach((el) => {
-    el.addEventListener('click', () => onPlotTap(Number(el.dataset.plot)));
+    el.addEventListener('click', () => handlePlotTap(Number(el.dataset.plot)));
   });
 }
 
-async function onPlotTap(index) {
+async function handlePlotTap(index) {
   const plot = farm.plots[index];
   if (!plot) return;
 
-  if (plot.state === 'locked') {
-    unlockPlotIndex = index;
-    document.getElementById('unlock-price').textContent = plot.unlock_price;
-    document.getElementById('dialog-unlock').classList.remove('hidden');
+  if (plot.state === 'empty') {
+    openPlotSheet(index);
     return;
   }
+
+  if (plot.ready || plot.state === 'ready') {
+    await runPlotAction('harvest', index);
+    return;
+  }
+
+  if (plot.state === 'dead') {
+    openPlotSheet(index);
+    return;
+  }
+
+  if (plot.needs_water && plot.needs_care) {
+    await runPlotAction('water', index);
+    return;
+  }
+
+  if (plot.needs_fertilize && plot.needs_care) {
+    await runPlotAction('fertilize', index);
+    return;
+  }
+
+  if (plot.state === 'wilting' && plot.care_type === 'water') {
+    await runPlotAction('water', index);
+    return;
+  }
+
+  if ((plot.care_type === 'sick' && plot.needs_care) || plot.state === 'wilting') {
+    openPlotSheet(index);
+    return;
+  }
+
+  openPlotSheet(index);
+}
+
+function openPlotSheet(index, show = true) {
+  activePlot = index;
+  const plot = farm.plots[index];
+  if (!plot) return;
+
+  const seed = plot.seed_id ? seeds[plot.seed_id] : null;
+  document.getElementById('plot-sheet-title').textContent = seed
+    ? `${seed.name} — Plot ${index + 1}`
+    : `Plot ${index + 1}`;
+
+  const body = document.getElementById('plot-sheet-body');
+  body.innerHTML = buildPlotSheetContent(plot, seed);
+
+  body.querySelectorAll('[data-action]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      runPlotAction(btn.dataset.action, index, btn.dataset.seed);
+    });
+  });
+
+  if (show) document.getElementById('sheet-plot').classList.remove('hidden');
+}
+
+function buildPlotSheetContent(plot, seed) {
+  const steps = careRules.stepsToHarvest || 10;
+  const step = plot.care_step || 0;
 
   if (plot.state === 'empty') {
-    if (selectedSeed) {
-      await plantSeed(index);
-    } else {
-      Arcade.toast('🛒 Buy seeds first — tap Seeds below', 'lose');
-    }
-    return;
+    return `<p class="sheet-intro">10 care rounds per crop. Miss one → wilt → dead.</p>
+      <div class="seed-pick-list">${seedList
+        .map((s) => {
+          const ok = walletBalance >= s.price;
+          return `<button type="button" class="seed-pick-row ${ok ? '' : 'disabled'}" data-action="plant" data-seed="${s.id}" ${ok ? '' : 'disabled'}>
+            <img src="${assetSeed(s.assets.seed)}" alt="">
+            <span class="seed-pick-info">
+              <strong>${s.name}</strong>
+              <small>${steps} care rounds · x${s.harvestAmount} harvest</small>
+            </span>
+            <span class="seed-pick-price">🪙 ${s.price}</span>
+          </button>`;
+        })
+        .join('')}</div>`;
   }
 
-  if (isGrowing(plot)) {
-    if (isReady(plot)) {
-      await harvest(index);
-    } else {
-      const seed = seeds[plot.seed_id];
-      const remaining = seed.growSeconds * 1000 - (Date.now() - new Date(plot.planted_at).getTime());
-      Arcade.toast(`⏱️ ${seed.name} ready in ${formatRemaining(remaining)}`, 'win');
-    }
-    return;
-  }
-
-  if (plot.state === 'ready' || isReady(plot)) {
-    await harvest(index);
-  }
-}
-
-function clearSelectedSeed() {
-  selectedSeed = null;
-  updateSeedBanner();
-}
-
-function updateSeedBanner() {
-  const banner = document.getElementById('seed-banner');
-  if (!selectedSeed) {
-    banner.classList.add('hidden');
-    return;
-  }
-  banner.classList.remove('hidden');
-  document.getElementById('seed-banner-img').src = assetSeed(selectedSeed.assets.seed);
-  document.getElementById('seed-banner-text').textContent = `${selectedSeed.name} selected — tap a plot to plant`;
-}
-
-function selectSeed(seed) {
-  if (farm.farm_level < seed.requiredLevel) {
-    Arcade.toast(`🔒 Requires farm level ${seed.requiredLevel}`, 'lose');
-    return;
-  }
-  if (farm.farm_coins < seed.price) {
-    Arcade.toast('❌ Not enough coins', 'lose');
-    return;
-  }
-  selectedSeed = seed;
-  updateSeedBanner();
-  closeSheet('sheet-shop');
-  Arcade.toast(`🌱 ${seed.name} selected — tap a plot to plant`, 'win');
-}
-
-async function plantSeed(index) {
-  if (!selectedSeed) return;
-  const seedId = selectedSeed.id;
-  selectedSeed = null;
-  updateSeedBanner();
-
-  try {
-    await Arcade.post('/api/fast-farm/buy-seed', {
-      seed_id: seedId,
-      plot_index: index,
-    });
-    Arcade.toast('🌱 Planted! Wait for it to grow', 'win');
-    await refreshFarm();
-  } catch (e) {
-    Arcade.toast(e.message || 'Failed to plant', 'lose');
-  }
-}
-
-async function harvest(index) {
-  const plot = farm.plots[index];
-  const seed = seeds[plot?.seed_id];
-  if (!seed) return;
-
-  try {
-    const r = await Arcade.post('/api/fast-farm/harvest', { plot_index: index });
-    const amount = r.harvested?.amount ?? seed.harvestAmount;
-    addFloatEffect(`+${amount} ${seed.name}`, 'green');
-    Arcade.toast(`🌾 Harvested ${amount}× ${seed.name}!`, 'win');
-    await refreshFarm();
-    if (document.getElementById('sheet-backpack') && !document.getElementById('sheet-backpack').classList.contains('hidden')) {
-      renderBackpack();
-    }
-  } catch (e) {
-    Arcade.toast(e.message || 'Failed to harvest', 'lose');
-  }
-}
-
-async function confirmUnlock() {
-  if (unlockPlotIndex == null) return;
-  try {
-    await Arcade.post('/api/fast-farm/unlock-plot', { plot_index: unlockPlotIndex });
-    closeSheet('dialog-unlock');
-    unlockPlotIndex = null;
-    Arcade.toast('🎉 Plot unlocked!', 'win');
-    await refreshFarm();
-  } catch (e) {
-    Arcade.toast(e.message || 'Failed to unlock', 'lose');
-  }
-}
-
-function openShop() {
-  renderSeedShop();
-  document.getElementById('sheet-shop').classList.remove('hidden');
-}
-
-function renderSeedShop() {
-  const el = document.getElementById('seed-grid');
-  const level = farm.farm_level ?? 1;
-  const coins = farm.farm_coins ?? 0;
-
-  el.innerHTML = seedList
-    .map((seed) => {
-      const unlocked = level >= seed.requiredLevel;
-      const canAfford = coins >= seed.price;
-      let cls = 'seed-card';
-      if (!unlocked) cls += ' locked';
-      else if (!canAfford) cls += ' afford-none';
-
-      let overlay = '';
-      if (!unlocked) {
-        overlay = `<div class="seed-card-overlay"><span>🔒</span><span class="lock-badge">🌿 Level ${seed.requiredLevel}</span></div>`;
-      } else if (!canAfford) {
-        overlay = `<div class="seed-card-overlay"><span class="lock-badge">💸 Need more coins</span></div>`;
-      }
-
-      return `<div class="${cls}" data-seed="${seed.id}">
-        ${overlay}
-        <div class="seed-card-img"><img src="${assetSeed(seed.assets.seed)}" alt=""></div>
-        <h4>${seed.name}</h4>
-        <p class="desc">${seed.description}</p>
-        <div class="seed-card-meta">
-          <span>⏱️ ${formatGrow(seed.growSeconds)}</span>
-          <span>🌾 x${seed.harvestAmount}</span>
-        </div>
-        <div class="seed-card-price"><span class="coin-icon">🪙</span> ${seed.price}</div>
+  if (plot.state === 'dead') {
+    return `<p class="sheet-intro warn">Crop died. Heal to retry (same progress) or clear.</p>
+      <div class="action-row">
+        <button type="button" class="action-btn heal" data-action="heal">💊 Revive 🪙${careCosts.heal}</button>
+        <button type="button" class="action-btn clear" data-action="clear">🗑️ Clear plot</button>
       </div>`;
-    })
-    .join('');
+  }
 
-  el.querySelectorAll('.seed-card:not(.locked):not(.afford-none)').forEach((card) => {
-    card.addEventListener('click', () => selectSeed(seeds[card.dataset.seed]));
-  });
+  if (plot.ready || plot.state === 'ready') {
+    return `<p class="sheet-intro success">Survived all ${steps} rounds!</p>
+      <div class="action-row">
+        <button type="button" class="action-btn harvest" data-action="harvest">🌾 Harvest</button>
+      </div>`;
+  }
+
+  const careName =
+    plot.care_type === 'fertilize' ? 'Fertilizer' : plot.care_type === 'sick' ? 'Medicine' : 'Water';
+
+  let html = `<p class="sheet-intro">Round <strong>${step + 1}/${steps}</strong> — needs <strong>${careName}</strong></p>
+    <div class="action-row">`;
+
+  if (plot.care_type === 'water' || plot.state === 'wilting') {
+    html += `<button type="button" class="action-btn water ${plot.needs_care ? 'pulse' : ''}" data-action="water">💧 Water</button>`;
+  }
+  if (plot.care_type === 'fertilize') {
+    html += `<button type="button" class="action-btn fert ${plot.needs_care ? 'pulse' : ''}" data-action="fertilize">🌿 Fertilize 🪙${careCosts.fertilize}</button>`;
+  }
+  if (plot.care_type === 'sick' || plot.state === 'wilting') {
+    html += `<button type="button" class="action-btn heal ${plot.needs_care ? 'pulse' : ''}" data-action="heal">💊 Heal 🪙${careCosts.heal}</button>`;
+  }
+
+  html += `</div><p class="care-tip">~${careRules.careWindowSec}s per round. Stagger planting so plots don't all scream at once.</p>`;
+  return html;
 }
 
-function openBackpack(tab = 'inventory') {
-  sellQty = {};
+async function runPlotAction(action, index, seedId) {
+  if (action === 'plant') {
+    if (!seedId) return;
+    try {
+      await Arcade.post('/api/fast-farm/buy-seed', { seed_id: seedId, plot_index: index });
+      Arcade.toast('🌱 Planted — stay alert!', 'win');
+      closeSheet('sheet-plot');
+      await refreshFarm();
+    } catch (e) {
+      Arcade.toast(e.message || 'Failed to plant', 'lose');
+    }
+    return;
+  }
+
+  const routes = {
+    water: '/api/fast-farm/water',
+    fertilize: '/api/fast-farm/fertilize',
+    heal: '/api/fast-farm/heal',
+    clear: '/api/fast-farm/clear',
+    harvest: '/api/fast-farm/harvest',
+  };
+
+  try {
+    const r = await Arcade.post(routes[action], { plot_index: index });
+    if (action === 'water') {
+      addFloatEffect('💧', 'blue');
+      Arcade.toast('💧 Watered!', 'win');
+    }
+    if (action === 'fertilize') Arcade.toast('🌿 Fed!', 'win');
+    if (action === 'heal') Arcade.toast('💊 Healed!', 'win');
+    if (action === 'clear') {
+      Arcade.toast('Plot cleared', 'win');
+      closeSheet('sheet-plot');
+    }
+    if (action === 'harvest') {
+      const seed = seeds[farm.plots[index]?.seed_id];
+      addFloatEffect(`+${r.harvested?.amount || '?'} ${seed?.name || ''}`, 'green');
+      Arcade.toast('🌾 Harvested!', 'win');
+      closeSheet('sheet-plot');
+    }
+    await refreshFarm();
+  } catch (e) {
+    Arcade.toast(e.message || 'Action failed', 'lose');
+  }
+}
+
+async function openBackpack() {
   renderBackpack();
-  switchBackpackTab(tab);
   document.getElementById('sheet-backpack').classList.remove('hidden');
 }
 
-function switchBackpackTab(tab) {
-  document.querySelectorAll('.sheet-tab').forEach((t) => {
-    t.classList.toggle('active', t.dataset.tab === tab);
-  });
-  document.getElementById('tab-inventory').classList.toggle('hidden', tab !== 'inventory');
-  document.getElementById('tab-sell').classList.toggle('hidden', tab !== 'sell');
-}
-
 function renderBackpack() {
-  const inv = farm.inventory || [];
+  const inv = farm.inventory || {};
   const invEl = document.getElementById('tab-inventory');
-  const sellEl = document.getElementById('tab-sell');
+  const entries = Object.entries(inv).filter(([, qty]) => qty > 0);
 
-  if (!inv.length) {
-    const empty = `<div class="empty-backpack">
+  if (!entries.length) {
+    invEl.innerHTML = `<div class="empty-backpack">
       <div class="emoji">🌱</div>
-      <h3>Backpack empty</h3>
-      <p>Harvest crops to fill your bag!</p>
+      <h3>Bag empty</h3>
+      <p>Survive 10 care rounds, harvest, sell at Black Market.</p>
     </div>`;
-    invEl.innerHTML = empty;
-    sellEl.innerHTML = empty;
     return;
   }
 
-  invEl.innerHTML = `<div class="inv-grid">${inv
-    .map((item) => {
-      const seed = seeds[item.crop_id];
+  invEl.innerHTML = `<div class="inv-grid">${entries
+    .map(([itemId, qty]) => {
+      const seedId = MARKET_TO_SEED[itemId];
+      const seed = seeds[seedId];
       if (!seed) return '';
       return `<div class="inv-card">
-        <span class="inv-qty">x${item.quantity}</span>
+        <span class="inv-qty">x${qty}</span>
         <img src="${assetIcon(seed.assets.icon)}" alt="">
         <span>${seed.name}</span>
       </div>`;
     })
     .join('')}</div>`;
-
-  sellEl.innerHTML = inv
-    .map((item) => {
-      const seed = seeds[item.crop_id];
-      if (!seed) return '';
-      const qty = sellQty[item.crop_id] ?? 0;
-      return `<div class="sell-row" data-crop="${item.crop_id}">
-        <img src="${assetIcon(seed.assets.icon)}" alt="">
-        <div class="sell-info">
-          <strong>${seed.name}</strong>
-          <small>Available: ${item.quantity} · 🪙 ${seed.sellPrice} each</small>
-        </div>
-        <div class="qty-controls">
-          <button type="button" class="qty-btn qty-minus" ${qty <= 0 ? 'disabled' : ''}>−</button>
-          <span class="qty-val">${qty}</span>
-          <button type="button" class="qty-btn qty-plus" ${qty >= item.quantity ? 'disabled' : ''}>+</button>
-        </div>
-        ${qty > 0 ? `<button type="button" class="btn-dialog primary sell-one" style="margin-left:8px;padding:8px 12px">Sell</button>` : ''}
-      </div>`;
-    })
-    .join('');
-
-  sellEl.querySelectorAll('.sell-row').forEach((row) => {
-    const cropId = row.dataset.crop;
-    const max = inv.find((i) => i.crop_id === cropId)?.quantity ?? 0;
-    row.querySelector('.qty-minus')?.addEventListener('click', () => {
-      sellQty[cropId] = Math.max(0, (sellQty[cropId] ?? 0) - 1);
-      renderBackpack();
-      switchBackpackTab('sell');
-    });
-    row.querySelector('.qty-plus')?.addEventListener('click', () => {
-      sellQty[cropId] = Math.min(max, (sellQty[cropId] ?? 0) + 1);
-      renderBackpack();
-      switchBackpackTab('sell');
-    });
-    row.querySelector('.sell-one')?.addEventListener('click', () => sellCrop(cropId, sellQty[cropId] ?? 0));
-  });
-}
-
-async function sellCrop(cropId, quantity) {
-  if (!quantity) return;
-  try {
-    const r = await Arcade.post('/api/fast-farm/sell', { crop_id: cropId, quantity });
-    addFloatEffect(`+${r.earned_coins} 🪙`, 'amber');
-    if (r.leveled_up) {
-      Arcade.toast(`🎉 Farm level ${r.farm_level}!`, 'win');
-    }
-    sellQty[cropId] = 0;
-    await refreshFarm();
-    renderBackpack();
-    switchBackpackTab('sell');
-  } catch (e) {
-    Arcade.toast(e.message || 'Failed to sell', 'lose');
-  }
 }
 
 function closeSheet(id) {
   document.getElementById(id)?.classList.add('hidden');
-  if (id === 'dialog-unlock') unlockPlotIndex = null;
+  if (id === 'sheet-plot') activePlot = null;
 }
 
 function addFloatEffect(text, colorClass) {
   const el = document.createElement('div');
   el.className = `float-effect ${colorClass}`;
   el.textContent = text;
-  el.style.top = '50%';
+  el.style.top = '45%';
   document.getElementById('fx-layer').appendChild(el);
   setTimeout(() => el.remove(), 2000);
 }

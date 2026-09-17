@@ -36,23 +36,39 @@ html, body {
   pointer-events: none;
 }
 
-.farm-ui {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
+/* Plot field — wide & low on the grass (tune via plotLayout config) */
+.farm-scene {
+  position: absolute;
+  left: 6%;
+  bottom: 10%;
+  width: 74%;
+  aspect-ratio: 1;
+  z-index: 5;
+}
+
+.farm-grid {
+  width: 100%;
   height: 100%;
-  min-height: 0;
-  padding-bottom: env(safe-area-inset-bottom, 0);
-  justify-content: flex-end;
+}
+
+.farm-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
 }
 
 .farm-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
   padding-top: max(12px, env(safe-area-inset-top, 12px));
+  pointer-events: auto;
 }
 
 .farm-back-btn {
@@ -70,42 +86,83 @@ html, body {
   text-decoration: none;
 }
 
-.farm-level-badge {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 16px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1.5px solid rgba(76, 175, 80, 0.6);
-  color: #a5d6a7;
-  font-size: 0.875rem;
+.farm-hint {
+  margin: 0;
+  flex: 1;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
-.farm-coins-pill {
-  margin-left: auto;
+.harvest-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 25px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 2px solid rgba(255, 193, 7, 0.6);
-  color: #ffc107;
-  font-size: 1.25rem;
+  gap: 6px;
+  max-width: 46%;
+  padding: 8px 12px;
+  border: 1.5px solid rgba(255, 152, 0, 0.55);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(230, 81, 0, 0.85), rgba(255, 152, 0, 0.85));
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.72rem;
   font-weight: 800;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(230, 81, 0, 0.35);
+}
+
+.harvest-chip.hidden { display: none; }
+
+.harvest-chip-icon {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+#harvest-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .coin-icon { font-size: 1.1em; line-height: 1; }
 
+.sheet-balance {
+  margin-left: auto;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ff8f00, #ffc107);
+  color: #fff;
+  font-weight: 800;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.market-hint {
+  margin: 0 16px 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 .seed-banner {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 118px;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 16px 8px;
   padding: 10px 16px;
+  pointer-events: auto;
   border-radius: 16px;
   background: linear-gradient(135deg, #388e3c, #66bb6a);
   box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
@@ -134,26 +191,12 @@ html, body {
   cursor: pointer;
 }
 
-.farm-spacer-top {
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.farm-spacer-bottom {
-  flex: 0 0 8px;
-}
-
-/* 3×3 plot grid — flush on background, no gaps (Flutter GridView spacing 0) */
+/* 3×3 plot grid — flush tiles, no gaps */
 .farm-grid {
-  width: 100%;
-  height: min(100vw, 430px);
-  max-height: 58vh;
-  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
   gap: 0;
-  margin: 0 auto;
 }
 
 .plot-cell {
@@ -164,6 +207,170 @@ html, body {
 }
 
 .plot-cell:active { opacity: 0.92; }
+
+.plot-cell.needs-care {
+  animation: plot-urgent 0.7s ease-in-out infinite;
+}
+
+.plot-cell.dead .plot-img {
+  filter: grayscale(0.7) brightness(0.6);
+}
+
+.plot-cell.ready .plot-crop {
+  animation: plot-ready 1.2s ease-in-out infinite;
+}
+
+@keyframes plot-urgent {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.12); }
+}
+
+@keyframes plot-ready {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.06); filter: brightness(1.15); }
+}
+
+/* Crop sprite on plot — sick states are obvious */
+.plot-crop {
+  position: absolute;
+  inset: 8% 12% 18% 12%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.crop-sprite {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+  transition: filter 0.25s, transform 0.25s;
+}
+
+.sick-veil {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.sick-bugs {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  font-size: 0.75rem;
+  animation: bug-wiggle 0.5s ease-in-out infinite;
+}
+
+@keyframes bug-wiggle {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+
+.crop-ok .crop-sprite { filter: saturate(1.05); }
+
+.crop-thirsty .crop-sprite {
+  filter: sepia(0.25) saturate(0.55) brightness(0.95);
+  transform: scale(0.94) translateY(2px);
+}
+
+.crop-thirsty .sick-veil {
+  background: radial-gradient(circle, rgba(139, 90, 43, 0.35) 0%, transparent 70%);
+}
+
+.crop-hungry .crop-sprite {
+  filter: hue-rotate(25deg) saturate(0.5) brightness(0.85);
+  transform: scale(0.92);
+}
+
+.crop-hungry .sick-veil {
+  background: radial-gradient(circle, rgba(101, 67, 33, 0.4) 0%, transparent 65%);
+}
+
+.crop-sick .crop-sprite,
+.crop-wilting .crop-sprite {
+  filter: hue-rotate(80deg) saturate(0.35) brightness(0.75) contrast(0.9);
+  transform: scale(0.88) rotate(-4deg);
+  animation: crop-shiver 0.35s ease-in-out infinite;
+}
+
+.crop-sick .sick-veil,
+.crop-wilting .sick-veil {
+  background: radial-gradient(circle, rgba(76, 175, 80, 0.25) 0%, rgba(139, 0, 0, 0.2) 100%);
+}
+
+.crop-dead .crop-sprite {
+  filter: grayscale(1) brightness(0.5);
+  transform: scale(0.8) rotate(8deg);
+  opacity: 0.7;
+}
+
+.crop-ready .crop-sprite {
+  filter: saturate(1.2) brightness(1.1);
+  transform: scale(1.05);
+}
+
+@keyframes crop-shiver {
+  0%, 100% { transform: scale(0.88) rotate(-4deg); }
+  50% { transform: scale(0.86) rotate(4deg); }
+}
+
+/* Care progress pips (no countdown timer) */
+.care-pips {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.care-pip {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.care-pip.done {
+  background: #66bb6a;
+  border-color: #a5d6a7;
+}
+
+.care-pip.now {
+  background: #ff9800;
+  border-color: #ffe082;
+  animation: pip-blink 0.6s ease-in-out infinite;
+}
+
+@keyframes pip-blink {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+}
+
+.plot-badge {
+  position: absolute;
+  z-index: 5;
+  font-size: 1rem;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+}
+
+.plot-badge.care {
+  top: 2px;
+  right: 2px;
+  animation: badge-pulse 0.7s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
 
 .plot-img {
   position: absolute;
@@ -248,9 +455,14 @@ html, body {
 
 /* Bottom action bar */
 .farm-bottom-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   justify-content: space-evenly;
-  padding: 0 24px 16px;
+  padding: 0 24px max(16px, env(safe-area-inset-bottom, 16px));
+  pointer-events: auto;
 }
 
 .farm-action-btn {
@@ -330,6 +542,7 @@ html, body {
 
 .float-effect.green { background: rgba(76, 175, 80, 0.9); box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
 .float-effect.amber { background: rgba(255, 193, 7, 0.9); box-shadow: 0 0 10px rgba(255, 193, 7, 0.5); }
+.float-effect.blue { background: rgba(33, 150, 243, 0.9); box-shadow: 0 0 10px rgba(33, 150, 243, 0.5); font-size: 1.5rem; }
 
 @keyframes float-up {
   0% { opacity: 1; top: 50%; }
@@ -371,8 +584,140 @@ html, body {
   to { transform: translateY(0); }
 }
 
-.sheet-shop {
+.sheet-shop,
+.sheet-plot {
   background: linear-gradient(180deg, #4a7023, #2d1b0e);
+}
+
+.sheet-header.compact {
+  padding: 12px 20px 8px;
+}
+
+.plot-sheet-body {
+  padding: 0 16px 24px;
+  overflow-y: auto;
+  max-height: 50vh;
+}
+
+.sheet-intro {
+  margin: 0 0 12px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.sheet-intro.warn { color: #ffb74d; }
+.sheet-intro.success { color: #a5d6a7; font-weight: 700; }
+
+.care-tip {
+  margin: 12px 0 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
+}
+
+.seed-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seed-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid rgba(129, 199, 132, 0.5);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.seed-pick-row:active { transform: scale(0.98); }
+.seed-pick-row.disabled { opacity: 0.45; cursor: default; }
+
+.seed-pick-row img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+.seed-pick-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.seed-pick-info strong { font-size: 0.95rem; }
+.seed-pick-info small { color: rgba(255, 255, 255, 0.6); font-size: 0.75rem; }
+
+.seed-pick-price {
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff8f00, #ffc107);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.action-btn {
+  flex: 1 1 45%;
+  min-width: 120px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 16px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.action-btn:active { transform: scale(0.97); }
+
+.action-btn.water {
+  background: linear-gradient(135deg, #0288d1, #29b6f6);
+}
+
+.action-btn.fert {
+  background: linear-gradient(135deg, #558b2f, #7cb342);
+}
+
+.action-btn.heal {
+  background: linear-gradient(135deg, #8e24aa, #ab47bc);
+}
+
+.action-btn.harvest {
+  flex: 1 1 100%;
+  background: linear-gradient(135deg, #f9a825, #ffca28);
+  color: #3e2723;
+  font-size: 1.05rem;
+}
+
+.action-btn.clear {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.action-btn.pulse {
+  animation: btn-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes btn-pulse {
+  0%, 100% { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); }
+  50% { box-shadow: 0 0 16px rgba(41, 182, 246, 0.7); }
 }
 
 .sheet-backpack {

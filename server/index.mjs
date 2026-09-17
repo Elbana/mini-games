@@ -18,6 +18,10 @@ import {
   handleGetFarmConfig,
   handleGetFarmState,
   handleBuySeed,
+  handleWater,
+  handleFertilize,
+  handleHeal,
+  handleClearPlot,
   handleHarvest,
   handleSell as handleFarmSell,
   handleUnlockPlot,
@@ -74,6 +78,10 @@ app.post('/api/candy-battle/abandon', handleAbandonFight);
 app.get('/api/fast-farm/config', handleGetFarmConfig);
 app.get('/api/fast-farm/state', handleGetFarmState);
 app.post('/api/fast-farm/buy-seed', handleBuySeed);
+app.post('/api/fast-farm/water', handleWater);
+app.post('/api/fast-farm/fertilize', handleFertilize);
+app.post('/api/fast-farm/heal', handleHeal);
+app.post('/api/fast-farm/clear', handleClearPlot);
 app.post('/api/fast-farm/harvest', handleHarvest);
 app.post('/api/fast-farm/sell', handleFarmSell);
 app.post('/api/fast-farm/unlock-plot', handleUnlockPlot);
