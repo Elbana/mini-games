@@ -1,8 +1,8 @@
-/* Deep Cast — top-down boat on flat scrolling water */
+/* Deep Cast — calm top-down fishing on still water */
 
 .fish-shell {
-  background: #0369a1;
-  font-family: 'Fredoka', 'Nunito', sans-serif;
+  background: #0c6b8a;
+  font-family: 'Nunito', 'Fredoka', sans-serif;
   position: relative;
 }
 
@@ -12,8 +12,15 @@
   left: 0;
   right: 0;
   z-index: 20;
-  background: linear-gradient(180deg, rgba(0, 30, 50, 0.55), transparent);
+  background: linear-gradient(180deg, rgba(0, 40, 60, 0.35), transparent);
   pointer-events: auto;
+}
+
+.fish-top-bar h1 {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .fish-toast-zone {
@@ -31,17 +38,17 @@
 .fish-toast {
   align-self: center;
   max-width: 100%;
-  padding: 7px 14px;
+  padding: 7px 16px;
   border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 800;
-  background: rgba(0, 30, 50, 0.72);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: rgba(0, 40, 60, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
   opacity: 0;
-  transform: translateY(-8px);
-  transition: opacity 0.2s, transform 0.2s;
+  transform: translateY(-6px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -53,18 +60,13 @@
 }
 
 .fish-toast.win {
-  border-color: rgba(93, 255, 176, 0.55);
-  color: #b6ffd8;
+  border-color: rgba(147, 230, 200, 0.4);
+  color: #c8f5e4;
 }
 
 .fish-toast.lose {
-  border-color: rgba(255, 90, 122, 0.55);
-  color: #ffb3c1;
-}
-
-.fish-top-bar h1 {
-  font-family: 'Fredoka', sans-serif;
-  font-size: 1rem;
+  border-color: rgba(255, 180, 190, 0.35);
+  color: #ffd6dc;
 }
 
 /* ── Ocean scene — full screen ── */
@@ -74,66 +76,47 @@
   overflow: hidden;
 }
 
-/* Scrolling water tiles — drift simulates boat movement */
+/* Still water — no scroll */
 .water-bg {
   position: absolute;
-  inset: -25%;
-  overflow: hidden;
-}
-
-.water-tile {
-  position: absolute;
   inset: 0;
-  background: url('/assets/fishing/water.png') center / 105% auto repeat;
-  will-change: transform;
-}
-
-.water-tile-a {
-  animation: water-drift-a 22s linear infinite;
-}
-
-.water-tile-b {
-  opacity: 0.35;
-  mix-blend-mode: soft-light;
-  animation: water-drift-b 30s linear infinite;
-}
-
-@keyframes water-drift-a {
-  0% { transform: translate(0, 0) scale(1.05); }
-  100% { transform: translate(-6%, -10%) scale(1.05); }
-}
-
-@keyframes water-drift-b {
-  0% { transform: translate(0, 0) scale(1.08); }
-  100% { transform: translate(5%, 8%) scale(1.08); }
+  background: url('/assets/fishing/water.png') center / cover no-repeat;
 }
 
 .water-veil {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 90% 60% at 50% 40%, rgba(255, 255, 255, 0.08), transparent 60%),
-    linear-gradient(180deg, rgba(0, 40, 70, 0.12) 0%, transparent 30%, rgba(0, 30, 60, 0.18) 100%);
+    radial-gradient(ellipse 80% 55% at 50% 42%, rgba(255, 255, 255, 0.1), transparent 65%),
+    linear-gradient(180deg, rgba(0, 50, 80, 0.08) 0%, transparent 40%, rgba(0, 40, 70, 0.1) 100%);
   pointer-events: none;
   z-index: 1;
+  animation: water-shimmer 10s ease-in-out infinite;
 }
 
-/* ── Fish shadows ── */
+@keyframes water-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.88; }
+}
+
+/* ── Fish shadows (under the boat) ── */
 .fish-shadows {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
   overflow: hidden;
 }
 
 .fish-shadow {
   position: absolute;
+  left: 50%;
+  top: 50%;
   width: var(--fish-w, 48px);
   height: var(--fish-h, 16px);
   opacity: 0;
   transform-origin: center;
-  animation: fish-swim var(--fish-dur, 16s) linear infinite;
+  animation: fish-swim var(--fish-dur, 28s) ease-in-out infinite;
   animation-delay: var(--fish-delay, 0s);
 }
 
@@ -141,9 +124,9 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(0, 55, 75, 0.42);
+  background: rgba(0, 50, 70, 0.32);
   border-radius: 50% 45% 45% 50%;
-  filter: blur(1.5px);
+  filter: blur(2px);
 }
 
 .fish-shadow::after {
@@ -153,33 +136,35 @@
   top: 50%;
   transform: translateY(-50%);
   border: 5px solid transparent;
-  border-left: 10px solid rgba(0, 55, 75, 0.38);
-  filter: blur(1px);
+  border-left: 10px solid rgba(0, 50, 70, 0.28);
+  filter: blur(1.5px);
 }
 
 .fish-shadow.big::before {
-  background: rgba(0, 45, 65, 0.28);
+  background: rgba(0, 40, 60, 0.22);
   border-radius: 55% 45% 50% 50%;
 }
 
 .fish-shadow.big::after {
-  border-left-color: rgba(0, 45, 65, 0.25);
+  border-left-color: rgba(0, 40, 60, 0.2);
 }
 
 @keyframes fish-swim {
   0% {
-    transform: translate(var(--x0), var(--y0)) rotate(var(--rot)) scale(var(--fish-scale, 1));
+    transform: translate(calc(-50% + var(--x0)), calc(-50% + var(--y0))) rotate(var(--rot)) scale(var(--fish-scale, 1));
     opacity: 0;
   }
-  8% { opacity: var(--fish-opacity, 0.7); }
-  92% { opacity: var(--fish-opacity, 0.7); }
+  12% { opacity: var(--fish-opacity, 0.55); }
+  88% { opacity: var(--fish-opacity, 0.55); }
   100% {
-    transform: translate(var(--x1), var(--y1)) rotate(var(--rot)) scale(var(--fish-scale, 1));
+    transform: translate(calc(-50% + var(--x0)), calc(-50% + var(--y0)))
+               translate(var(--dx), var(--dy))
+               rotate(var(--rot)) scale(var(--fish-scale, 1));
     opacity: 0;
   }
 }
 
-/* Surface ripples */
+/* Surface ripples — soft, sparse */
 .ripple-field {
   position: absolute;
   inset: 0;
@@ -191,28 +176,28 @@
   position: absolute;
   width: var(--ripple-size, 40px);
   height: var(--ripple-size, 40px);
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 50%;
   opacity: 0;
-  animation: ripple-pulse var(--ripple-dur, 4s) ease-out infinite;
+  animation: ripple-pulse var(--ripple-dur, 6s) ease-out infinite;
   animation-delay: var(--ripple-delay, 0s);
 }
 
 @keyframes ripple-pulse {
-  0% { transform: scale(0.3); opacity: 0.5; }
-  100% { transform: scale(1.4); opacity: 0; }
+  0% { transform: scale(0.4); opacity: 0.35; }
+  100% { transform: scale(1.5); opacity: 0; }
 }
 
-/* ── Boat (top-down, centered) ── */
+/* ── Boat — gentle bob only ── */
 .boat-wrap {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: min(52vw, 220px);
-  transform: translate(-50%, -54%);
+  width: min(50vw, 210px);
+  transform: translate(-50%, -52%);
   z-index: 5;
-  animation: boat-bob 3s ease-in-out infinite;
-  filter: drop-shadow(0 12px 24px rgba(0, 30, 50, 0.35));
+  animation: boat-bob 5.5s ease-in-out infinite;
+  filter: drop-shadow(0 10px 20px rgba(0, 30, 50, 0.22));
 }
 
 .boat-art {
@@ -222,34 +207,33 @@
 }
 
 @keyframes boat-bob {
-  0%, 100% { transform: translate(-50%, -54%) rotate(-1.5deg); }
-  50% { transform: translate(-50%, calc(-54% - 8px)) rotate(1.5deg); }
+  0%, 100% { transform: translate(-50%, -52%) rotate(-0.6deg); }
+  50% { transform: translate(-50%, calc(-52% - 4px)) rotate(0.6deg); }
 }
 
-/* Cast line pulse when reeling */
 .boat-wrap.casting #main-line {
-  stroke: rgba(255, 213, 110, 0.95);
-  stroke-width: 2;
-  animation: line-tug 0.4s ease-in-out infinite;
+  stroke: rgba(255, 230, 180, 0.85);
+  stroke-width: 1.6;
+  animation: line-tug 0.7s ease-in-out infinite;
 }
 
 @keyframes line-tug {
   0%, 100% { stroke-dashoffset: 0; }
-  50% { stroke-dashoffset: 6; }
+  50% { stroke-dashoffset: 4; }
 }
 
-/* ── HUD — floats over water ── */
+/* ── HUD — light, calm ── */
 .fish-hud {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  left: 16px;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom, 16px));
   margin: 0;
-  padding: 12px 14px;
-  background: rgba(0, 30, 50, 0.55);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 24px rgba(0, 30, 50, 0.15);
   z-index: 10;
   pointer-events: auto;
 }
@@ -259,82 +243,92 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
-  font-size: 0.84rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .cast-btn {
   width: 100%;
-  font-size: 1rem;
-  padding: 12px;
-  background: linear-gradient(135deg, #38bdf8, #0284c7);
-  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 13px;
+  background: linear-gradient(135deg, rgba(103, 232, 249, 0.85), rgba(8, 145, 178, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(8, 145, 178, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* ── Reel overlay ── */
+.cast-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 10px rgba(8, 145, 178, 0.2);
+}
+
+/* ── Reel overlay — softer burst ── */
 .reel-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2, 40, 65, 0.88);
-  backdrop-filter: blur(10px);
+  background: rgba(2, 50, 75, 0.65);
+  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  padding-bottom: max(28px, env(safe-area-inset-bottom, 28px));
   z-index: 40;
-  padding: 24px;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
 .reel-overlay.hidden { display: none; }
 
 .reel-title {
   font-family: 'Fredoka', sans-serif;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--arcade-gold);
-  text-shadow: 0 0 24px rgba(255, 213, 110, 0.6);
-  animation: pulse-glow 0.9s infinite;
-  margin-bottom: 28px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: rgba(255, 240, 210, 0.95);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  margin-bottom: 20px;
+  letter-spacing: 0.04em;
 }
 
 .reel-track {
-  width: min(100%, 340px);
-  height: 56px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0.7));
+  width: min(100%, 320px);
+  height: 48px;
+  background: rgba(0, 0, 0, 0.25);
   border-radius: 999px;
   position: relative;
   overflow: hidden;
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  margin-bottom: 28px;
-  box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  margin-bottom: 20px;
 }
 
 .reel-zone {
   position: absolute;
   top: 5px;
   bottom: 5px;
-  background: linear-gradient(90deg, rgba(93,255,176,0.3), rgba(93,255,176,0.7), rgba(93,255,176,0.3));
+  background: linear-gradient(90deg, rgba(147, 230, 200, 0.25), rgba(147, 230, 200, 0.55), rgba(147, 230, 200, 0.25));
   border-radius: 999px;
-  border: 2px solid #5dffb0;
-  box-shadow: 0 0 24px rgba(93, 255, 176, 0.5);
+  border: 1.5px solid rgba(147, 230, 200, 0.6);
 }
 
 .reel-pointer {
   position: absolute;
   top: 4px;
   bottom: 4px;
-  width: 6px;
-  background: linear-gradient(180deg, #fff, #ffd56e);
-  border-radius: 3px;
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.9);
+  width: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 2px;
   left: 0;
 }
 
 #btn-reel {
-  min-width: 180px;
-  font-size: 1.2rem;
-  padding: 18px 36px;
-  animation: pulse-glow 1.2s infinite;
+  min-width: 160px;
+  font-size: 1rem;
+  padding: 14px 32px;
+  background: linear-gradient(135deg, rgba(255, 220, 150, 0.9), rgba(230, 170, 80, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .top-bar a { text-decoration: none; }

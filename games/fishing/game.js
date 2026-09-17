@@ -35,65 +35,113 @@ function setupFishToasts() {
     requestAnimationFrame(() => el.classList.add('show'));
     setTimeout(() => {
       el.classList.remove('show');
-      setTimeout(() => el.remove(), 220);
-    }, 2000);
+      setTimeout(() => el.remove(), 400);
+    }, 2800);
   };
 }
 
-/** Fish shadows + surface ripples for alive water feel */
+/** Calm fish shadows gliding under the boat + soft ripples */
 function initOceanAmbient() {
   const shadowRoot = document.getElementById('fish-shadows');
   const rippleRoot = document.getElementById('ripple-field');
   if (!shadowRoot || !rippleRoot) return;
 
-  const fishCount = 10;
-  for (let i = 0; i < fishCount; i += 1) {
-    spawnFishShadow(shadowRoot, i === 0);
+  spawnFishShadow(shadowRoot, { big: true, underBoat: true });
+
+  for (let i = 0; i < 9; i += 1) {
+    spawnFishShadow(shadowRoot, { underBoat: true });
   }
 
-  for (let i = 0; i < 6; i += 1) {
-    spawnRipple(rippleRoot);
+  for (let i = 0; i < 3; i += 1) {
+    spawnFishShadow(shadowRoot, { underBoat: false });
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    spawnRipple(rippleRoot, i < 3);
   }
 }
 
-function spawnFishShadow(container, isBig = false) {
+function spawnFishShadow(container, { big = false, underBoat = true } = {}) {
   const el = document.createElement('div');
-  el.className = isBig ? 'fish-shadow big' : 'fish-shadow';
+  el.className = big ? 'fish-shadow big' : 'fish-shadow';
 
-  const w = isBig ? 90 + Math.random() * 50 : 28 + Math.random() * 36;
-  const h = w * 0.32;
-  const scale = 0.7 + Math.random() * 0.8;
-  const angle = Math.random() * 360;
-  const dur = 14 + Math.random() * 20;
+  const w = big ? 80 + Math.random() * 40 : 24 + Math.random() * 32;
+  const scale = big ? 0.9 + Math.random() * 0.3 : 0.65 + Math.random() * 0.55;
+  const dur = big ? 48 + Math.random() * 24 : 26 + Math.random() * 22;
 
-  const x0 = `${-10 + Math.random() * 120}%`;
-  const y0 = `${-10 + Math.random() * 120}%`;
-  const x1 = `${-20 + Math.random() * 140}%`;
-  const y1 = `${-20 + Math.random() * 140}%`;
+  let x0;
+  let y0;
+  let dx;
+  let dy;
+  let rot;
+
+  if (underBoat) {
+    const mode = Math.floor(Math.random() * 4);
+    if (mode === 0) {
+      const lane = (Math.random() - 0.5) * 90;
+      rot = '0deg';
+      x0 = `${-45 - Math.random() * 15}vw`;
+      y0 = `${lane}px`;
+      dx = `${90 + Math.random() * 30}vw`;
+      dy = `${(Math.random() - 0.5) * 20}px`;
+    } else if (mode === 1) {
+      const lane = (Math.random() - 0.5) * 90;
+      rot = '180deg';
+      x0 = `${45 + Math.random() * 15}vw`;
+      y0 = `${lane}px`;
+      dx = `${-90 - Math.random() * 30}vw`;
+      dy = `${(Math.random() - 0.5) * 20}px`;
+    } else if (mode === 2) {
+      const lane = (Math.random() - 0.5) * 70;
+      rot = '90deg';
+      x0 = `${lane}px`;
+      y0 = `${35 + Math.random() * 12}vh`;
+      dx = `${(Math.random() - 0.5) * 24}px`;
+      dy = `${-55 - Math.random() * 20}vh`;
+    } else {
+      const lane = (Math.random() - 0.5) * 70;
+      rot = '-90deg';
+      x0 = `${lane}px`;
+      y0 = `${-35 - Math.random() * 12}vh`;
+      dx = `${(Math.random() - 0.5) * 24}px`;
+      dy = `${55 + Math.random() * 20}vh`;
+    }
+  } else {
+    rot = `${Math.random() * 360}deg`;
+    x0 = `${(Math.random() - 0.5) * 80}vw`;
+    y0 = `${(Math.random() - 0.5) * 60}vh`;
+    dx = `${(Math.random() - 0.5) * 50}vw`;
+    dy = `${(Math.random() - 0.5) * 40}vh`;
+  }
 
   el.style.setProperty('--fish-w', `${w}px`);
-  el.style.setProperty('--fish-h', `${h}px`);
+  el.style.setProperty('--fish-h', `${w * 0.32}px`);
   el.style.setProperty('--fish-scale', scale.toFixed(2));
   el.style.setProperty('--fish-dur', `${dur}s`);
   el.style.setProperty('--fish-delay', `${Math.random() * dur}s`);
-  el.style.setProperty('--fish-opacity', isBig ? '0.45' : `${0.55 + Math.random() * 0.3}`);
-  el.style.setProperty('--rot', `${angle}deg`);
+  el.style.setProperty('--fish-opacity', big ? '0.38' : `${0.35 + Math.random() * 0.25}`);
+  el.style.setProperty('--rot', rot);
   el.style.setProperty('--x0', x0);
   el.style.setProperty('--y0', y0);
-  el.style.setProperty('--x1', x1);
-  el.style.setProperty('--y1', y1);
+  el.style.setProperty('--dx', dx);
+  el.style.setProperty('--dy', dy);
 
   container.appendChild(el);
 }
 
-function spawnRipple(container) {
+function spawnRipple(container, nearBoat = false) {
   const el = document.createElement('div');
   el.className = 'ripple';
-  el.style.left = `${8 + Math.random() * 84}%`;
-  el.style.top = `${8 + Math.random() * 84}%`;
-  el.style.setProperty('--ripple-size', `${24 + Math.random() * 36}px`);
-  el.style.setProperty('--ripple-dur', `${3 + Math.random() * 4}s`);
-  el.style.setProperty('--ripple-delay', `${Math.random() * 5}s`);
+  if (nearBoat) {
+    el.style.left = `${38 + Math.random() * 24}%`;
+    el.style.top = `${40 + Math.random() * 18}%`;
+  } else {
+    el.style.left = `${10 + Math.random() * 80}%`;
+    el.style.top = `${10 + Math.random() * 80}%`;
+  }
+  el.style.setProperty('--ripple-size', `${20 + Math.random() * 28}px`);
+  el.style.setProperty('--ripple-dur', `${5 + Math.random() * 5}s`);
+  el.style.setProperty('--ripple-delay', `${Math.random() * 8}s`);
   container.appendChild(el);
 }
 
@@ -177,8 +225,8 @@ async function reelIn() {
             ? 'Good catch'
             : 'Small catch';
       Arcade.toast(`${r.fish.icon} ${r.fish.name} — ${grade}`, 'win');
-      ArcadeFX.confetti(12);
-      ArcadeFX.burst(window.innerWidth / 2, window.innerHeight * 0.42, r.fish.icon, 8);
+      ArcadeFX.confetti(6);
+      ArcadeFX.burst(window.innerWidth / 2, window.innerHeight * 0.45, r.fish.icon, 4);
     } else {
       const msg = r.misfortune?.message || (r.result.grade === 'fail' ? 'Fish got away!' : 'Nothing on the line…');
       Arcade.toast(msg, 'lose');
