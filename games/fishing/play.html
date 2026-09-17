@@ -16,6 +16,10 @@
       <header class="top-bar fish-top-bar">
         <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
         <h1>Deep Cast</h1>
+        <div class="fish-top-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-help" aria-label="How to play">?</button>
+          <button type="button" class="btn btn-ghost btn-sm sound-toggle" id="btn-sound" aria-pressed="false" aria-label="Sound on">🔊</button>
+        </div>
         <div class="balance-pill" id="balance">…</div>
       </header>
       <div id="toast-zone" class="fish-toast-zone" aria-live="polite"></div>
@@ -88,9 +92,33 @@
       </div>
     </div>
 
+    <div id="help-overlay" class="help-overlay hidden">
+      <div class="help-panel card">
+        <div class="help-head">
+          <h3>How to Play</h3>
+          <button type="button" class="btn btn-ghost btn-sm" id="help-close" aria-label="Close">✕</button>
+        </div>
+        <div class="help-body">
+          <ol class="help-steps">
+            <li>Tap a <strong>bait chip</strong> at the bottom to equip it. Use <strong>+</strong> to buy more.</li>
+            <li>Tap the <strong>open sea</strong> to cast — not the boat or HUD.</li>
+            <li>Wait for the bite callout, then the reel fight begins.</li>
+            <li><strong>Hold</strong> anywhere to reel in. <strong>Release</strong> when the fish pulls hard.</li>
+            <li>Keep the bobber in the <strong>green zone</strong> and fill the progress bar to land the fish.</li>
+            <li>Sell your catch at the <strong>Black Market</strong> back in the hub.</li>
+          </ol>
+          <h4 class="help-section-title">Fish Ranking</h4>
+          <div id="help-fish-list" class="help-fish-list"></div>
+          <h4 class="help-section-title">Bait Types</h4>
+          <div id="help-bait-list" class="help-bait-list"></div>
+        </div>
+        <button type="button" class="btn btn-primary" id="help-ok">Got it</button>
+      </div>
+    </div>
+
     <div id="result-overlay" class="result-overlay hidden">
       <div class="result-card card" id="result-card">
-        <div id="result-icon" class="result-icon">🐟</div>
+        <div id="result-icon" class="result-icon"><span id="result-icon-fallback">🐟</span></div>
         <div id="result-rank" class="result-rank">Common</div>
         <h2 id="result-name">Sardine</h2>
         <p id="result-detail" class="result-detail">★ · Sell at Black Market</p>

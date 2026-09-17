@@ -1,0 +1,43 @@
+# Deep Cast — Assets
+
+Replace any file here **keeping the same filename** to update the game visuals or sounds.
+
+## Images
+
+| Path | Used for |
+|------|----------|
+| `images/water.svg` | Full-screen sea background |
+| `images/bobber.svg` | Cast bobber on the water |
+| `images/boat.svg` | Reserved for future boat art swap |
+| `images/bait/bait_worm.svg` | Worm bait chip |
+| `images/bait/bait_shrimp.svg` | Shrimp bait chip |
+| `images/bait/bait_lure.svg` | Flash Lure bait chip |
+| `images/bait/bait_golden.svg` | Golden bait chip |
+| `images/fish/fish_sardine.svg` | Sardine catch art |
+| `images/fish/fish_bass.svg` | Bass catch art |
+| `images/fish/fish_tuna.svg` | Tuna catch art |
+| `images/fish/fish_swordfish.svg` | Swordfish catch art |
+| `images/fish/fish_shark.svg` | Shark catch art |
+| `images/fish/fish_leviathan.svg` | Leviathan catch art |
+| `images/fish/fish_phantom.svg` | Phantom Ray catch art |
+
+PNG or WebP work too — update the path in `manifest.json` if you change the extension.
+
+## Sounds
+
+Drop `.ogg` files into `sounds/` using the names in `manifest.json`:
+
+- `cast.ogg` — line thrown
+- `splash.ogg` — bobber hits water
+- `bite.ogg` — fish bites
+- `fight.ogg` — reel fight starts
+- `reel.ogg` — while holding to reel
+- `catch.ogg` — fish landed
+- `catch-rare.ogg` — epic / legendary / mythic catch
+- `escape.ogg` — fish got away
+- `snap.ogg` — line snapped
+- `buy.ogg` — bait pack purchased
+- `select.ogg` — bait chip selected
+- `click.ogg` — UI taps
+
+If a sound file is missing, the game synthesizes a fallback tone automatically.

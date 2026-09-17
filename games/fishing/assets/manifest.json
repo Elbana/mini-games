@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "description": "Swap any file below (same filename) to update Deep Cast art and sounds without code changes.",
+  "baseUrl": "/fishing/assets",
+  "background": {
+    "water": "/fishing/assets/images/water.svg"
+  },
+  "ui": {
+    "bobber": "/fishing/assets/images/bobber.svg",
+    "boat": "/fishing/assets/images/boat.svg"
+  },
+  "bait": {
+    "bait_worm": "/fishing/assets/images/bait/bait_worm.svg",
+    "bait_shrimp": "/fishing/assets/images/bait/bait_shrimp.svg",
+    "bait_lure": "/fishing/assets/images/bait/bait_lure.svg",
+    "bait_golden": "/fishing/assets/images/bait/bait_golden.svg"
+  },
+  "fish": {
+    "fish_sardine": "/fishing/assets/images/fish/fish_sardine.svg",
+    "fish_bass": "/fishing/assets/images/fish/fish_bass.svg",
+    "fish_tuna": "/fishing/assets/images/fish/fish_tuna.svg",
+    "fish_swordfish": "/fishing/assets/images/fish/fish_swordfish.svg",
+    "fish_shark": "/fishing/assets/images/fish/fish_shark.svg",
+    "fish_leviathan": "/fishing/assets/images/fish/fish_leviathan.svg",
+    "fish_phantom": "/fishing/assets/images/fish/fish_phantom.svg"
+  },
+  "sounds": {
+    "cast": "cast.ogg",
+    "splash": "splash.ogg",
+    "bite": "bite.ogg",
+    "fight": "fight.ogg",
+    "reel": "reel.ogg",
+    "catch": "catch.ogg",
+    "catchRare": "catch-rare.ogg",
+    "escape": "escape.ogg",
+    "snap": "snap.ogg",
+    "buy": "buy.ogg",
+    "select": "select.ogg",
+    "click": "click.ogg"
+  }
+}

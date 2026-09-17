@@ -1,8 +1,12 @@
 import { biteCallout, catchCallout } from './bite-words.js';
+import { loadFishingManifest, baitImage, fishImage, waterBackground } from './assets.mjs';
+import { FishingSounds } from './sounds.js';
 
 let gear = { baitStock: {}, selectedBait: 'bait_worm' };
 let activeCast = null;
-let config = { baits: [] };
+let config = { baits: [], fish: [], ranks: {} };
+let manifest = null;
+let sounds = null;
 let gameState = 'idle';
 let actionBusy = false;
 let isPulling = false;
@@ -18,11 +22,104 @@ async function init() {
   setupFishToasts();
   initOceanAmbient();
   bindCastAndFightInput();
+
+  manifest = await loadFishingManifest();
+  sounds = new FishingSounds(manifest);
+  applyManifestVisuals();
+
+  document.body.addEventListener('pointerdown', () => sounds.unlock(), { once: true });
+
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/fishing/config');
   await refreshState();
-  document.getElementById('result-ok').addEventListener('click', closeResult);
+  renderHelpPanel();
+
+  document.getElementById('result-ok').addEventListener('click', () => {
+    sounds.play('click');
+    closeResult();
+  });
+  document.getElementById('btn-help').addEventListener('click', openHelp);
+  document.getElementById('help-close').addEventListener('click', closeHelp);
+  document.getElementById('help-ok').addEventListener('click', closeHelp);
+  document.getElementById('help-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'help-overlay') closeHelp();
+  });
+  bindSoundToggle();
   bindBaitChipRow();
+}
+
+function applyManifestVisuals() {
+  const water = document.querySelector('.water-bg');
+  if (water) water.style.backgroundImage = `url('${waterBackground(manifest)}')`;
+}
+
+function bindSoundToggle() {
+  const btn = document.getElementById('btn-sound');
+  const sync = () => {
+    const muted = sounds.isMuted();
+    btn.textContent = muted ? '🔇' : '🔊';
+    btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    btn.setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
+  };
+  sync();
+  btn.addEventListener('click', () => {
+    sounds.toggleMuted();
+    sync();
+    if (!sounds.isMuted()) {
+      sounds.unlock();
+      sounds.play('click', { volume: 0.2 });
+    }
+  });
+}
+
+function openHelp() {
+  if (gameState !== 'idle' || actionBusy) return;
+  sounds.play('click');
+  renderHelpPanel();
+  document.getElementById('help-overlay').classList.remove('hidden');
+}
+
+function closeHelp() {
+  sounds.play('click', { volume: 0.15 });
+  document.getElementById('help-overlay').classList.add('hidden');
+}
+
+function renderHelpPanel() {
+  const rankOrder = ['mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common'];
+  const fish = [...(config.fish || [])].sort(
+    (a, b) => rankOrder.indexOf(a.rank) - rankOrder.indexOf(b.rank)
+  );
+
+  document.getElementById('help-fish-list').innerHTML = fish.map((f) => {
+    const rank = config.ranks[f.rank] || {};
+    const stars = '★'.repeat(rank.stars || 1);
+    const img = fishImage(manifest, f.id);
+    const art = img
+      ? `<img src="${img}" alt="">`
+      : `<span style="font-size:1.6rem">${f.icon}</span>`;
+    return `<div class="help-fish-row">
+      ${art}
+      <div>
+        <div class="help-fish-name">${f.name}</div>
+        <div class="help-fish-rank" style="color:${rank.color || '#fff'}">${stars} ${rank.label || f.rank}</div>
+      </div>
+      <div class="help-fish-price">~🪙${Arcade.formatCoins(f.sellBase)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('help-bait-list').innerHTML = (config.baits || []).map((b) => {
+    const img = baitImage(manifest, b.id);
+    const art = img
+      ? `<img src="${img}" alt="">`
+      : `<span style="font-size:1.6rem">${b.icon}</span>`;
+    return `<div class="help-bait-row">
+      ${art}
+      <div>
+        <div class="help-fish-name">${b.name}</div>
+        <div class="help-bait-meta">🪙${Arcade.formatCoins(b.price)} · +${b.packSize} per pack · better odds for rare fish</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function getBoatExclusionRect(sceneEl) {
@@ -52,7 +149,7 @@ function bindCastAndFightInput() {
 
   scene.addEventListener('pointerup', (e) => {
     if (gameState !== 'idle' || actionBusy) return;
-    if (e.target.closest('.fish-hud, .top-bar, .fight-panel, .boat-wrap, button, a')) return;
+    if (e.target.closest('.fish-hud, .top-bar, .fight-panel, .boat-wrap, .help-overlay, button, a')) return;
 
     const rect = scene.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
@@ -66,10 +163,12 @@ function bindCastAndFightInput() {
 
   const pullStart = (e) => {
     if (gameState !== 'fighting') return;
-    if (e.target.closest('button, a, .result-overlay')) return;
+    if (e.target.closest('button, a, .result-overlay, .help-overlay')) return;
     isPulling = true;
+    sounds?.startReel();
   };
   const pullEnd = () => {
+    if (isPulling) sounds?.stopReel();
     isPulling = false;
   };
 
@@ -236,9 +335,13 @@ function renderBaitRow() {
     const count = gear.baitStock[b.id] || 0;
     const selected = gear.selectedBait === b.id;
     const label = BAIT_CHIP_SHORT[b.id] || b.name;
+    const img = baitImage(manifest, b.id);
+    const icon = img
+      ? `<img class="bait-chip-item-img" src="${img}" alt="">`
+      : `<span class="bait-chip-item-icon">${b.icon}</span>`;
     return `<div class="bait-chip-wrap${selected ? ' selected' : ''}${count < 1 ? ' empty' : ''}" data-bait="${b.id}">
       <button type="button" class="bait-chip-item" data-action="select" data-bait="${b.id}" aria-pressed="${selected}" aria-label="${b.name}, ${count} left">
-        <span class="bait-chip-item-icon">${b.icon}</span>
+        ${icon}
         <span class="bait-chip-item-count">×${count}</span>
         <span class="bait-chip-item-name">${label}</span>
       </button>
@@ -271,6 +374,7 @@ async function refreshState() {
 
 async function selectBait(baitId) {
   if (gear.selectedBait === baitId) return;
+  sounds?.play('select', { volume: 0.3 });
   gear.selectedBait = baitId;
   renderBaitRow();
   try {
@@ -291,6 +395,7 @@ async function buyBaitPack(baitId) {
     gear = r.gear;
     renderBaitRow();
     Arcade.refreshBalance(document.getElementById('balance'));
+    sounds?.play('buy', { volume: 0.4 });
     Arcade.toast(`+${bait.packSize} ${bait.name}!`, 'win');
   } catch (e) {
     Arcade.toast(e.message, 'lose');
@@ -344,6 +449,8 @@ async function castAt(x, y) {
     renderBaitRow();
 
     placeCastVisuals(x, y);
+    sounds?.play('cast', { volume: 0.35 });
+    setTimeout(() => sounds?.play('splash', { volume: 0.3 }), 120);
     gameState = 'waiting';
     document.getElementById('ocean-scene').classList.add('waiting-bite');
     document.getElementById('cast-hint').textContent = 'Waiting for a bite…';
@@ -354,6 +461,7 @@ async function castAt(x, y) {
       gameState = 'bite';
       document.getElementById('cast-hint').textContent = 'Tap the sea to cast your line';
       document.getElementById('bobber').classList.add('biting');
+      sounds?.play('bite', { volume: 0.45 });
 
       const hype = biteCallout(activeCast.tierKey);
       showCallout(hype.word, { color: hype.color, glow: hype.glow });
@@ -381,6 +489,7 @@ function startFight() {
   isPulling = false;
   document.getElementById('fight-panel').classList.remove('hidden');
   document.getElementById('ocean-scene').classList.add('fighting');
+  sounds?.play('fight', { volume: 0.35 });
 
   let tension = 0.5;
   let progress = 0;
@@ -446,13 +555,25 @@ function updateFightUI(tension, progress) {
   document.getElementById('progress-runner').style.left = `${Math.min(100, Math.max(0, progress) * 100)}%`;
 }
 
+function setResultIcon(fish) {
+  const wrap = document.getElementById('result-icon');
+  const src = fish ? fishImage(manifest, fish.id) : null;
+  if (src && fish) {
+    wrap.innerHTML = `<img src="${src}" alt="${fish.name}">`;
+  } else {
+    wrap.innerHTML = `<span id="result-icon-fallback">${fish?.icon || '💨'}</span>`;
+  }
+}
+
 function showFightResult(r, cast) {
   const overlay = document.getElementById('result-overlay');
   const card = document.getElementById('result-card');
 
   if (r.won && r.fish) {
     card.className = 'result-card card win';
-    document.getElementById('result-icon').textContent = r.fish.icon;
+    setResultIcon(r.fish);
+    const rare = r.fish.rankStars >= 4 || r.fish.rank === 'mythic';
+    sounds?.play(rare ? 'catchRare' : 'catch', { volume: rare ? 0.5 : 0.42 });
     document.getElementById('result-rank').textContent = r.fish.rankLabel;
     document.getElementById('result-rank').style.color = r.fish.rankColor;
     document.getElementById('result-name').textContent = r.fish.name;
@@ -468,7 +589,10 @@ function showFightResult(r, cast) {
     ArcadeFX.burst(window.innerWidth / 2, window.innerHeight * 0.38, r.fish.icon, 6);
   } else {
     card.className = 'result-card card lose';
-    document.getElementById('result-icon').textContent = r.result.reason === 'snapped' ? '🪢' : '💨';
+    setResultIcon(null);
+    document.getElementById('result-icon-fallback').textContent =
+      r.result.reason === 'snapped' ? '🪢' : '💨';
+    sounds?.play(r.result.reason === 'snapped' ? 'snap' : 'escape', { volume: 0.38 });
     document.getElementById('result-rank').textContent = 'Missed';
     document.getElementById('result-rank').style.color = '#ffb3c1';
     document.getElementById('result-name').textContent =
@@ -491,6 +615,7 @@ async function endFight(outcome) {
 
   cancelAnimationFrame(fightAnim);
   fightAnim = null;
+  sounds?.stopReel();
   isPulling = false;
   gameState = 'idle';
 

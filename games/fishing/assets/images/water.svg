@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a9bc2"/>
+      <stop offset="45%" stop-color="#0c7ea8"/>
+      <stop offset="100%" stop-color="#065a7a"/>
+    </linearGradient>
+    <pattern id="ripples" width="120" height="60" patternUnits="userSpaceOnUse">
+      <ellipse cx="30" cy="20" rx="22" ry="8" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+      <ellipse cx="90" cy="42" rx="18" ry="6" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.5"/>
+    </pattern>
+  </defs>
+  <rect width="800" height="600" fill="url(#sea)"/>
+  <rect width="800" height="600" fill="url(#ripples)" opacity="0.9"/>
+</svg>

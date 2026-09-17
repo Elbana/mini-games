@@ -16,11 +16,28 @@
   pointer-events: auto;
 }
 
+.fish-top-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .fish-top-bar h1 {
   font-family: 'Fredoka', sans-serif;
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  justify-self: center;
+}
+
+.fish-top-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.sound-toggle[aria-pressed="true"] {
+  opacity: 0.55;
 }
 
 .fish-toast-zone {
@@ -120,7 +137,7 @@
 .water-bg {
   position: absolute;
   inset: 0;
-  background: url('/assets/fishing/water.png') center / cover no-repeat;
+  background: #0c7ea8 center / cover no-repeat;
 }
 
 .water-veil {
@@ -365,6 +382,14 @@
   font-size: 1.35rem;
   line-height: 1;
   margin-top: 2px;
+}
+
+.bait-chip-item-img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  margin-top: 2px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
 }
 
 .bait-chip-item-count {
@@ -689,5 +714,133 @@
 }
 
 #result-ok { width: 100%; }
+
+.result-icon img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
+}
+
+/* How to play panel */
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(0, 20, 40, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.help-overlay.hidden { display: none; }
+
+.help-panel {
+  width: min(100%, 420px);
+  max-height: min(82vh, 640px);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 14px 12px;
+  animation: result-pop 0.4s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.help-head h3 {
+  margin: 0;
+  font-family: 'Fredoka', sans-serif;
+}
+
+.help-body {
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+  margin-bottom: 10px;
+}
+
+.help-steps {
+  margin: 0 0 14px;
+  padding-left: 1.15rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+.help-steps li + li {
+  margin-top: 6px;
+}
+
+.help-section-title {
+  margin: 0 0 8px;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.help-fish-list,
+.help-bait-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.help-fish-row,
+.help-bait-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+}
+
+.help-fish-row img,
+.help-bait-row img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.help-fish-name {
+  font-weight: 800;
+}
+
+.help-fish-rank {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.help-fish-price {
+  font-size: 0.75rem;
+  font-weight: 700;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.help-bait-row {
+  grid-template-columns: auto 1fr;
+}
+
+.help-bait-meta {
+  font-size: 0.72rem;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+#help-ok { width: 100%; }
 
 .top-bar a { text-decoration: none; }
