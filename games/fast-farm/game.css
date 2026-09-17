@@ -1,112 +1,172 @@
-.farm-shell { position: relative; }
+.farm-shell {
+  position: relative;
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+}
 
 .farm-bg {
   position: absolute;
   inset: 0;
   background: url('/assets/farm/background.webp') center/cover no-repeat;
-  opacity: 0.35;
   z-index: 0;
+}
+
+.farm-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 220, 150, 0.15) 0%, rgba(20, 60, 30, 0.5) 100%);
 }
 
 .farm-content { position: relative; z-index: 1; }
 
 .farm-tagline {
   text-align: center;
-  font-size: 0.78rem;
-  opacity: 0.85;
-  margin: 0 0 12px;
+  font-size: 0.82rem;
   font-weight: 700;
+  margin: 0 0 14px;
+  color: #fff8e7;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 213, 110, 0.25);
 }
 
 .plot-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .plot {
   aspect-ratio: 1;
-  border-radius: 14px;
-  background: url('/assets/farm/plot-tile.webp') center/cover;
-  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 18px;
+  background: url('/assets/farm/plot-tile-green.webp') center/cover;
+  border: 3px solid rgba(139, 90, 43, 0.6);
   position: relative;
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible;
   transition: transform 0.15s;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.35),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.15);
 }
 
-.plot:active { transform: scale(0.97); }
+.plot:active { transform: scale(0.96); }
 
 .plot .crop-img {
   position: absolute;
-  inset: 10%;
+  inset: 8%;
   object-fit: contain;
   pointer-events: none;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  animation: crop-sway 3s ease-in-out infinite;
+}
+
+@keyframes crop-sway {
+  0%, 100% { transform: rotate(-1deg); }
+  50% { transform: rotate(1deg); }
 }
 
 .plot.ready {
-  animation: pulse-glow 1.2s infinite;
-  border-color: var(--arcade-gold);
+  animation: plot-ready 1s ease-in-out infinite;
+  border-color: #ffd56e;
+}
+
+@keyframes plot-ready {
+  0%, 100% { box-shadow: 0 8px 20px rgba(0,0,0,0.35), 0 0 0 0 rgba(255, 213, 110, 0.4); }
+  50% { box-shadow: 0 8px 20px rgba(0,0,0,0.35), 0 0 20px 4px rgba(255, 213, 110, 0.5); }
+}
+
+.plot.ready::before {
+  content: '✨';
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  font-size: 1.2rem;
+  animation: float 1.5s ease-in-out infinite;
 }
 
 .plot.wilting {
-  border-color: var(--arcade-red);
-  animation: shake 0.5s infinite;
+  border-color: #ff5a7a;
+  animation: plot-wilt 0.6s ease-in-out infinite;
 }
 
-.plot.dead { filter: grayscale(0.8) brightness(0.6); }
+@keyframes plot-wilt {
+  0%, 100% { filter: saturate(0.7); }
+  50% { filter: saturate(0.4) brightness(0.85); }
+}
+
+.plot.dead { filter: grayscale(0.85) brightness(0.55); }
 
 .plot-timer {
   position: absolute;
-  bottom: 4px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 0.65rem;
-  font-weight: 900;
-  background: rgba(0,0,0,0.55);
-  padding: 2px;
-}
-
-.plot-actions {
-  position: absolute;
-  top: 4px;
+  bottom: -2px;
+  left: 4px;
   right: 4px;
-  display: flex;
-  gap: 4px;
-}
-
-.plot-actions button {
-  border: none;
-  border-radius: 8px;
-  padding: 4px 6px;
-  font-size: 0.65rem;
+  text-align: center;
+  font-size: 0.68rem;
   font-weight: 800;
-  cursor: pointer;
+  background: linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.85));
+  padding: 4px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.seed-shop h2 { margin: 0 0 12px; font-size: 0.95rem; }
+.plot.growing::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 20px;
+  border: 3px solid transparent;
+  border-top-color: #5dffb0;
+  animation: grow-ring 1.2s linear infinite;
+}
 
-.seed-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+@keyframes grow-ring {
+  to { transform: rotate(360deg); }
+}
+
+.seed-shop {
+  background: linear-gradient(160deg, rgba(139, 90, 43, 0.35), rgba(34, 80, 40, 0.4));
+  border: 2px solid rgba(255, 213, 110, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.seed-shop h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-family: 'Fredoka', sans-serif;
+  color: #fff8e7;
+}
+
+.seed-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
 .seed-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px;
-  background: rgba(0,0,0,0.25);
-  border-radius: 12px;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
   font-size: 0.78rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform 0.15s;
 }
 
-.seed-card img { width: 36px; height: 36px; object-fit: contain; }
+.seed-card img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
 
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,25 +176,35 @@
 
 .overlay.hidden { display: none; }
 
-.modal-card { max-width: 320px; width: 100%; }
-.modal-card h3 { margin: 0 0 12px; }
+.modal-card {
+  max-width: 320px;
+  width: 100%;
+  background: linear-gradient(160deg, rgba(34, 80, 40, 0.9), rgba(20, 50, 25, 0.95));
+  border: 2px solid rgba(255, 213, 110, 0.35);
+}
+
+.modal-card h3 { margin: 0 0 12px; font-family: 'Fredoka', sans-serif; }
 
 .seed-pick {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   margin-bottom: 8px;
-  border: 1px solid var(--arcade-border);
-  border-radius: 12px;
-  background: rgba(0,0,0,0.3);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.25);
   color: #fff;
   font-family: inherit;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
 }
 
-.seed-pick img { width: 32px; height: 32px; }
+.seed-pick:active { transform: scale(0.98); border-color: #ffd56e; }
+
+.seed-pick img { width: 36px; height: 36px; }
 
 .top-bar a { text-decoration: none; }
+.top-bar h1 { font-family: 'Fredoka', sans-serif; }

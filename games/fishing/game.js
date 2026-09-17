@@ -101,7 +101,8 @@ async function reelIn() {
             : 'Small catch…';
       document.getElementById('catch-popup').classList.remove('hidden');
       document.getElementById('fish-hint').textContent = 'Sell loot in the Hub!';
-      ArcadeFX.burst(window.innerWidth / 2, window.innerHeight / 3, r.fish.icon, 8);
+      ArcadeFX.confetti(16);
+      ArcadeFX.burst(window.innerWidth / 2, window.innerHeight / 3, r.fish.icon, 10);
     } else {
       Arcade.toast('Fish got away!', 'lose');
       document.getElementById('fish-hint').textContent = 'Try again — time the green zone!';

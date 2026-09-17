@@ -59,10 +59,11 @@ function renderPlots() {
           timer = 'DEAD';
         } else if (now >= p.readyAt) {
           cls += p.needsWater ? ' wilting' : ' ready';
-          timer = p.needsWater ? 'HEAL!' : 'HARVEST!';
+          timer = p.needsWater ? '💧 HEAL!' : '⭐ HARVEST!';
         } else {
+          cls += ' growing';
           const sec = Math.ceil((p.readyAt - now) / 1000);
-          timer = `${sec}s`;
+          timer = `🌱 ${sec}s`;
         }
       } else if (p.dead) {
         cls += ' dead';

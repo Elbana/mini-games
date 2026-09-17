@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <title>Candy Battle</title>
   <link rel="stylesheet" href="/shared/arcade-shell.css">
+  <link rel="stylesheet" href="/shared/gems.css">
   <link rel="stylesheet" href="/candy-battle/game.css">
   <script src="/shared/arcade-api.js"></script>
   <script src="/shared/fx.js" defer></script>
   <script src="/candy-battle/game.js" defer></script>
 </head>
 <body>
-  <div class="arcade-shell" id="app">
+  <div class="arcade-shell candy-world" id="app">
+    <div class="candy-bg" aria-hidden="true"></div>
     <header class="top-bar">
       <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
       <h1>Candy Battle</h1>
@@ -29,15 +31,21 @@
     </div>
 
     <div id="screen-fight" class="screen hidden">
-      <div class="battle-hud">
-        <div class="fighter player-side">
-          <span>You</span>
-          <div class="hp-bar"><div class="hp-fill player" id="player-hp"></div></div>
+      <div class="arena-panel">
+        <div class="monster-stage">
+          <div class="monster-sprite" id="monster-sprite">👾</div>
+          <div class="monster-shadow"></div>
         </div>
-        <div class="vs-badge">VS</div>
-        <div class="fighter monster-side">
-          <span id="monster-name">Monster</span>
-          <div class="hp-bar"><div class="hp-fill monster" id="monster-hp"></div></div>
+        <div class="battle-hud">
+          <div class="fighter player-side">
+            <span>❤️ You</span>
+            <div class="hp-bar"><div class="hp-fill player" id="player-hp"></div></div>
+          </div>
+          <div class="vs-badge">VS</div>
+          <div class="fighter monster-side">
+            <span id="monster-name">Monster</span>
+            <div class="hp-bar"><div class="hp-fill monster" id="monster-hp"></div></div>
+          </div>
         </div>
       </div>
       <p class="candy-ammo">🍬 <span id="fight-ammo">0</span> buy-in left</p>

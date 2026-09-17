@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap');
 
 :root {
   --arcade-bg: #0a0618;
@@ -165,6 +165,81 @@ html[data-arcade-embed='1'] body {
 @keyframes coin-burst {
   0% { transform: scale(0) rotate(0deg); opacity: 1; }
   100% { transform: scale(2) rotate(180deg); opacity: 0; }
+}
+
+/* FX particles */
+.fx-particle {
+  position: fixed;
+  font-size: 18px;
+  pointer-events: none;
+  z-index: 300;
+  animation: fx-fly 0.65s ease forwards;
+}
+
+@keyframes fx-fly {
+  to { transform: translate(var(--tx), var(--ty)); opacity: 0; }
+}
+
+.fx-spark {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 300;
+  animation: fx-spark 0.45s ease forwards;
+}
+
+@keyframes fx-spark {
+  to { transform: translate(var(--dx), var(--dy)); opacity: 0; scale: 0.2; }
+}
+
+.fx-damage {
+  position: fixed;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 700;
+  font-size: 1.4rem;
+  pointer-events: none;
+  z-index: 300;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  animation: fx-damage-up 0.85s ease forwards;
+}
+
+@keyframes fx-damage-up {
+  0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+  20% { transform: translate(-50%, -10px) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%, -50px) scale(1); opacity: 0; }
+}
+
+.fx-confetti {
+  position: fixed;
+  top: -10px;
+  width: 10px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 300;
+  animation: fx-confetti-fall 1.8s ease-in forwards;
+}
+
+@keyframes fx-confetti-fall {
+  to { transform: translateY(110vh) rotate(var(--rot)); opacity: 0; }
+}
+
+.fx-shake { animation: shake 0.4s ease !important; }
+
+.fx-flash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--flash-color, rgba(255, 255, 255, 0.3));
+  pointer-events: none;
+  animation: fx-flash-fade 0.35s ease forwards;
+  z-index: 10;
+}
+
+@keyframes fx-flash-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 .toast {

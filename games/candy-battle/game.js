@@ -107,8 +107,9 @@ async function startFight() {
     document.getElementById('screen-lobby').classList.add('hidden');
     document.getElementById('screen-fight').classList.remove('hidden');
     document.getElementById('monster-name').textContent = fight.monsterName;
-    document.getElementById('monster-preview').textContent =
-      MONSTER_EMOJI[selectedLevel - 1] || '👾';
+    const emoji = MONSTER_EMOJI[selectedLevel - 1] || '👾';
+    document.getElementById('monster-preview').textContent = emoji;
+    document.getElementById('monster-sprite').textContent = emoji;
     updateHud(r.buyInCandies || buyIn);
     initBoard();
   } catch (e) {
@@ -155,15 +156,21 @@ function randomType(r, c) {
   return t;
 }
 
-function renderBoard() {
+function renderBoard(falling = false) {
   const board = document.getElementById('board');
   board.innerHTML = '';
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
+      const t = grid[r][c];
       const div = document.createElement('div');
-      div.className = `cell t${grid[r][c]}`;
+      div.className = `cell${falling ? ' falling' : ''}`;
       div.dataset.r = r;
       div.dataset.c = c;
+      if (t != null) {
+        const gem = document.createElement('div');
+        gem.className = `gem t${t}`;
+        div.appendChild(gem);
+      }
       div.addEventListener('click', () => onCellClick(r, c));
       board.appendChild(div);
     }
@@ -249,13 +256,18 @@ async function resolveMatches() {
     totalSize += size;
     maxSize = Math.max(maxSize, size >= 5 ? 5 : size >= 4 ? 4 : 3);
     matches.forEach(([r, c]) => {
+      const t = grid[r][c];
+      const cellEl = document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+      if (cellEl) {
+        cellEl.classList.add('match-pop');
+        ArcadeFX.matchBurst(cellEl, t);
+      }
       grid[r][c] = null;
-      document.querySelector(`[data-r="${r}"][data-c="${c}"]`)?.classList.add('match-flash');
     });
-    await sleep(200);
+    await sleep(280);
     applyGravity();
-    renderBoard();
-    await sleep(150);
+    renderBoard(true);
+    await sleep(180);
   }
   if (totalSize >= 3) {
     await sendMatch(maxSize, comboChain);
@@ -285,10 +297,18 @@ async function sendMatch(matchSize, combo) {
     msg.textContent = `-${matchSize} match → ${r.damage} dmg!${
       r.monsterAttack ? ` Monster hits ${r.monsterAttack}` : ''
     }${r.bonusCandies ? ` +${r.bonusCandies} free candies!` : ''}`;
-    if (r.monsterAttack) ArcadeFX.shake(document.getElementById('app'));
-    if (r.won || r.lost || r.ended) {
-      showResult(r);
+    if (r.damage) {
+      const sprite = document.getElementById('monster-sprite');
+      sprite?.classList.add('hit');
+      setTimeout(() => sprite?.classList.remove('hit'), 400);
+      const rect = sprite?.getBoundingClientRect();
+      if (rect) ArcadeFX.floatText(rect.left + rect.width / 2, rect.top, `-${r.damage}`, '#ff6bcb');
     }
+    if (r.monsterAttack) {
+      ArcadeFX.shake(document.getElementById('app'));
+      ArcadeFX.floatText(window.innerWidth / 2, 120, `-${r.monsterAttack}`, '#ff5a7a');
+    }
+    if (r.won || r.lost || r.ended) showResult(r);
   } catch (e) {
     Arcade.toast(e.message, 'lose');
   }
@@ -303,7 +323,8 @@ function showResult(r) {
     document.getElementById('result-detail').textContent = r.rewards?.length
       ? `Loot: ${r.rewards.map((x) => x.qty + '× ' + x.itemId).join(', ')} — sell at Black Market!`
       : 'You earned loot!';
-    ArcadeFX.burst(window.innerWidth / 2, window.innerHeight / 2, '💎', 10);
+    ArcadeFX.confetti(30);
+    ArcadeFX.burst(window.innerWidth / 2, window.innerHeight / 2, '💎', 12);
   } else {
     document.getElementById('result-icon').textContent = '💀';
     document.getElementById('result-title').textContent = r.reason === 'out_of_candies' ? 'Out of Candies!' : 'Defeated';
