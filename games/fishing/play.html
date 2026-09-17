@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/fishing/game.css">
   <script src="/shared/arcade-api.js"></script>
   <script src="/shared/fx.js" defer></script>
-  <script src="/fishing/game.js" defer></script>
+  <script type="module" src="/fishing/game.js"></script>
 </head>
 <body>
   <div class="arcade-shell fish-shell">
@@ -19,6 +19,7 @@
         <div class="balance-pill" id="balance">…</div>
       </header>
       <div id="toast-zone" class="fish-toast-zone" aria-live="polite"></div>
+      <div id="callout-layer" aria-hidden="true"></div>
       <div class="water-bg" aria-hidden="true"></div>
       <div class="water-veil" aria-hidden="true"></div>
       <div class="fish-shadows" id="fish-shadows" aria-hidden="true"></div>
@@ -72,11 +73,6 @@
       </div>
 
       <div id="fight-panel" class="fight-panel hidden">
-        <div class="fight-banner" id="fight-banner">
-          <span class="fight-tier" id="fight-tier">BIG FISH!</span>
-          <span class="fight-sub" id="fight-sub">Hang on tight!</span>
-        </div>
-
         <div class="tension-wrap">
           <div class="tension-bar">
             <div class="tension-marker" id="tension-marker">

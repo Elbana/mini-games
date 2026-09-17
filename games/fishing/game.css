@@ -69,6 +69,39 @@
   color: #ffd6dc;
 }
 
+/* Candy-battle-style bite callouts */
+#callout-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 35;
+}
+
+.bite-callout {
+  position: fixed;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  font-family: 'Fredoka', sans-serif;
+  font-size: clamp(2rem, 11vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  animation: bite-pop 0.92s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  white-space: nowrap;
+}
+
+.bite-callout.small {
+  font-size: clamp(1.35rem, 6.5vw, 2.1rem);
+  top: 28%;
+  animation-duration: 0.78s;
+}
+
+@keyframes bite-pop {
+  0% { transform: translate(-50%, -50%) scale(0.12); opacity: 0; }
+  22% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%, -62%) scale(1); opacity: 0; }
+}
+
 /* ── Ocean scene — full screen, tap to cast ── */
 .ocean-scene {
   position: absolute;
@@ -342,34 +375,6 @@
 }
 
 .fight-panel.hidden { display: none; }
-
-.fight-banner {
-  text-align: center;
-  margin-bottom: 12px;
-  animation: fight-pop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
-}
-
-.fight-tier {
-  display: block;
-  font-family: 'Fredoka', sans-serif;
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.35);
-}
-
-.fight-sub {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
-  opacity: 0.85;
-  margin-top: 2px;
-}
-
-@keyframes fight-pop {
-  0% { transform: scale(0.85); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
 
 /* Tension bar — red | orange | green | orange | red */
 .tension-wrap {

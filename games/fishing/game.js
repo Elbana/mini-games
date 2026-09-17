@@ -1,3 +1,5 @@
+import { biteCallout, catchCallout, FIGHT_WORDS } from './bite-words.js';
+
 let gear = { bait: 0 };
 let activeCast = null;
 let config = {};
@@ -6,6 +8,7 @@ let actionBusy = false;
 let isPulling = false;
 let fightAnim = null;
 let fightStats = { greenTime: 0, totalTime: 0 };
+let fightMilestones = new Set();
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -46,6 +49,18 @@ function bindCastAndFightInput() {
   window.addEventListener('pointerdown', pullStart);
   window.addEventListener('pointerup', pullEnd);
   window.addEventListener('pointercancel', pullEnd);
+}
+
+function showCallout(text, { color = '#fff', glow = '#0284c7', small = false } = {}) {
+  const layer = document.getElementById('callout-layer');
+  if (!layer || !text) return;
+  const el = document.createElement('div');
+  el.className = `bite-callout${small ? ' small' : ''}`;
+  el.textContent = text;
+  el.style.color = color;
+  el.style.textShadow = `0 0 22px ${glow}, 0 4px 0 ${glow}, 0 7px 16px rgba(0,0,0,0.45)`;
+  layer.appendChild(el);
+  setTimeout(() => el.remove(), small ? 780 : 950);
 }
 
 function setupFishToasts() {
@@ -243,7 +258,10 @@ async function castAt(x, y) {
       gameState = 'fighting';
       document.getElementById('cast-hint').textContent = 'Tap the sea to cast your line';
       document.getElementById('bobber').classList.add('biting');
-      startFight();
+
+      const hype = biteCallout(activeCast.tierKey);
+      showCallout(hype.word, { color: hype.color, glow: hype.glow });
+      setTimeout(() => startFight(), 900);
     }, biteMs);
 
     setTimeout(() => {
@@ -263,15 +281,13 @@ function startFight() {
   const cast = activeCast;
   if (!cast) return;
 
-  document.getElementById('fight-tier').textContent = cast.tierLabel;
-  document.getElementById('fight-sub').textContent = cast.tierSub;
-  document.getElementById('fight-banner').style.color = cast.tierColor;
   document.getElementById('fight-panel').classList.remove('hidden');
   document.getElementById('ocean-scene').classList.add('fighting');
 
   let tension = 0.5;
   let progress = 0;
   fightStats = { greenTime: 0, totalTime: 0 };
+  fightMilestones = new Set();
   let fishPhase = Math.random() * Math.PI * 2;
   let last = performance.now();
 
@@ -302,6 +318,7 @@ function startFight() {
     }
 
     updateFightUI(tension, progress);
+    checkFightMilestones(progress, cast.tierKey);
 
     if (tension <= 0.06) {
       endFight('escaped');
@@ -321,6 +338,17 @@ function startFight() {
 
   cancelAnimationFrame(fightAnim);
   fightAnim = requestAnimationFrame(tick);
+}
+
+function checkFightMilestones(progress, tierKey) {
+  for (const step of FIGHT_WORDS) {
+    if (progress < step.at || fightMilestones.has(step.at)) continue;
+    fightMilestones.add(step.at);
+    const word = step.words[Math.floor(Math.random() * step.words.length)];
+    const hype = biteCallout(tierKey);
+    showCallout(word, { color: hype.color, glow: hype.glow, small: true });
+    break;
+  }
 }
 
 function updateFightUI(tension, progress) {
@@ -367,8 +395,9 @@ async function endFight(outcome) {
     }
 
     if (r.fish) {
-      const tierMsg = r.tierLabel || 'Caught';
-      Arcade.toast(`${tierMsg} ${r.fish.icon} ${r.fish.name}!`, 'win');
+      const hype = biteCallout(r.tierKey || cast.tierKey);
+      showCallout(catchCallout(r.tierKey || cast.tierKey), { color: hype.color, glow: hype.glow });
+      Arcade.toast(`${r.fish.icon} ${r.fish.name} — sell at Black Market!`, 'win');
       const burst = r.tierKey === 'monster' || r.tierKey === 'super' ? 10 : 6;
       ArcadeFX.confetti(burst);
       ArcadeFX.burst(window.innerWidth / 2, window.innerHeight * 0.4, r.fish.icon, burst - 2);
