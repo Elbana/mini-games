@@ -41,7 +41,8 @@ Default placeholders are included. Replace them with your own:
 - `cast.ogg` — line thrown through the air
 - `lure.ogg` — lure/bobber hits the water (real splash sample)
 - `splash.ogg` — alias for lure splash
-- `reel.ogg` — **real fishing reel crank** (loops while you hold to pull)
+- `reel-clicks.ogg` — **reel ratchet clicks** (loops while you hold to pull)
+- `reel.ogg` — alternate smooth reel crank (swap in `index.json` if preferred)
 - `bite.ogg` — fish bites
 - `fight.ogg` — reel fight starts
 - `reel.ogg` — while holding to reel

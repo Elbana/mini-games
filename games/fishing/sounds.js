@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'deep-cast-sound';
 
-/** Deep Cast audio — real OGG samples when present, synth fallback otherwise. */
+/** Deep Cast audio — real OGG samples when present, synthesizes otherwise. */
 export class FishingSounds {
   constructor(manifest) {
     this.base = `${manifest?.baseUrl || '/fishing/assets'}/sounds`;
@@ -10,6 +10,8 @@ export class FishingSounds {
     this._ready = this._init();
     this._reelLoop = null;
     this._lureLoop = null;
+    this._reelAudio = null;
+    this._reelSynthTimer = null;
   }
 
   isMuted() {
@@ -34,8 +36,9 @@ export class FishingSounds {
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     } catch {
-      return;
+      /* synth-only */
     }
+
     let files = {};
     try {
       const idx = await fetch(`${this.base}/index.json`);
@@ -45,6 +48,14 @@ export class FishingSounds {
       return;
     }
 
+    const reelFile = files.reel || 'reel.ogg';
+    this._reelAudio = new Audio(`${this.base}/${reelFile}`);
+    this._reelAudio.preload = 'auto';
+    this._reelAudio.loop = true;
+    this._reelAudio.volume = 0.85;
+
+    if (!this.ctx) return;
+
     await Promise.all(
       Object.entries(files).map(async ([key, file]) => {
         if (!file || typeof file !== 'string') return;
@@ -53,7 +64,7 @@ export class FishingSounds {
           if (!res.ok) return;
           const data = await res.arrayBuffer();
           if (data.byteLength < 256) return;
-          const buf = await this.ctx.decodeAudioData(data);
+          const buf = await this.ctx.decodeAudioData(data.slice(0));
           this.cache.set(key, buf);
         } catch {
           /* synth fallback for this cue */
@@ -69,7 +80,8 @@ export class FishingSounds {
 
   play(name, opts = {}) {
     if (this.muted) return;
-    this._ready.then(() => {
+    this._ready.then(async () => {
+      await this.unlock();
       const buf = this.cache.get(name);
       if (buf && this.ctx) {
         this._playBuffer(buf, opts);
@@ -96,24 +108,42 @@ export class FishingSounds {
   }
 
   /** Real fishing reel crank — loops while the player holds to pull. */
-  startReel() {
+  async startReel() {
     if (this.muted || this._reelLoop) return;
-    this._ready.then(() => {
-      const buf = this.cache.get('reel');
-      if (!buf || !this.ctx) {
-        this._reelSynthFallback();
+    await this._ready;
+    await this.unlock();
+
+    if (this._reelAudio) {
+      try {
+        this._reelAudio.currentTime = 0;
+        this._reelAudio.volume = 0.85;
+        await this._reelAudio.play();
+        this._reelLoop = 'html';
         return;
+      } catch {
+        /* fall through to web audio / synth */
       }
+    }
+
+    const buf = this.cache.get('reel');
+    if (buf && this.ctx) {
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
-      src.playbackRate.value = 1.05;
+      src.playbackRate.value = 1.15;
+      if (buf.duration > 2) {
+        src.loopStart = 0.2;
+        src.loopEnd = Math.min(buf.duration - 0.1, 4.5);
+      }
       const g = this.ctx.createGain();
-      g.gain.value = 0.42;
+      g.gain.value = 0.75;
       src.connect(g).connect(this.ctx.destination);
-      src.start(0);
+      src.start(0, 0.2);
       this._reelLoop = { src, g };
-    });
+      return;
+    }
+
+    this._reelSynthFallback();
   }
 
   stopReel() {
@@ -121,7 +151,19 @@ export class FishingSounds {
       clearInterval(this._reelSynthTimer);
       this._reelSynthTimer = null;
     }
-    if (!this._reelLoop || !this.ctx) return;
+
+    if (this._reelLoop === 'html' && this._reelAudio) {
+      this._reelAudio.pause();
+      this._reelAudio.currentTime = 0;
+      this._reelLoop = null;
+      return;
+    }
+
+    if (!this._reelLoop || this._reelLoop === 'html') return;
+    if (!this.ctx) {
+      this._reelLoop = null;
+      return;
+    }
     const { src, g } = this._reelLoop;
     const t = this.ctx.currentTime;
     g.gain.cancelScheduledValues(t);
@@ -138,14 +180,15 @@ export class FishingSounds {
   }
 
   _reelSynthFallback() {
-    this.play('reel', { volume: 0.22 });
-    this._reelSynthTimer = setInterval(() => this.play('reel', { volume: 0.18 }), 280);
+    this.play('reel', { volume: 0.35 });
+    this._reelSynthTimer = setInterval(() => this.play('reel', { volume: 0.28 }), 220);
   }
 
   /** Gentle lure-in-water ambience while waiting for a bite. */
   startLureIdle() {
     if (this.muted || this._lureLoop) return;
-    this._ready.then(() => {
+    this._ready.then(async () => {
+      await this.unlock();
       const buf = this.cache.get('lure') || this.cache.get('splash');
       if (!buf || !this.ctx) return;
       const src = this.ctx.createBufferSource();

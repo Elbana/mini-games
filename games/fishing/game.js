@@ -161,20 +161,39 @@ function bindCastAndFightInput() {
     castAt(x, y);
   });
 
-  const pullStart = (e) => {
-    if (gameState !== 'fighting') return;
-    if (e.target.closest('button, a, .result-overlay, .help-overlay')) return;
-    isPulling = true;
-    sounds?.startReel();
-  };
-  const pullEnd = () => {
-    if (isPulling) sounds?.stopReel();
-    isPulling = false;
-  };
+}
 
-  window.addEventListener('pointerdown', pullStart);
-  window.addEventListener('pointerup', pullEnd);
-  window.addEventListener('pointercancel', pullEnd);
+let fightPullBound = false;
+
+function onFightPullStart(e) {
+  if (gameState !== 'fighting') return;
+  if (e.target.closest('button, a, .result-overlay, .help-overlay')) return;
+  if (isPulling) return;
+  isPulling = true;
+  sounds?.unlock();
+  sounds?.startReel();
+}
+
+function onFightPullEnd() {
+  if (!isPulling) return;
+  isPulling = false;
+  sounds?.stopReel();
+}
+
+function bindFightPull() {
+  if (fightPullBound) return;
+  fightPullBound = true;
+  document.addEventListener('pointerdown', onFightPullStart, { capture: true });
+  document.addEventListener('pointerup', onFightPullEnd, { capture: true });
+  document.addEventListener('pointercancel', onFightPullEnd, { capture: true });
+}
+
+function unbindFightPull() {
+  if (!fightPullBound) return;
+  fightPullBound = false;
+  document.removeEventListener('pointerdown', onFightPullStart, { capture: true });
+  document.removeEventListener('pointerup', onFightPullEnd, { capture: true });
+  document.removeEventListener('pointercancel', onFightPullEnd, { capture: true });
 }
 
 function showCallout(text, { color = '#fff', glow = '#0284c7', small = false } = {}) {
@@ -491,6 +510,7 @@ function startFight() {
 
   gameState = 'fighting';
   isPulling = false;
+  bindFightPull();
   document.getElementById('fight-panel').classList.remove('hidden');
   document.getElementById('ocean-scene').classList.add('fighting');
   sounds?.play('fight', { volume: 0.35 });
@@ -621,6 +641,7 @@ async function endFight(outcome) {
   fightAnim = null;
   sounds?.stopReel();
   sounds?.stopLureIdle();
+  unbindFightPull();
   isPulling = false;
   gameState = 'idle';
 
