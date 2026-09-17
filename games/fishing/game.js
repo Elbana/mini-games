@@ -61,52 +61,6 @@ function initOceanAmbient() {
   for (let i = 0; i < 5; i += 1) {
     spawnRipple(rippleRoot, i < 3);
   }
-
-  initBirds();
-}
-
-function initBirds() {
-  const root = document.getElementById('bird-field');
-  if (!root) return;
-
-  for (let i = 0; i < 7; i += 1) {
-    spawnBird(root, { delayRatio: i / 7 });
-  }
-
-  for (let i = 0; i < 3; i += 1) {
-    spawnBirdFlock(root, 2 + Math.floor(Math.random() * 2), i / 3);
-  }
-}
-
-function spawnBird(container, { flockOffset = 0, flip = Math.random() > 0.5, delayRatio = Math.random(), y = null } = {}) {
-  const el = document.createElement('div');
-  el.className = `sky-bird${flip ? ' flip' : ''}`;
-  el.innerHTML = '<span class="bird-wing bird-wing-l"></span><span class="bird-wing bird-wing-r"></span>';
-
-  const dur = 16 + Math.random() * 20;
-  const yPos = y ?? 6 + Math.random() * 32;
-  const drift = (Math.random() - 0.5) * 6;
-
-  el.style.setProperty('--bird-dur', `${dur}s`);
-  el.style.setProperty('--bird-delay', `${delayRatio * dur + flockOffset}s`);
-  el.style.setProperty('--bird-y', `${yPos}vh`);
-  el.style.setProperty('--bird-drift', `${drift}vh`);
-  el.style.setProperty('--bird-scale', (0.65 + Math.random() * 0.55).toFixed(2));
-
-  container.appendChild(el);
-}
-
-function spawnBirdFlock(container, count, delayRatio) {
-  const y = 10 + Math.random() * 22;
-  const flip = Math.random() > 0.5;
-  for (let i = 0; i < count; i += 1) {
-    spawnBird(container, {
-      flockOffset: i * 1.4,
-      flip,
-      delayRatio,
-      y: y + i * 1.8 + (Math.random() - 0.5) * 2,
-    });
-  }
 }
 
 function spawnFishShadow(container, { big = false, underBoat = true, delayRatio = Math.random() } = {}) {
