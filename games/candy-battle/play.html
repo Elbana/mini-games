@@ -4,11 +4,10 @@
   <meta charset="UTF-8">
   <title>Candy Battle</title>
   <link rel="stylesheet" href="/shared/arcade-shell.css">
-  <link rel="stylesheet" href="/shared/gems.css">
   <link rel="stylesheet" href="/candy-battle/game.css">
   <script src="/shared/arcade-api.js"></script>
-  <script src="/shared/fx.js" defer></script>
-  <script src="/candy-battle/game.js" defer></script>
+  <script src="/shared/fx.js"></script>
+  <script type="module" src="/candy-battle/game.js"></script>
 </head>
 <body>
   <div class="arcade-shell candy-world" id="app">
@@ -54,6 +53,8 @@
       </div>
       <div id="battle-msg" class="battle-msg"></div>
     </div>
+
+    <div id="projectile-layer" aria-hidden="true"></div>
 
     <div id="overlay-result" class="overlay hidden">
       <div class="result-card card">

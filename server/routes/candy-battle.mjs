@@ -100,6 +100,87 @@ export async function handleStartFight(req, res) {
   res.json({ fight: session.arcade.candyBattle, monster });
 }
 
+/** One swap turn — consumes 1 buy-in candy, applies all cascade waves, monster counter-attacks once. */
+export async function handleCandyTurn(req, res) {
+  const operator = requireGameAccess(req, res, SLUG);
+  if (!operator) return;
+  const ctx = buildContext(operator, extractPlayerId(req));
+  const { waves = [] } = req.body || {};
+  if (!Array.isArray(waves) || waves.length < 1 || waves.length > 24) {
+    return res.status(400).json({ error: 'Invalid turn' });
+  }
+  const session = getPlayerData(ctx);
+  const fight = session.arcade.candyBattle;
+  if (!fight?.active) {
+    return res.status(400).json({ error: 'No active fight' });
+  }
+  const tierId = fight.tierId;
+  const buyIn = session.arcade.candyBuyIn?.[tierId] || 0;
+  if (buyIn < 1) {
+    fight.active = false;
+    savePlayerData(ctx, session);
+    return res.json({ fight, ended: true, reason: 'out_of_candies', won: false });
+  }
+  session.arcade.candyBuyIn[tierId] -= 1;
+
+  const monster = monsterForLevel(fight.level);
+  let totalDamage = 0;
+  const waveDamage = [];
+  let combo = 0;
+
+  for (const w of waves) {
+    const size = Math.min(36, Math.max(3, Number(w.size) || 3));
+    combo = Math.min(20, Math.max(combo + 1, Number(w.combo) || 1));
+    const dmg = damageFromMatch(size >= 5 ? 5 : size >= 4 ? 4 : 3, combo);
+    waveDamage.push(dmg);
+    totalDamage += dmg;
+  }
+
+  fight.monsterHp = Math.max(0, fight.monsterHp - totalDamage);
+  fight.rounds += 1;
+  fight.combo = combo;
+
+  let won = false;
+  let lost = false;
+  let bonusCandies = 0;
+  let monsterAttack = 0;
+  let rewards = [];
+
+  if (fight.monsterHp <= 0) {
+    won = true;
+    fight.active = false;
+    const tier = CANDY_TIERS[tierId];
+    const qty = rollRewardQty(tier);
+    addInventory(session, tier.rewardItem, qty);
+    rewards.push({ itemId: tier.rewardItem, qty });
+    session.arcade.stats.candyWins += 1;
+    addScore(SLUG, ctx.playerId, ctx.playerId, qty * 20, { win: true });
+  } else {
+    monsterAttack = rollMonsterAttack(monster);
+    fight.playerHp = Math.max(0, fight.playerHp - monsterAttack);
+    bonusCandies = rollBonusCandies(monster);
+    if (bonusCandies > 0) session.arcade.candyBuyIn[tierId] += bonusCandies;
+    if (fight.playerHp <= 0) {
+      lost = true;
+      fight.active = false;
+    }
+  }
+
+  savePlayerData(ctx, session);
+  res.json({
+    fight,
+    totalDamage,
+    waveDamage,
+    waveCount: waves.length,
+    monsterAttack,
+    bonusCandies,
+    rewards,
+    won,
+    lost,
+    buyInCandies: session.arcade.candyBuyIn,
+  });
+}
+
 export async function handleCandyMatch(req, res) {
   const operator = requireGameAccess(req, res, SLUG);
   if (!operator) return;

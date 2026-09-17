@@ -10,6 +10,7 @@ import {
   handleGetCandyState,
   handleBuyCandies,
   handleStartFight,
+  handleCandyTurn,
   handleCandyMatch,
   handleAbandonFight,
 } from './routes/candy-battle.mjs';
@@ -66,6 +67,7 @@ app.get('/api/candy-battle/config', handleGetCandyConfig);
 app.get('/api/candy-battle/state', handleGetCandyState);
 app.post('/api/candy-battle/buy-candies', handleBuyCandies);
 app.post('/api/candy-battle/start-fight', handleStartFight);
+app.post('/api/candy-battle/turn', handleCandyTurn);
 app.post('/api/candy-battle/match', handleCandyMatch);
 app.post('/api/candy-battle/abandon', handleAbandonFight);
 
@@ -85,7 +87,7 @@ app.post('/api/fishing/reel', handleReel);
 app.use('/shared', express.static(path.join(GAMES_ROOT, 'shared')));
 app.use('/assets', express.static(ASSETS_ROOT));
 app.use('/hub', express.static(path.join(GAMES_ROOT, 'hub')));
-app.use('/candy-battle', express.static(path.join(GAMES_ROOT, 'candy-battle')));
+app.use('/candy-battle', express.static(path.join(GAMES_ROOT, 'candy-battle'), { maxAge: IS_PRODUCTION ? '1d' : 0 }));
 app.use('/fast-farm', express.static(path.join(GAMES_ROOT, 'fast-farm')));
 app.use('/fishing', express.static(path.join(GAMES_ROOT, 'fishing')));
 

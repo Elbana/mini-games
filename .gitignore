@@ -4,3 +4,7 @@ data/market/
 data/leaderboards/
 .env
 *.log
+games/candy-battle/assets/yaycandies/
+games/candy-battle/assets/*.zip
+games/candy-battle/assets/puzzle-pack.zip
+games/candy-battle/assets/interface-sounds.zip

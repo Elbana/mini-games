@@ -1,41 +1,64 @@
-const COLS = 6;
-const ROWS = 6;
-const TYPES = 6;
+import {
+  COLS,
+  ROWS,
+  createBoard,
+  findMatchGroups,
+  swapCells,
+  clearClusters,
+  applyGravity,
+  clusterCenter,
+} from './board-engine.js';
+import { BoardAnimator } from './animator.js';
+import { CandySounds } from './sounds.js';
 
 let config = null;
+let manifest = null;
+let grid = [];
 let selectedTier = 'sugar';
 let selectedLevel = 1;
-let grid = [];
 let selectedCell = null;
 let busy = false;
 let fight = null;
 let buyIn = {};
-let comboChain = 0;
+let animator = null;
+let sounds = null;
 
 const MONSTER_EMOJI = ['👾', '🦇', '🪨', '🐉', '👑', '😈'];
 
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-  const hubLink = document.querySelector('.top-bar a');
-  hubLink.href = `/?token=${Arcade.token}&player=${Arcade.player}`;
+  document.querySelector('.top-bar a').href = `/?token=${Arcade.token}&player=${Arcade.player}`;
+  sounds = new CandySounds();
+  document.body.addEventListener(
+    'pointerdown',
+    () => sounds.unlock(),
+    { once: true }
+  );
+
+  manifest = await fetch('/candy-battle/assets/manifest.json').then((r) => r.json());
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/candy-battle/config');
   await refreshState();
   buildTierPicker();
   buildLevelPicker();
+
   document.getElementById('btn-start').addEventListener('click', startFight);
   document.getElementById('btn-continue').addEventListener('click', () => {
     document.getElementById('overlay-result').classList.add('hidden');
     showLobby();
   });
+
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+  board.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
+  animator = new BoardAnimator(board, manifest, sounds);
 }
 
 async function refreshState() {
   const st = await Arcade.get('/api/candy-battle/state');
   buyIn = st.buyInCandies || {};
-  const total = Object.values(buyIn).reduce((a, b) => a + b, 0);
-  document.getElementById('ammo-count').textContent = total;
+  document.getElementById('ammo-count').textContent = Object.values(buyIn).reduce((a, b) => a + b, 0);
   document.getElementById('btn-start').disabled = (buyIn[selectedTier] || 0) < 3;
 }
 
@@ -46,7 +69,7 @@ function buildTierPicker() {
       .map(
         (t) =>
           `<button type="button" class="tier-btn ${t.id === selectedTier ? 'selected' : ''}" data-tier="${t.id}">
-        ${t.name}<br><small>${(buyIn[t.id] || 0)} owned</small>
+        ${t.name}<br><small>${buyIn[t.id] || 0} owned</small>
       </button>`
       )
       .join('') +
@@ -90,7 +113,6 @@ async function buyPack(tierId) {
     document.getElementById('btn-start').disabled = (buyIn[selectedTier] || 0) < 3;
     Arcade.toast(`+${r.added} buy-in candies!`, 'win');
     Arcade.refreshBalance(document.getElementById('balance'));
-    ArcadeFX.burst(window.innerWidth / 2, 200, '🍬', 5);
   } catch (e) {
     Arcade.toast(e.message, 'lose');
   }
@@ -103,7 +125,6 @@ async function startFight() {
       tierId: selectedTier,
     });
     fight = r.fight;
-    comboChain = 0;
     document.getElementById('screen-lobby').classList.add('hidden');
     document.getElementById('screen-fight').classList.remove('hidden');
     document.getElementById('monster-name').textContent = fight.monsterName;
@@ -111,7 +132,9 @@ async function startFight() {
     document.getElementById('monster-preview').textContent = emoji;
     document.getElementById('monster-sprite').textContent = emoji;
     updateHud(r.buyInCandies || buyIn);
-    initBoard();
+    grid = createBoard();
+    renderBoard();
+    animator.measure();
   } catch (e) {
     Arcade.toast(e.message, 'lose');
   }
@@ -133,46 +156,26 @@ function updateHud(bi) {
   document.getElementById('fight-ammo').textContent = buyIn[selectedTier] || 0;
 }
 
-function initBoard() {
-  grid = [];
-  for (let r = 0; r < ROWS; r++) {
-    grid[r] = [];
-    for (let c = 0; c < COLS; c++) {
-      grid[r][c] = randomType(r, c);
-    }
-  }
-  while (findMatches().length) refillMatches();
-  renderBoard();
-}
-
-function randomType(r, c) {
-  let t;
-  do {
-    t = Math.floor(Math.random() * TYPES);
-  } while (
-    (c >= 2 && grid[r][c - 1] === t && grid[r][c - 2] === t) ||
-    (r >= 2 && grid[r - 1]?.[c] === t && grid[r - 2]?.[c] === t)
-  );
-  return t;
-}
-
-function renderBoard(falling = false) {
+function renderBoard() {
   const board = document.getElementById('board');
   board.innerHTML = '';
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const t = grid[r][c];
-      const div = document.createElement('div');
-      div.className = `cell${falling ? ' falling' : ''}`;
-      div.dataset.r = r;
-      div.dataset.c = c;
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
       if (t != null) {
-        const gem = document.createElement('div');
-        gem.className = `gem t${t}`;
-        div.appendChild(gem);
+        const img = document.createElement('img');
+        img.className = 'candy-img';
+        img.draggable = false;
+        img.src = manifest.candyPath.replace('{color}', manifest.candies[t]);
+        img.alt = '';
+        cell.appendChild(img);
       }
-      div.addEventListener('click', () => onCellClick(r, c));
-      board.appendChild(div);
+      cell.addEventListener('click', () => onCellClick(r, c));
+      board.appendChild(cell);
     }
   }
 }
@@ -182,131 +185,101 @@ function onCellClick(r, c) {
   if (selectedCell === null) {
     selectedCell = { r, c };
     highlightSelected();
+    sounds.play('click', { volume: 0.15 });
     return;
   }
   const { r: r0, c: c0 } = selectedCell;
+  if (r === r0 && c === c0) {
+    selectedCell = null;
+    highlightSelected();
+    return;
+  }
   if (Math.abs(r - r0) + Math.abs(c - c0) !== 1) {
     selectedCell = { r, c };
     highlightSelected();
     return;
   }
-  swap(r0, c0, r, c);
+  attemptSwap(r0, c0, r, c);
 }
 
 function highlightSelected() {
   document.querySelectorAll('.cell').forEach((el) => el.classList.remove('selected'));
   if (!selectedCell) return;
-  const el = document.querySelector(`[data-r="${selectedCell.r}"][data-c="${selectedCell.c}"]`);
-  el?.classList.add('selected');
+  document.querySelector(`[data-r="${selectedCell.r}"][data-c="${selectedCell.c}"]`)?.classList.add('selected');
 }
 
-async function swap(r0, c0, r1, c1) {
+async function attemptSwap(r0, c0, r1, c1) {
   busy = true;
   selectedCell = null;
   highlightSelected();
-  [grid[r0][c0], grid[r1][c1]] = [grid[r1][c1], grid[r0][c0]];
+
+  await animator.swapAnimate(r0, c0, r1, c1);
+  swapCells(grid, r0, c0, r1, c1);
   renderBoard();
-  const matches = findMatches();
-  if (!matches.length) {
-    [grid[r0][c0], grid[r1][c1]] = [grid[r1][c1], grid[r0][c0]];
+
+  if (!findMatchGroups(grid).length) {
+    swapCells(grid, r0, c0, r1, c1);
     renderBoard();
+    await animator.invalidSwap(r0, c0, r1, c1);
     busy = false;
     return;
   }
-  comboChain = 0;
-  await resolveMatches();
+
+  await runFullCascadeTurn();
   busy = false;
 }
 
-function findMatches() {
-  const matched = new Set();
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const t = grid[r][c];
-      if (t == null) continue;
-      if (c <= COLS - 3 && grid[r][c + 1] === t && grid[r][c + 2] === t) {
-        matched.add(`${r},${c}`);
-        matched.add(`${r},${c + 1}`);
-        matched.add(`${r},${c + 2}`);
-      }
-      if (r <= ROWS - 3 && grid[r + 1][c] === t && grid[r + 2][c] === t) {
-        matched.add(`${r},${c}`);
-        matched.add(`${r + 1},${c}`);
-        matched.add(`${r + 2},${c}`);
-      }
-    }
-  }
-  return [...matched].map((s) => s.split(',').map(Number));
+function estimateDamage(size, combo) {
+  const s = size >= 5 ? 5 : size >= 4 ? 4 : 3;
+  const base = { 3: 8, 4: 14, 5: 22 }[s] || s * 5;
+  return Math.round(base * (1 + (combo - 1) * 0.25));
 }
 
-function refillMatches() {
-  const m = findMatches();
-  m.forEach(([r, c]) => (grid[r][c] = randomType(r, c)));
-  if (findMatches().length) refillMatches();
-}
+/** One player move: full Candy Crush cascades — each cluster pops, falls, and strikes the monster. */
+async function runFullCascadeTurn() {
+  const waves = [];
+  let combo = 0;
+  const monsterEl = document.getElementById('monster-sprite');
 
-async function resolveMatches() {
-  let totalSize = 0;
-  let maxSize = 3;
   while (true) {
-    const matches = findMatches();
-    if (!matches.length) break;
-    comboChain += 1;
-    const size = matches.length;
-    totalSize += size;
-    maxSize = Math.max(maxSize, size >= 5 ? 5 : size >= 4 ? 4 : 3);
-    matches.forEach(([r, c]) => {
-      const t = grid[r][c];
-      const cellEl = document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
-      if (cellEl) {
-        cellEl.classList.add('match-pop');
-        ArcadeFX.matchBurst(cellEl, t);
-      }
-      grid[r][c] = null;
-    });
-    await sleep(280);
-    applyGravity();
-    renderBoard(true);
-    await sleep(180);
-  }
-  if (totalSize >= 3) {
-    await sendMatch(maxSize, comboChain);
-  }
-}
+    const groups = findMatchGroups(grid);
+    if (!groups.length) break;
+    combo++;
 
-function applyGravity() {
-  for (let c = 0; c < COLS; c++) {
-    let write = ROWS - 1;
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (grid[r][c] != null) {
-        grid[write][c] = grid[r][c];
-        if (write !== r) grid[r][c] = null;
-        write--;
-      }
+    await Promise.all(groups.map((cluster) => animator.popCluster(cluster, combo)));
+
+    for (const cluster of groups) {
+      const center = clusterCenter(cluster);
+      const r = Math.round(center.r);
+      const c = Math.round(center.c);
+      const size = cluster.length;
+      waves.push({ size, combo, type: center.type, r, c });
+      const est = estimateDamage(size, combo);
+      await animator.launchProjectile(r, c, center.type, est, monsterEl);
+      await sleep(60);
     }
-    for (let r = write; r >= 0; r--) grid[r][c] = randomType(r, c);
-  }
-}
 
-async function sendMatch(matchSize, combo) {
+    clearClusters(grid, groups);
+    const moves = applyGravity(grid);
+    renderBoard();
+    await animator.fallMoves(moves);
+  }
+
+  if (!waves.length) return;
+
   try {
-    const r = await Arcade.post('/api/candy-battle/match', { matchSize, combo });
+    const r = await Arcade.post('/api/candy-battle/turn', { waves });
     fight = r.fight;
     updateHud(r.buyInCandies);
+
     const msg = document.getElementById('battle-msg');
-    msg.textContent = `-${matchSize} match → ${r.damage} dmg!${
+    msg.textContent = `${waves.length} match${waves.length > 1 ? 'es' : ''} → ${r.totalDamage} total dmg!${
       r.monsterAttack ? ` Monster hits ${r.monsterAttack}` : ''
     }${r.bonusCandies ? ` +${r.bonusCandies} free candies!` : ''}`;
-    if (r.damage) {
-      const sprite = document.getElementById('monster-sprite');
-      sprite?.classList.add('hit');
-      setTimeout(() => sprite?.classList.remove('hit'), 400);
-      const rect = sprite?.getBoundingClientRect();
-      if (rect) ArcadeFX.floatText(rect.left + rect.width / 2, rect.top, `-${r.damage}`, '#ff6bcb');
-    }
+
     if (r.monsterAttack) {
       ArcadeFX.shake(document.getElementById('app'));
-      ArcadeFX.floatText(window.innerWidth / 2, 120, `-${r.monsterAttack}`, '#ff5a7a');
+      ArcadeFX.floatText(window.innerWidth / 2, 100, `-${r.monsterAttack}`, '#ff5a7a');
     }
     if (r.won || r.lost || r.ended) showResult(r);
   } catch (e) {
@@ -321,13 +294,14 @@ function showResult(r) {
     document.getElementById('result-icon').textContent = '🏆';
     document.getElementById('result-title').textContent = 'Monster Defeated!';
     document.getElementById('result-detail').textContent = r.rewards?.length
-      ? `Loot: ${r.rewards.map((x) => x.qty + '× ' + x.itemId).join(', ')} — sell at Black Market!`
+      ? `Loot: ${r.rewards.map((x) => x.qty + '× ' + x.itemId).join(', ')}`
       : 'You earned loot!';
+    sounds.play('win', { volume: 0.5 });
     ArcadeFX.confetti(30);
-    ArcadeFX.burst(window.innerWidth / 2, window.innerHeight / 2, '💎', 12);
   } else {
     document.getElementById('result-icon').textContent = '💀';
-    document.getElementById('result-title').textContent = r.reason === 'out_of_candies' ? 'Out of Candies!' : 'Defeated';
+    document.getElementById('result-title').textContent =
+      r.reason === 'out_of_candies' ? 'Out of Candies!' : 'Defeated';
     document.getElementById('result-detail').textContent = 'Buy more candies and try again.';
   }
 }
