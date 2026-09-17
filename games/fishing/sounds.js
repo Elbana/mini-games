@@ -1,5 +1,7 @@
 const STORAGE_KEY = 'deep-cast-sound';
 
+const REEL_FALLBACKS = ['reel.ogg', 'reel-smooth.ogg', 'reel-slow.ogg', 'reel-clicks.ogg'];
+
 /** Deep Cast audio — real OGG samples when present, synthesizes otherwise. */
 export class FishingSounds {
   constructor(manifest) {
@@ -10,8 +12,8 @@ export class FishingSounds {
     this._ready = this._init();
     this._reelLoop = null;
     this._lureLoop = null;
-    this._reelAudio = null;
     this._reelSynthTimer = null;
+    this._reelFile = 'reel.ogg';
   }
 
   isMuted() {
@@ -32,11 +34,33 @@ export class FishingSounds {
     return this.muted;
   }
 
+  async _loadBuffer(file) {
+    const res = await fetch(`${this.base}/${file}`);
+    if (!res.ok) throw new Error(`missing ${file}`);
+    const data = await res.arrayBuffer();
+    if (data.byteLength < 256) throw new Error(`empty ${file}`);
+    return this.ctx.decodeAudioData(data.slice(0));
+  }
+
+  async _loadReelBuffer(preferred) {
+    const tries = [preferred, ...REEL_FALLBACKS.filter((f) => f !== preferred)];
+    for (const file of tries) {
+      try {
+        const buf = await this._loadBuffer(file);
+        this.cache.set('reel', buf);
+        this._reelFile = file;
+        return;
+      } catch {
+        /* try next reel sample */
+      }
+    }
+  }
+
   async _init() {
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     } catch {
-      /* synth-only */
+      return;
     }
 
     let files = {};
@@ -48,24 +72,14 @@ export class FishingSounds {
       return;
     }
 
-    const reelFile = files.reel || 'reel.ogg';
-    this._reelAudio = new Audio(`${this.base}/${reelFile}`);
-    this._reelAudio.preload = 'auto';
-    this._reelAudio.loop = true;
-    this._reelAudio.volume = 0.82;
-    this._reelAudio.playbackRate = 1.05;
-
-    if (!this.ctx) return;
+    this._reelFile = files.reel || 'reel.ogg';
+    await this._loadReelBuffer(this._reelFile);
 
     await Promise.all(
       Object.entries(files).map(async ([key, file]) => {
-        if (!file || typeof file !== 'string') return;
+        if (key === 'reel' || !file || typeof file !== 'string') return;
         try {
-          const res = await fetch(`${this.base}/${file}`);
-          if (!res.ok) return;
-          const data = await res.arrayBuffer();
-          if (data.byteLength < 256) return;
-          const buf = await this.ctx.decodeAudioData(data.slice(0));
+          const buf = await this._loadBuffer(file);
           this.cache.set(key, buf);
         } catch {
           /* synth fallback for this cue */
@@ -108,33 +122,20 @@ export class FishingSounds {
     return { src, g };
   }
 
-  /** Real fishing reel crank — loops while the player holds to pull. */
+  /** Continuous rolling reel — loops while the player holds to pull. */
   async startReel() {
     if (this.muted || this._reelLoop) return;
     await this._ready;
     await this.unlock();
-
-    if (this._reelAudio) {
-      try {
-        this._reelAudio.currentTime = 0;
-        this._reelAudio.volume = 0.82;
-        this._reelAudio.playbackRate = 1.05;
-        await this._reelAudio.play();
-        this._reelLoop = 'html';
-        return;
-      } catch {
-        /* fall through to web audio / synth */
-      }
-    }
 
     const buf = this.cache.get('reel');
     if (buf && this.ctx) {
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
-      src.playbackRate.value = 1.05;
+      src.playbackRate.value = 1.1;
       const g = this.ctx.createGain();
-      g.gain.value = 0.78;
+      g.gain.value = 2.6;
       src.connect(g).connect(this.ctx.destination);
       src.start(0);
       this._reelLoop = { src, g };
@@ -150,18 +151,11 @@ export class FishingSounds {
       this._reelSynthTimer = null;
     }
 
-    if (this._reelLoop === 'html' && this._reelAudio) {
-      this._reelAudio.pause();
-      this._reelAudio.currentTime = 0;
+    if (!this._reelLoop || !this.ctx) {
       this._reelLoop = null;
       return;
     }
 
-    if (!this._reelLoop || this._reelLoop === 'html') return;
-    if (!this.ctx) {
-      this._reelLoop = null;
-      return;
-    }
     const { src, g } = this._reelLoop;
     const t = this.ctx.currentTime;
     g.gain.cancelScheduledValues(t);
