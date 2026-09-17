@@ -18,5 +18,5 @@ export function fishImage(manifest, fishId) {
 }
 
 export function waterBackground(manifest) {
-  return manifest?.background?.water || '/fishing/assets/images/water.svg';
+  return manifest?.background?.water || '/fishing/assets/images/water.png';
 }

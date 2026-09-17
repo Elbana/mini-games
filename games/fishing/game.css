@@ -137,7 +137,7 @@
 .water-bg {
   position: absolute;
   inset: 0;
-  background: #0c7ea8 center / cover no-repeat;
+  background: #0c7ea8 url('/fishing/assets/images/water.png') center / cover no-repeat;
 }
 
 .water-veil {

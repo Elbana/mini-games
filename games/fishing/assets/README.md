@@ -6,7 +6,7 @@ Replace any file here **keeping the same filename** to update the game visuals o
 
 | Path | Used for |
 |------|----------|
-| `images/water.svg` | Full-screen sea background |
+| `images/water.png` | Full-screen sea background (replace this file to change the ocean) |
 | `images/bobber.svg` | Cast bobber on the water |
 | `images/boat.svg` | Reserved for future boat art swap |
 | `images/bait/bait_worm.svg` | Worm bait chip |
