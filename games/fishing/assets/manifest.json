@@ -24,18 +24,5 @@
     "fish_leviathan": "/fishing/assets/images/fish/fish_leviathan.svg",
     "fish_phantom": "/fishing/assets/images/fish/fish_phantom.svg"
   },
-  "sounds": {
-    "cast": "cast.ogg",
-    "splash": "splash.ogg",
-    "bite": "bite.ogg",
-    "fight": "fight.ogg",
-    "reel": "reel.ogg",
-    "catch": "catch.ogg",
-    "catchRare": "catch-rare.ogg",
-    "escape": "escape.ogg",
-    "snap": "snap.ogg",
-    "buy": "buy.ogg",
-    "select": "select.ogg",
-    "click": "click.ogg"
-  }
+  "soundsIndex": "/fishing/assets/sounds/index.json"
 }

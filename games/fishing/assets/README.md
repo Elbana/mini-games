@@ -25,7 +25,18 @@ PNG or WebP work too — update the path in `manifest.json` if you change the ex
 
 ## Sounds
 
-Drop `.ogg` files into `sounds/` using the names in `manifest.json`:
+Edit `sounds/index.json` to map action names → filenames, then drop matching `.ogg` files into `sounds/`:
+
+```json
+{
+  "cast": "cast.ogg",
+  "bite": "bite.ogg"
+}
+```
+
+Only files listed in `index.json` are loaded (no missing-file console errors).
+
+Default placeholders are included. Replace them with your own:
 
 - `cast.ogg` — line thrown
 - `splash.ogg` — bobber hits water

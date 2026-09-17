@@ -4,7 +4,6 @@ const STORAGE_KEY = 'deep-cast-sound';
 export class FishingSounds {
   constructor(manifest) {
     this.base = `${manifest?.baseUrl || '/fishing/assets'}/sounds`;
-    this.files = manifest?.sounds || {};
     this.ctx = null;
     this.cache = new Map();
     this.muted = localStorage.getItem(STORAGE_KEY) === 'off';
@@ -33,15 +32,25 @@ export class FishingSounds {
     } catch {
       return;
     }
+    let files = {};
+    try {
+      const idx = await fetch(`${this.base}/index.json`);
+      if (!idx.ok) return;
+      files = await idx.json();
+    } catch {
+      return;
+    }
+
     await Promise.all(
-      Object.entries(this.files).map(async ([key, file]) => {
+      Object.entries(files).map(async ([key, file]) => {
+        if (!file || typeof file !== 'string') return;
         try {
           const res = await fetch(`${this.base}/${file}`);
           if (!res.ok) return;
           const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
           this.cache.set(key, buf);
         } catch {
-          /* synth fallback */
+          /* synth fallback for this cue */
         }
       })
     );
