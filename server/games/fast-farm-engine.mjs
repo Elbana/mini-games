@@ -206,11 +206,27 @@ export function needsFertilize(plot, now = Date.now()) {
 }
 
 export function needsHeal(plot, now = Date.now()) {
+  const type = currentCareType(plot);
   return (
-    (currentCareType(plot) === 'sick' && needsCare(plot, now)) ||
-    plot.state === 'wilting' ||
+    (type === 'sick' && (needsCare(plot, now) || plot.state === 'wilting')) ||
     plot.state === 'dead'
   );
+}
+
+export function careActionForPlot(plot) {
+  const type = currentCareType(plot);
+  if (type === 'fertilize') return 'fertilize';
+  if (type === 'sick') return 'heal';
+  return 'water';
+}
+
+export function canPerformCare(plot, action, now = Date.now()) {
+  if (!plot.seed_id || plot.state === 'empty' || plot.state === 'ready' || plot.state === 'dead') {
+    return false;
+  }
+  const expected = careActionForPlot(plot);
+  if (action !== expected) return false;
+  return needsCare(plot, now) || plot.state === 'wilting';
 }
 
 export function canFertilize(plot, now = Date.now()) {
@@ -256,24 +272,19 @@ function advanceCare(plot, now = Date.now()) {
 }
 
 export function afterWater(plot, now = Date.now()) {
-  if (currentCareType(plot) !== 'water') {
-    throw new Error('This crop needs something else right now');
-  }
-  if (!needsCare(plot, now) && plot.state !== 'wilting') {
+  if (!canPerformCare(plot, 'water', now)) {
+    if (currentCareType(plot) !== 'water') throw new Error('This crop needs something else right now');
     throw new Error('Too early — crop is fine for now');
   }
-  const base = plot.state === 'wilting' ? { ...plot, state: 'growing' } : plot;
-  return advanceCare(base, now);
+  return advanceCare({ ...plot, state: 'growing' }, now);
 }
 
 export function afterFertilize(plot, now = Date.now()) {
-  if (currentCareType(plot) !== 'fertilize') {
-    throw new Error('This crop does not need fertilizer now');
-  }
-  if (!needsCare(plot, now)) {
+  if (!canPerformCare(plot, 'fertilize', now)) {
+    if (currentCareType(plot) !== 'fertilize') throw new Error('This crop does not need fertilizer now');
     throw new Error('Too early to fertilize');
   }
-  return advanceCare(plot, now);
+  return advanceCare({ ...plot, state: 'growing' }, now);
 }
 
 export function afterHeal(plot, now = Date.now()) {
@@ -283,13 +294,10 @@ export function afterHeal(plot, now = Date.now()) {
       now,
     );
   }
-  if (currentCareType(plot) === 'sick' && needsCare(plot, now)) {
-    return advanceCare({ ...plot, state: 'growing' }, now);
+  if (!canPerformCare(plot, 'heal', now)) {
+    throw new Error('This crop is not sick');
   }
-  if (plot.state === 'wilting') {
-    return scheduleNextCare({ ...plot, state: 'growing' }, now);
-  }
-  throw new Error('This crop is not sick');
+  return advanceCare({ ...plot, state: 'growing' }, now);
 }
 
 export function emptyPlot(plotIndex) {

@@ -73,7 +73,6 @@ export function handleGetFarmConfig(_req, res) {
   res.json({
     seeds: Object.values(SEEDS),
     plotCount: PLOT_COUNT,
-    plotLayout: { left: '6%', bottom: '10%', width: '74%' },
     careCosts: { fertilize: FERTILIZE_COST, heal: HEAL_COST },
     careRules: {
       stepsToHarvest: CARE_STEPS_TO_HARVEST,
@@ -194,7 +193,7 @@ export async function handleHeal(req, res) {
   const farm = ensureFarm(session);
   const plot = applyGrowthState({ ...farm.plots[plot_index] });
 
-  if (!needsHeal(plot) && plot.state !== 'dead') {
+  if (plot.state !== 'dead' && !needsHeal(plot)) {
     return res.status(400).json({ success: false, error: 'This crop is not sick' });
   }
 

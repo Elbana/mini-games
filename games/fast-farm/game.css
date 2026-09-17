@@ -36,12 +36,12 @@ html, body {
   pointer-events: none;
 }
 
-/* Plot field — wide & low on the grass (tune via plotLayout config) */
+/* Plot field — edit here to move/resize (CSS only, not overridden by JS) */
 .farm-scene {
   position: absolute;
-  left: 6%;
-  bottom: 10%;
-  width: 74%;
+  left: 1%;
+  bottom: 1%;
+  width: 92%;
   aspect-ratio: 1;
   z-index: 5;
 }
@@ -191,12 +191,14 @@ html, body {
   cursor: pointer;
 }
 
-/* 3×3 plot grid — flush tiles, no gaps */
+/* 3×3 plot grid — isometric tiles overlap vertically */
 .farm-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-rows: 38% 28% 28%;
   gap: 0;
+  align-content: start;
+  height: 100%;
 }
 
 .plot-cell {
@@ -204,6 +206,15 @@ html, body {
   overflow: visible;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Top row stays put; pull middle & bottom rows up into the dead space */
+.plot-cell:nth-child(n+4):nth-child(-n+6) {
+  transform: translateY(-26%);
+}
+
+.plot-cell:nth-child(n+7) {
+  transform: translateY(-48%);
 }
 
 .plot-cell:active { opacity: 0.92; }

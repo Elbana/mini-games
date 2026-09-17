@@ -8,8 +8,6 @@ let careCosts = { fertilize: 4, heal: 6 };
 let careRules = { stepsToHarvest: 10, careWindowSec: 6.5 };
 let activePlot = null;
 let tickTimer = null;
-let plotLayout = { left: '6%', bottom: '10%', width: '74%' };
-
 const MARKET_TO_SEED = {
   crop_carrot: 'carrot',
   crop_potato: 'potato',
@@ -29,22 +27,12 @@ async function init() {
   const cfg = await Arcade.get('/api/fast-farm/config');
   seedList = cfg.seeds || [];
   seeds = Object.fromEntries(seedList.map((s) => [s.id, s]));
-  if (cfg.plotLayout) plotLayout = cfg.plotLayout;
   if (cfg.careCosts) careCosts = cfg.careCosts;
   if (cfg.careRules) careRules = cfg.careRules;
-  applyPlotLayout();
 
   bindUi();
   await refreshFarm();
   tickTimer = setInterval(refreshFarm, 800);
-}
-
-function applyPlotLayout() {
-  const scene = document.getElementById('farm-scene');
-  if (!scene) return;
-  scene.style.left = plotLayout.left;
-  scene.style.bottom = plotLayout.bottom;
-  scene.style.width = plotLayout.width;
 }
 
 function bindUi() {
@@ -133,24 +121,36 @@ function plotBaseAsset(plot) {
   return '/assets/farm/plot-seeded.webp';
 }
 
+function careIsActive(plot) {
+  return plot.needs_care || plot.state === 'wilting';
+}
+
 function cropVisualClass(plot) {
   if (plot.ready || plot.state === 'ready') return 'crop-ready';
   if (plot.state === 'dead') return 'crop-dead';
+  if (!careIsActive(plot)) return 'crop-ok';
   if (plot.state === 'wilting') return 'crop-wilting';
-  if (plot.care_type === 'sick' && plot.needs_care) return 'crop-sick';
-  if (plot.needs_fertilize || plot.care_type === 'fertilize') return 'crop-hungry';
-  if (plot.needs_water || plot.care_type === 'water') return plot.needs_care ? 'crop-thirsty' : 'crop-ok';
+  if (plot.care_type === 'sick') return 'crop-sick';
+  if (plot.care_type === 'fertilize') return 'crop-hungry';
+  if (plot.care_type === 'water') return 'crop-thirsty';
   return 'crop-ok';
 }
 
 function careLabel(plot) {
   if (plot.ready || plot.state === 'ready') return '⭐';
   if (plot.state === 'dead') return '💀';
+  if (!careIsActive(plot)) return '';
   if (plot.state === 'wilting') return '⚠️';
-  if (plot.needs_heal || plot.care_type === 'sick') return '🤒';
-  if (plot.needs_fertilize || plot.care_type === 'fertilize') return '🌿';
-  if (plot.needs_water && plot.needs_care) return '💧';
+  if (plot.care_type === 'sick') return '🤒';
+  if (plot.care_type === 'fertilize') return '🌿';
+  if (plot.care_type === 'water') return '💧';
   return '';
+}
+
+function careActionForPlot(plot) {
+  if (plot.care_type === 'fertilize') return 'fertilize';
+  if (plot.care_type === 'sick') return 'heal';
+  return 'water';
 }
 
 function renderPlots() {
@@ -227,22 +227,16 @@ async function handlePlotTap(index) {
     return;
   }
 
-  if (plot.needs_water && plot.needs_care) {
-    await runPlotAction('water', index);
-    return;
-  }
-
-  if (plot.needs_fertilize && plot.needs_care) {
-    await runPlotAction('fertilize', index);
-    return;
-  }
-
-  if (plot.state === 'wilting' && plot.care_type === 'water') {
-    await runPlotAction('water', index);
-    return;
-  }
-
-  if ((plot.care_type === 'sick' && plot.needs_care) || plot.state === 'wilting') {
+  if (careIsActive(plot)) {
+    const action = careActionForPlot(plot);
+    if (action === 'water') {
+      await runPlotAction('water', index);
+      return;
+    }
+    if (action === 'fertilize') {
+      await runPlotAction('fertilize', index);
+      return;
+    }
     openPlotSheet(index);
     return;
   }
@@ -308,20 +302,27 @@ function buildPlotSheetContent(plot, seed) {
       </div>`;
   }
 
+  const nextName =
+    plot.care_type === 'fertilize' ? 'fertilizer' : plot.care_type === 'sick' ? 'medicine' : 'water';
+
+  if (!careIsActive(plot)) {
+    return `<p class="sheet-intro">Round <strong>${step + 1}/${steps}</strong> — growing fine. Next: <strong>${nextName}</strong> soon.</p>
+      <p class="care-tip">Wait for the badge to appear, then tap the plot.</p>`;
+  }
+
   const careName =
     plot.care_type === 'fertilize' ? 'Fertilizer' : plot.care_type === 'sick' ? 'Medicine' : 'Water';
 
-  let html = `<p class="sheet-intro">Round <strong>${step + 1}/${steps}</strong> — needs <strong>${careName}</strong></p>
+  let html = `<p class="sheet-intro">Round <strong>${step + 1}/${steps}</strong> — needs <strong>${careName}</strong> now!</p>
     <div class="action-row">`;
 
-  if (plot.care_type === 'water' || plot.state === 'wilting') {
-    html += `<button type="button" class="action-btn water ${plot.needs_care ? 'pulse' : ''}" data-action="water">💧 Water</button>`;
-  }
-  if (plot.care_type === 'fertilize') {
-    html += `<button type="button" class="action-btn fert ${plot.needs_care ? 'pulse' : ''}" data-action="fertilize">🌿 Fertilize 🪙${careCosts.fertilize}</button>`;
-  }
-  if (plot.care_type === 'sick' || plot.state === 'wilting') {
-    html += `<button type="button" class="action-btn heal ${plot.needs_care ? 'pulse' : ''}" data-action="heal">💊 Heal 🪙${careCosts.heal}</button>`;
+  const action = careActionForPlot(plot);
+  if (action === 'water') {
+    html += `<button type="button" class="action-btn water pulse" data-action="water">💧 Water</button>`;
+  } else if (action === 'fertilize') {
+    html += `<button type="button" class="action-btn fert pulse" data-action="fertilize">🌿 Fertilize 🪙${careCosts.fertilize}</button>`;
+  } else {
+    html += `<button type="button" class="action-btn heal pulse" data-action="heal">💊 Heal 🪙${careCosts.heal}</button>`;
   }
 
   html += `</div><p class="care-tip">~${careRules.careWindowSec}s per round. Stagger planting so plots don't all scream at once.</p>`;
