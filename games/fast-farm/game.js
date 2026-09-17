@@ -30,9 +30,25 @@ async function init() {
   if (cfg.careCosts) careCosts = cfg.careCosts;
   if (cfg.careRules) careRules = cfg.careRules;
 
+  setupFarmToast();
   bindUi();
   await refreshFarm();
   tickTimer = setInterval(refreshFarm, 800);
+}
+
+function setupFarmToast() {
+  const zone = document.getElementById('toast-zone');
+  Arcade.toast = (msg, type = '') => {
+    const el = document.createElement('div');
+    el.className = `farm-toast ${type}`.trim();
+    el.textContent = msg;
+    zone.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => {
+      el.classList.remove('show');
+      setTimeout(() => el.remove(), 280);
+    }, 1800);
+  };
 }
 
 function bindUi() {
@@ -115,9 +131,13 @@ function renderHud() {
     total > 0 ? `${total} crops harvested — sell in Hub` : '0 crops harvested';
 }
 
-function plotBaseAsset(plot) {
-  if (plot.state === 'empty') return '/assets/farm/plot-tile.webp';
-  if (plot.state === 'dead') return '/assets/farm/plot-tile.webp';
+function plotIsReady(plot) {
+  return plot.ready || plot.state === 'ready';
+}
+
+function plotBaseAsset(plot, seed) {
+  if (plot.state === 'empty' || plot.state === 'dead') return '/assets/farm/plot-tile.webp';
+  if (plotIsReady(plot) && seed) return assetPlanted(seed.assets.planted);
   return '/assets/farm/plot-seeded.webp';
 }
 
@@ -165,14 +185,11 @@ function renderPlots() {
       const steps = careRules.stepsToHarvest || 10;
 
       let cropHtml = '';
-      if (growing || plot.ready || plot.state === 'ready') {
-        const src = plot.ready || plot.state === 'ready'
-          ? assetPlanted(seed.assets.planted)
-          : assetIcon(seed.assets.icon);
+      if (growing && !plotIsReady(plot) && seed) {
         cropHtml = `
           <div class="plot-crop ${cropCls}">
-            <img class="crop-sprite" src="${src}" alt="">
-            ${plot.state !== 'ready' && !plot.ready ? '<span class="sick-veil"></span>' : ''}
+            <img class="crop-sprite" src="${assetIcon(seed.assets.icon)}" alt="">
+            <span class="sick-veil"></span>
             ${cropCls === 'crop-sick' || cropCls === 'crop-wilting' ? '<span class="sick-bugs">🦠</span>' : ''}
           </div>`;
       }
@@ -181,21 +198,21 @@ function renderPlots() {
         'plot-cell',
         plot.needs_care ? 'needs-care' : '',
         cropCls,
-        plot.ready ? 'ready' : '',
+        plotIsReady(plot) ? 'ready' : '',
         plot.state === 'dead' ? 'dead' : '',
       ]
         .filter(Boolean)
         .join(' ');
 
       const progressHtml =
-        growing && !plot.ready
+        growing && !plotIsReady(plot)
           ? `<div class="care-pips">${Array.from({ length: steps }, (_, j) =>
               `<span class="care-pip ${j < step ? 'done' : j === step && plot.needs_care ? 'now' : ''}"></span>`,
             ).join('')}</div>`
           : '';
 
       return `<div class="${cls}" data-plot="${i}" role="gridcell">
-        <img class="plot-img" src="${plotBaseAsset(plot)}" alt="">
+        <img class="plot-img" src="${plotBaseAsset(plot, seed)}" alt="">
         ${cropHtml}
         ${badge ? `<span class="plot-badge care">${badge}</span>` : ''}
         ${progressHtml}
@@ -254,6 +271,11 @@ function openPlotSheet(index, show = true) {
     ? `${seed.name} — Plot ${index + 1}`
     : `Plot ${index + 1}`;
 
+  const panel = document.querySelector('#sheet-plot .sheet-panel');
+  const isSeed = plot.state === 'empty';
+  panel.classList.toggle('sheet-seed-mode', isSeed);
+  panel.classList.toggle('sheet-action-mode', !isSeed);
+
   const body = document.getElementById('plot-sheet-body');
   body.innerHTML = buildPlotSheetContent(plot, seed);
 
@@ -271,17 +293,15 @@ function buildPlotSheetContent(plot, seed) {
   const step = plot.care_step || 0;
 
   if (plot.state === 'empty') {
-    return `<p class="sheet-intro">10 care rounds per crop. Miss one → wilt → dead.</p>
-      <div class="seed-pick-list">${seedList
+    return `<p class="sheet-intro compact">Pick a seed — tap to plant instantly</p>
+      <div class="seed-quick-grid">${[...seedList]
+        .sort((a, b) => a.price - b.price)
         .map((s) => {
           const ok = walletBalance >= s.price;
-          return `<button type="button" class="seed-pick-row ${ok ? '' : 'disabled'}" data-action="plant" data-seed="${s.id}" ${ok ? '' : 'disabled'}>
+          return `<button type="button" class="seed-quick-btn ${ok ? '' : 'disabled'}" data-action="plant" data-seed="${s.id}" ${ok ? '' : 'disabled'}>
             <img src="${assetSeed(s.assets.seed)}" alt="">
-            <span class="seed-pick-info">
-              <strong>${s.name}</strong>
-              <small>${steps} care rounds · x${s.harvestAmount} harvest</small>
-            </span>
-            <span class="seed-pick-price">🪙 ${s.price}</span>
+            <span class="seed-quick-name">${s.name}</span>
+            <span class="seed-quick-price">🪙${s.price}</span>
           </button>`;
         })
         .join('')}</div>`;
@@ -415,9 +435,13 @@ function closeSheet(id) {
 
 function addFloatEffect(text, colorClass) {
   const el = document.createElement('div');
-  el.className = `float-effect ${colorClass}`;
+  el.className = `farm-toast float ${colorClass}`;
   el.textContent = text;
-  el.style.top = '45%';
-  document.getElementById('fx-layer').appendChild(el);
-  setTimeout(() => el.remove(), 2000);
+  const zone = document.getElementById('toast-zone');
+  zone.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 280);
+  }, 1400);
 }

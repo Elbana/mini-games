@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Fast Farm</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/shared/arcade-shell.css">
   <link rel="stylesheet" href="/fast-farm/game.css">
   <script src="/shared/arcade-api.js"></script>
@@ -31,6 +31,7 @@
       </header>
     </div>
 
+    <div id="toast-zone" class="farm-toast-zone" aria-live="polite"></div>
     <div id="fx-layer" aria-hidden="true"></div>
 
     <div id="sheet-plot" class="farm-sheet hidden" role="dialog" aria-modal="true">
@@ -38,10 +39,7 @@
       <div class="sheet-panel sheet-plot">
         <div class="sheet-handle"></div>
         <header class="sheet-header compact">
-          <div>
-            <h2 id="plot-sheet-title">Plot</h2>
-            <p id="plot-sheet-sub">Choose an action</p>
-          </div>
+          <h2 id="plot-sheet-title">Plot</h2>
         </header>
         <div id="plot-sheet-body" class="plot-sheet-body"></div>
       </div>

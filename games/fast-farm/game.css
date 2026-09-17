@@ -1,4 +1,4 @@
-/* Fast Farm — matches Riko Flutter farm_screen.dart layout */
+/* Fast Farm — responsive field layout + playful UI */
 
 html, body {
   margin: 0;
@@ -9,10 +9,15 @@ html, body {
 }
 
 .farm-screen {
+  --field-top: clamp(38%, 42vh, 46%);
+  --field-bottom: clamp(0.5%, 1vh, 2%);
+  --field-side: clamp(0.5%, 1vw, 2%);
   position: relative;
-  max-width: 430px;
+  width: 100%;
+  max-width: min(430px, 100vw);
   margin: 0 auto;
   height: 100dvh;
+  height: 100svh;
   overflow: hidden;
 }
 
@@ -36,13 +41,13 @@ html, body {
   pointer-events: none;
 }
 
-/* Plot field — edit here to move/resize (CSS only, not overridden by JS) */
+/* Plot field — locked to grass area between house and bottom edge */
 .farm-scene {
   position: absolute;
-  left: 1%;
-  bottom: 1%;
-  width: 92%;
-  aspect-ratio: 1;
+  top: var(--field-top);
+  bottom: var(--field-bottom);
+  left: var(--field-side);
+  right: var(--field-side);
   z-index: 5;
 }
 
@@ -75,26 +80,32 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: clamp(36px, 10vw, 42px);
+  height: clamp(36px, 10vw, 42px);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  border: 2px solid rgba(255, 255, 255, 0.25);
   color: #fff;
   font-size: 1.4rem;
   line-height: 1;
   text-decoration: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
 .farm-hint {
   margin: 0;
   flex: 1;
-  padding: 8px 14px;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.45);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.82rem;
-  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: clamp(0.72rem, 2.8vw, 0.82rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .harvest-chip {
@@ -227,7 +238,8 @@ html, body {
   filter: grayscale(0.7) brightness(0.6);
 }
 
-.plot-cell.ready .plot-crop {
+.plot-cell.ready .plot-img {
+  filter: saturate(1.15) brightness(1.08);
   animation: plot-ready 1.2s ease-in-out infinite;
 }
 
@@ -315,11 +327,6 @@ html, body {
   filter: grayscale(1) brightness(0.5);
   transform: scale(0.8) rotate(8deg);
   opacity: 0.7;
-}
-
-.crop-ready .crop-sprite {
-  filter: saturate(1.2) brightness(1.1);
-  transform: scale(1.05);
 }
 
 @keyframes crop-shiver {
@@ -529,36 +536,62 @@ html, body {
 
 .farm-action-badge.hidden { display: none; }
 
-/* Floating harvest effect */
 #fx-layer {
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 100;
-  max-width: 430px;
-  margin: 0 auto;
+  z-index: 8;
 }
 
-.float-effect {
+/* Toasts — top of field, never over plots */
+.farm-toast-zone {
   position: absolute;
+  top: calc(var(--field-top) - clamp(36px, 8vh, 48px));
   left: 50%;
   transform: translateX(-50%);
-  padding: 10px 20px;
-  border-radius: 20px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(92%, 380px);
+  pointer-events: none;
+}
+
+.farm-toast {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: clamp(0.78rem, 3vw, 0.9rem);
+  font-weight: 600;
   color: #fff;
-  font-size: 1.25rem;
-  font-weight: 800;
-  animation: float-up 2s ease-out forwards;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transform: translateY(-8px) scale(0.92);
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
-.float-effect.green { background: rgba(76, 175, 80, 0.9); box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
-.float-effect.amber { background: rgba(255, 193, 7, 0.9); box-shadow: 0 0 10px rgba(255, 193, 7, 0.5); }
-.float-effect.blue { background: rgba(33, 150, 243, 0.9); box-shadow: 0 0 10px rgba(33, 150, 243, 0.5); font-size: 1.5rem; }
-
-@keyframes float-up {
-  0% { opacity: 1; top: 50%; }
-  100% { opacity: 0; top: 30%; }
+.farm-toast.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
+
+.farm-toast.win {
+  border-color: rgba(93, 255, 176, 0.45);
+  color: #b9ffd9;
+}
+
+.farm-toast.lose {
+  border-color: rgba(255, 90, 122, 0.45);
+  color: #ffb3c4;
+}
+
+.farm-toast.float.green { border-color: rgba(93, 255, 176, 0.5); color: #b9ffd9; }
+.farm-toast.float.blue { border-color: rgba(110, 203, 255, 0.5); color: #b8e4ff; }
 
 /* Bottom sheets */
 .farm-sheet {
@@ -568,6 +601,13 @@ html, body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  max-width: min(430px, 100vw);
+  margin: 0 auto;
+}
+
+.farm-sheet:has(.sheet-action-mode) {
+  align-items: flex-end;
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .farm-sheet.hidden { display: none; }
@@ -576,18 +616,36 @@ html, body {
 .dialog-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(3px);
 }
 
 .sheet-panel {
   position: relative;
   width: 100%;
   max-width: 430px;
-  max-height: 75vh;
-  border-radius: 28px 28px 0 0;
+  border-radius: 24px 24px 0 0;
   display: flex;
   flex-direction: column;
-  animation: sheet-up 0.28s ease;
+  animation: sheet-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.sheet-panel.sheet-action-mode {
+  max-height: none;
+  border-radius: 20px;
+  margin-bottom: clamp(12px, 3vh, 24px);
+  width: calc(100% - 24px);
+  animation: pop-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sheet-panel.sheet-seed-mode {
+  max-height: min(52vh, 420px);
+}
+
+@keyframes pop-up {
+  from { transform: translateY(16px) scale(0.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 @keyframes sheet-up {
@@ -597,24 +655,43 @@ html, body {
 
 .sheet-shop,
 .sheet-plot {
-  background: linear-gradient(180deg, #4a7023, #2d1b0e);
+  background: linear-gradient(180deg, rgba(74, 112, 35, 0.96), rgba(45, 27, 14, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sheet-header.compact {
-  padding: 12px 20px 8px;
+  padding: 10px 16px 4px;
+}
+
+.sheet-header.compact h2 {
+  margin: 0;
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
 }
 
 .plot-sheet-body {
-  padding: 0 16px 24px;
+  padding: 8px 14px 16px;
   overflow-y: auto;
-  max-height: 50vh;
+}
+
+.sheet-action-mode .plot-sheet-body {
+  padding-bottom: 18px;
 }
 
 .sheet-intro {
-  margin: 0 0 12px;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.9rem;
+  margin: 0 0 10px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(0.82rem, 3vw, 0.9rem);
   text-align: center;
+}
+
+.sheet-intro.compact {
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .sheet-intro.warn { color: #ffb74d; }
@@ -625,6 +702,53 @@ html, body {
   text-align: center;
   color: rgba(255, 255, 255, 0.55);
   font-size: 0.78rem;
+}
+
+/* Quick seed grid — all crops visible, no scroll */
+.seed-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(6px, 2vw, 10px);
+}
+
+.seed-quick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: clamp(6px, 2vw, 10px) 4px;
+  border: 2px solid rgba(129, 199, 132, 0.45);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+  color: #fff;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+}
+
+.seed-quick-btn:active:not(.disabled) { transform: scale(0.94); }
+.seed-quick-btn.disabled { opacity: 0.4; cursor: default; }
+
+.seed-quick-btn img {
+  width: clamp(32px, 10vw, 40px);
+  height: clamp(32px, 10vw, 40px);
+  object-fit: contain;
+}
+
+.seed-quick-name {
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: clamp(0.62rem, 2.4vw, 0.72rem);
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.seed-quick-price {
+  font-size: clamp(0.6rem, 2.2vw, 0.68rem);
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 143, 0, 0.85), rgba(255, 193, 7, 0.85));
 }
 
 .seed-pick-list {
@@ -1094,4 +1218,18 @@ html, body {
 .btn-dialog.primary {
   background: #4caf50;
   color: #fff;
+}
+
+@media (max-height: 640px) {
+  .farm-screen { --field-top: 36%; }
+  .plot-cell:nth-child(n+4):nth-child(-n+6) { transform: translateY(-22%); }
+  .plot-cell:nth-child(n+7) { transform: translateY(-40%); }
+}
+
+@media (min-height: 820px) {
+  .farm-screen { --field-top: 44%; }
+}
+
+@media (max-width: 360px) {
+  .seed-quick-grid { grid-template-columns: repeat(4, 1fr); gap: 5px; }
 }
