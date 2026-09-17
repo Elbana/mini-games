@@ -1,106 +1,281 @@
+/* Deep Cast — top-down boat on flat scrolling water */
+
 .fish-shell {
-  background: linear-gradient(180deg, #0c4a6e 0%, #0a0618 55%);
+  background: #0369a1;
   font-family: 'Fredoka', 'Nunito', sans-serif;
-}
-
-.ocean-scene {
-  flex: 1;
   position: relative;
-  min-height: 240px;
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(56, 189, 248, 0.4), transparent 55%),
-    linear-gradient(180deg, #7dd3fc 0%, #0284c7 35%, #1e3a8a 70%, #0f172a 100%);
 }
 
-.ocean-scene::before {
+.fish-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: linear-gradient(180deg, rgba(0, 30, 50, 0.55), transparent);
+  pointer-events: auto;
+}
+
+.fish-toast-zone {
+  position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top, 12px)) + 52px);
+  left: 12px;
+  right: 12px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.fish-toast {
+  align-self: center;
+  max-width: 100%;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  background: rgba(0, 30, 50, 0.72);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s, transform 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fish-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fish-toast.win {
+  border-color: rgba(93, 255, 176, 0.55);
+  color: #b6ffd8;
+}
+
+.fish-toast.lose {
+  border-color: rgba(255, 90, 122, 0.55);
+  color: #ffb3c1;
+}
+
+.fish-top-bar h1 {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 1rem;
+}
+
+/* ── Ocean scene — full screen ── */
+.ocean-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Scrolling water tiles — drift simulates boat movement */
+.water-bg {
+  position: absolute;
+  inset: -25%;
+  overflow: hidden;
+}
+
+.water-tile {
+  position: absolute;
+  inset: 0;
+  background: url('/assets/fishing/water.png') center / 105% auto repeat;
+  will-change: transform;
+}
+
+.water-tile-a {
+  animation: water-drift-a 22s linear infinite;
+}
+
+.water-tile-b {
+  opacity: 0.35;
+  mix-blend-mode: soft-light;
+  animation: water-drift-b 30s linear infinite;
+}
+
+@keyframes water-drift-a {
+  0% { transform: translate(0, 0) scale(1.05); }
+  100% { transform: translate(-6%, -10%) scale(1.05); }
+}
+
+@keyframes water-drift-b {
+  0% { transform: translate(0, 0) scale(1.08); }
+  100% { transform: translate(5%, 8%) scale(1.08); }
+}
+
+.water-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 40%, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(180deg, rgba(0, 40, 70, 0.12) 0%, transparent 30%, rgba(0, 30, 60, 0.18) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Fish shadows ── */
+.fish-shadows {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fish-shadow {
+  position: absolute;
+  width: var(--fish-w, 48px);
+  height: var(--fish-h, 16px);
+  opacity: 0;
+  transform-origin: center;
+  animation: fish-swim var(--fish-dur, 16s) linear infinite;
+  animation-delay: var(--fish-delay, 0s);
+}
+
+.fish-shadow::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&q=70') center 30%/cover;
-  opacity: 0.25;
-  mix-blend-mode: overlay;
+  background: rgba(0, 55, 75, 0.42);
+  border-radius: 50% 45% 45% 50%;
+  filter: blur(1.5px);
 }
 
-.wave {
+.fish-shadow::after {
+  content: '';
   position: absolute;
-  bottom: 0;
-  left: -15%;
-  width: 130%;
-  height: 90px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 45% 45% 0 0;
-  animation: wave-move 5s ease-in-out infinite;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-left: 10px solid rgba(0, 55, 75, 0.38);
+  filter: blur(1px);
 }
 
-.wave2 { animation-delay: -2.5s; opacity: 0.55; height: 65px; }
-
-@keyframes wave-move {
-  0%, 100% { transform: translateX(0) scaleY(1); }
-  50% { transform: translateX(-4%) scaleY(1.08); }
+.fish-shadow.big::before {
+  background: rgba(0, 45, 65, 0.28);
+  border-radius: 55% 45% 50% 50%;
 }
 
-.boat {
+.fish-shadow.big::after {
+  border-left-color: rgba(0, 45, 65, 0.25);
+}
+
+@keyframes fish-swim {
+  0% {
+    transform: translate(var(--x0), var(--y0)) rotate(var(--rot)) scale(var(--fish-scale, 1));
+    opacity: 0;
+  }
+  8% { opacity: var(--fish-opacity, 0.7); }
+  92% { opacity: var(--fish-opacity, 0.7); }
+  100% {
+    transform: translate(var(--x1), var(--y1)) rotate(var(--rot)) scale(var(--fish-scale, 1));
+    opacity: 0;
+  }
+}
+
+/* Surface ripples */
+.ripple-field {
   position: absolute;
-  top: 32%;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 3.5rem;
-  animation: boat-bob 2.8s ease-in-out infinite;
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.45));
+  inset: 0;
   z-index: 2;
+  pointer-events: none;
+}
+
+.ripple {
+  position: absolute;
+  width: var(--ripple-size, 40px);
+  height: var(--ripple-size, 40px);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  opacity: 0;
+  animation: ripple-pulse var(--ripple-dur, 4s) ease-out infinite;
+  animation-delay: var(--ripple-delay, 0s);
+}
+
+@keyframes ripple-pulse {
+  0% { transform: scale(0.3); opacity: 0.5; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+/* ── Boat (top-down, centered) ── */
+.boat-wrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(52vw, 220px);
+  transform: translate(-50%, -54%);
+  z-index: 5;
+  animation: boat-bob 3s ease-in-out infinite;
+  filter: drop-shadow(0 12px 24px rgba(0, 30, 50, 0.35));
+}
+
+.boat-art {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 @keyframes boat-bob {
-  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-2deg); }
-  50% { transform: translateX(-50%) translateY(-10px) rotate(2deg); }
+  0%, 100% { transform: translate(-50%, -54%) rotate(-1.5deg); }
+  50% { transform: translate(-50%, calc(-54% - 8px)) rotate(1.5deg); }
 }
 
-.fish-hint {
-  position: absolute;
-  bottom: 28px;
-  left: 16px;
-  right: 16px;
-  text-align: center;
-  font-weight: 700;
-  font-size: 0.88rem;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-  background: rgba(0, 0, 0, 0.35);
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  z-index: 2;
+/* Cast line pulse when reeling */
+.boat-wrap.casting #main-line {
+  stroke: rgba(255, 213, 110, 0.95);
+  stroke-width: 2;
+  animation: line-tug 0.4s ease-in-out infinite;
 }
 
+@keyframes line-tug {
+  0%, 100% { stroke-dashoffset: 0; }
+  50% { stroke-dashoffset: 6; }
+}
+
+/* ── HUD — floats over water ── */
 .fish-hud {
-  margin: 12px 16px 20px;
-  flex-shrink: 0;
-  background: linear-gradient(160deg, rgba(14, 165, 233, 0.2), rgba(30, 58, 138, 0.25));
-  border: 2px solid rgba(125, 211, 252, 0.3);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  margin: 0;
+  padding: 12px 14px;
+  background: rgba(0, 30, 50, 0.55);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .hud-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
-  font-size: 0.88rem;
+  margin-bottom: 10px;
+  font-size: 0.84rem;
   font-weight: 700;
 }
 
 .cast-btn {
   width: 100%;
-  font-size: 1.1rem;
-  padding: 16px;
+  font-size: 1rem;
+  padding: 12px;
   background: linear-gradient(135deg, #38bdf8, #0284c7);
-  box-shadow: 0 8px 24px rgba(56, 189, 248, 0.35);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
 }
 
+/* ── Reel overlay ── */
 .reel-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2, 20, 40, 0.92);
+  background: rgba(2, 40, 65, 0.88);
   backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
@@ -162,28 +337,4 @@
   animation: pulse-glow 1.2s infinite;
 }
 
-.catch-card {
-  text-align: center;
-  animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  background: linear-gradient(160deg, rgba(56, 189, 248, 0.25), rgba(30, 58, 138, 0.3));
-  border: 2px solid rgba(125, 211, 252, 0.4);
-}
-
-.catch-icon {
-  font-size: 5rem;
-  animation: catch-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-  filter: drop-shadow(0 8px 20px rgba(56, 189, 248, 0.5));
-}
-
-@keyframes catch-bounce {
-  0% { transform: scale(0) rotate(-20deg); }
-  70% { transform: scale(1.2) rotate(5deg); }
-  100% { transform: scale(1) rotate(0); }
-}
-
-.catch-card h2 { margin: 8px 0; font-family: 'Fredoka', sans-serif; }
-.catch-card p { color: var(--arcade-gold); font-weight: 800; font-size: 1rem; }
-#btn-ok { width: 100%; margin-top: 14px; }
-
 .top-bar a { text-decoration: none; }
-.top-bar h1 { font-family: 'Fredoka', sans-serif; }
