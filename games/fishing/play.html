@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Deep Cast</title>
+  <link rel="stylesheet" href="/shared/arcade-shell.css">
+  <link rel="stylesheet" href="/fishing/game.css">
+  <script src="/shared/arcade-api.js"></script>
+  <script src="/shared/fx.js" defer></script>
+  <script src="/fishing/game.js" defer></script>
+</head>
+<body>
+  <div class="arcade-shell fish-shell">
+    <header class="top-bar">
+      <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
+      <h1>Deep Cast</h1>
+      <div class="balance-pill" id="balance">…</div>
+    </header>
+    <div class="ocean-scene">
+      <div class="wave wave1"></div>
+      <div class="wave wave2"></div>
+      <div class="boat">🚣</div>
+      <div class="fish-hint" id="fish-hint">Buy bait & cast!</div>
+    </div>
+    <div class="fish-hud card">
+      <div class="hud-row">
+        <span>Bait: <strong id="bait-count">0</strong></span>
+        <button class="btn btn-ghost btn-sm" id="btn-bait">+ Bait Pack</button>
+      </div>
+      <button class="btn btn-primary cast-btn" id="btn-cast">Cast Line 🎣</button>
+    </div>
+    <div id="reel-overlay" class="reel-overlay hidden">
+      <p class="reel-title">REEL NOW!</p>
+      <div class="reel-track">
+        <div class="reel-zone" id="reel-zone"></div>
+        <div class="reel-pointer" id="reel-pointer"></div>
+      </div>
+      <button class="btn btn-gold" id="btn-reel">HOOK!</button>
+    </div>
+    <div id="catch-popup" class="overlay hidden">
+      <div class="card catch-card">
+        <div id="catch-icon" class="catch-icon">🐟</div>
+        <h2 id="catch-name">Bass</h2>
+        <p id="catch-grade">Perfect!</p>
+        <button class="btn btn-primary" id="btn-ok">Nice!</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

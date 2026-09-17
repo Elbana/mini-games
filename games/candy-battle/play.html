@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Candy Battle</title>
+  <link rel="stylesheet" href="/shared/arcade-shell.css">
+  <link rel="stylesheet" href="/candy-battle/game.css">
+  <script src="/shared/arcade-api.js"></script>
+  <script src="/shared/fx.js" defer></script>
+  <script src="/candy-battle/game.js" defer></script>
+</head>
+<body>
+  <div class="arcade-shell" id="app">
+    <header class="top-bar">
+      <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
+      <h1>Candy Battle</h1>
+      <div class="balance-pill" id="balance">…</div>
+    </header>
+
+    <div id="screen-lobby" class="screen">
+      <div class="card lobby-card">
+        <div class="monster-preview" id="monster-preview">👾</div>
+        <h2 id="lobby-title">Buy candies. Fight monsters.</h2>
+        <p class="ammo-display">Buy-in: <strong id="ammo-count">0</strong> candies</p>
+        <div class="tier-picker" id="tier-picker"></div>
+        <div class="level-picker" id="level-picker"></div>
+        <button class="btn btn-primary" id="btn-start" disabled>Start Battle</button>
+      </div>
+    </div>
+
+    <div id="screen-fight" class="screen hidden">
+      <div class="battle-hud">
+        <div class="fighter player-side">
+          <span>You</span>
+          <div class="hp-bar"><div class="hp-fill player" id="player-hp"></div></div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="fighter monster-side">
+          <span id="monster-name">Monster</span>
+          <div class="hp-bar"><div class="hp-fill monster" id="monster-hp"></div></div>
+        </div>
+      </div>
+      <p class="candy-ammo">🍬 <span id="fight-ammo">0</span> buy-in left</p>
+      <div class="board-wrap">
+        <div id="board" class="board"></div>
+      </div>
+      <div id="battle-msg" class="battle-msg"></div>
+    </div>
+
+    <div id="overlay-result" class="overlay hidden">
+      <div class="result-card card">
+        <div class="result-icon" id="result-icon">🏆</div>
+        <h2 id="result-title">Victory!</h2>
+        <p id="result-detail"></p>
+        <button class="btn btn-gold" id="btn-continue">Continue</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

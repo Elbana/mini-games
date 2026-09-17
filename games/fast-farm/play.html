@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fast Farm</title>
+  <link rel="stylesheet" href="/shared/arcade-shell.css">
+  <link rel="stylesheet" href="/fast-farm/game.css">
+  <script src="/shared/arcade-api.js"></script>
+  <script src="/shared/fx.js" defer></script>
+  <script src="/fast-farm/game.js" defer></script>
+</head>
+<body>
+  <div class="arcade-shell farm-shell">
+    <header class="top-bar">
+      <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
+      <h1>Fast Farm</h1>
+      <div class="balance-pill" id="balance">…</div>
+    </header>
+    <div class="farm-bg"></div>
+    <div class="content-scroll farm-content">
+      <p class="farm-tagline">Crops grow in seconds — miss the window, lose your stake!</p>
+      <div id="plots" class="plot-grid"></div>
+      <div class="card seed-shop">
+        <h2>🌱 Seed Shop</h2>
+        <div id="seed-list" class="seed-list"></div>
+      </div>
+    </div>
+    <div id="plant-modal" class="overlay hidden">
+      <div class="card modal-card">
+        <h3>Plant on plot <span id="modal-plot"></span></h3>
+        <div id="modal-seeds"></div>
+        <button class="btn btn-ghost btn-sm" id="modal-close">Cancel</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

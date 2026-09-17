@@ -1,0 +1,195 @@
+.hub-shell { background: transparent; }
+
+.hub-tag {
+  margin: 0;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.hub-header h1 { font-size: 1.5rem; margin: 2px 0 0; }
+
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(255,107,203,0.15), rgba(110,203,255,0.1));
+  border-color: rgba(255,107,203,0.25);
+}
+
+.hero-card h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.hero-card p { margin: 0; opacity: 0.75; font-size: 0.85rem; line-height: 1.4; }
+
+.hero-sparkles {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 30%, rgba(255,213,110,0.2), transparent 40%),
+              radial-gradient(circle at 80% 70%, rgba(110,203,255,0.15), transparent 35%);
+  pointer-events: none;
+}
+
+.game-grid {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.game-card {
+  position: relative;
+  display: block;
+  padding: 20px;
+  border-radius: var(--arcade-radius);
+  text-decoration: none;
+  color: #fff;
+  overflow: hidden;
+  min-height: 110px;
+  transition: transform 0.2s;
+}
+
+.game-card:active { transform: scale(0.98); }
+
+.game-card-bg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.9;
+  z-index: 0;
+}
+
+.game-card.candy .game-card-bg {
+  background: linear-gradient(135deg, #ff6bcb 0%, #7c3aed 100%);
+}
+
+.game-card.farm .game-card-bg {
+  background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+}
+
+.game-card.fish .game-card-bg {
+  background: linear-gradient(135deg, #0ea5e9 0%, #1e3a8a 100%);
+}
+
+.game-card > *:not(.game-card-bg) { position: relative; z-index: 1; }
+
+.game-icon {
+  font-size: 2rem;
+  display: block;
+  animation: float 3s ease-in-out infinite;
+}
+
+.game-card h3 { margin: 8px 0 4px; font-size: 1.15rem; font-weight: 900; }
+.game-card p { margin: 0; font-size: 0.8rem; opacity: 0.85; }
+
+.game-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  background: rgba(0,0,0,0.35);
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.section-head h2 { margin: 0; font-size: 1rem; }
+
+.live-dot {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--arcade-green);
+  animation: pulse-glow 2s infinite;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(93,255,176,0.1);
+}
+
+.market-hint { font-size: 0.78rem; opacity: 0.65; margin: 0 0 12px; }
+
+.market-list { display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; }
+
+.market-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 12px;
+  font-size: 0.82rem;
+}
+
+.market-row .price { font-weight: 800; color: var(--arcade-gold); }
+.market-row .trend.up { color: var(--arcade-green); }
+.market-row .trend.down { color: var(--arcade-red); }
+
+.inventory-sell { margin-top: 16px; border-top: 1px solid var(--arcade-border); padding-top: 12px; }
+.inventory-sell h3 { margin: 0 0 10px; font-size: 0.85rem; opacity: 0.8; }
+
+.inv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.inv-row .qty { opacity: 0.7; font-size: 0.8rem; min-width: 40px; }
+
+.lb-section h2 { margin: 0 0 12px; font-size: 1rem; }
+
+.lb-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+
+.lb-tab {
+  border: 1px solid var(--arcade-border);
+  background: transparent;
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.lb-tab.active {
+  background: linear-gradient(135deg, var(--arcade-pink), #b84dff);
+  border-color: transparent;
+}
+
+.leaderboard {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leaderboard li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.82rem;
+}
+
+.leaderboard .rank {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.75rem;
+}
+
+.leaderboard li:nth-child(1) .rank { background: linear-gradient(135deg, #ffd56e, #ff9f43); color: #1a0a00; }
+.leaderboard .score { margin-left: auto; font-weight: 800; color: var(--arcade-gold); }
+
+.market-section { margin-bottom: 16px; }

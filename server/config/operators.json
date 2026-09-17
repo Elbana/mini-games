@@ -1,0 +1,22 @@
+{
+  "operators": [
+    {
+      "id": "demo",
+      "token": "op_demo",
+      "name": "Demo operator",
+      "enabledGames": ["candy-battle", "fast-farm", "fishing"],
+      "wallet": { "mode": "mock" }
+    },
+    {
+      "id": "riko",
+      "token": "op_riko",
+      "name": "Riko voice chat",
+      "enabledGames": ["candy-battle", "fast-farm", "fishing"],
+      "wallet": {
+        "mode": "http",
+        "baseUrl": "http://127.0.0.1:3005/api/games-mobile-wallet",
+        "apiKey": "dev-games-mobile-key"
+      }
+    }
+  ]
+}

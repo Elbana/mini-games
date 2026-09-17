@@ -1,0 +1,13 @@
+{
+  "name": "arcade-games",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server/index.mjs --dev",
+    "start": "node server/index.mjs",
+    "test": "node --test server/**/*.test.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
