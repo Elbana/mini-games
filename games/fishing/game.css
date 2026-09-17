@@ -154,8 +154,8 @@
     transform: translate(calc(-50% + var(--x0)), calc(-50% + var(--y0))) rotate(var(--rot)) scale(var(--fish-scale, 1));
     opacity: 0;
   }
-  12% { opacity: var(--fish-opacity, 0.55); }
-  88% { opacity: var(--fish-opacity, 0.55); }
+  6% { opacity: var(--fish-opacity, 0.55); }
+  94% { opacity: var(--fish-opacity, 0.55); }
   100% {
     transform: translate(calc(-50% + var(--x0)), calc(-50% + var(--y0)))
                translate(var(--dx), var(--dy))

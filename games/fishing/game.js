@@ -46,14 +46,16 @@ function initOceanAmbient() {
   const rippleRoot = document.getElementById('ripple-field');
   if (!shadowRoot || !rippleRoot) return;
 
-  spawnFishShadow(shadowRoot, { big: true, underBoat: true });
-
-  for (let i = 0; i < 9; i += 1) {
-    spawnFishShadow(shadowRoot, { underBoat: true });
+  for (let i = 0; i < 2; i += 1) {
+    spawnFishShadow(shadowRoot, { big: true, underBoat: true, delayRatio: i / 2 });
   }
 
-  for (let i = 0; i < 3; i += 1) {
-    spawnFishShadow(shadowRoot, { underBoat: false });
+  for (let i = 0; i < 22; i += 1) {
+    spawnFishShadow(shadowRoot, { underBoat: true, delayRatio: i / 22 });
+  }
+
+  for (let i = 0; i < 10; i += 1) {
+    spawnFishShadow(shadowRoot, { underBoat: false, delayRatio: i / 10 });
   }
 
   for (let i = 0; i < 5; i += 1) {
@@ -61,13 +63,13 @@ function initOceanAmbient() {
   }
 }
 
-function spawnFishShadow(container, { big = false, underBoat = true } = {}) {
+function spawnFishShadow(container, { big = false, underBoat = true, delayRatio = Math.random() } = {}) {
   const el = document.createElement('div');
   el.className = big ? 'fish-shadow big' : 'fish-shadow';
 
-  const w = big ? 80 + Math.random() * 40 : 24 + Math.random() * 32;
-  const scale = big ? 0.9 + Math.random() * 0.3 : 0.65 + Math.random() * 0.55;
-  const dur = big ? 48 + Math.random() * 24 : 26 + Math.random() * 22;
+  const w = big ? 80 + Math.random() * 40 : 20 + Math.random() * 36;
+  const scale = big ? 0.9 + Math.random() * 0.3 : 0.6 + Math.random() * 0.65;
+  const dur = big ? 40 + Math.random() * 20 : 18 + Math.random() * 16;
 
   let x0;
   let y0;
@@ -78,28 +80,28 @@ function spawnFishShadow(container, { big = false, underBoat = true } = {}) {
   if (underBoat) {
     const mode = Math.floor(Math.random() * 4);
     if (mode === 0) {
-      const lane = (Math.random() - 0.5) * 90;
+      const lane = (Math.random() - 0.5) * 130;
       rot = '0deg';
       x0 = `${-45 - Math.random() * 15}vw`;
       y0 = `${lane}px`;
       dx = `${90 + Math.random() * 30}vw`;
       dy = `${(Math.random() - 0.5) * 20}px`;
     } else if (mode === 1) {
-      const lane = (Math.random() - 0.5) * 90;
+      const lane = (Math.random() - 0.5) * 130;
       rot = '180deg';
       x0 = `${45 + Math.random() * 15}vw`;
       y0 = `${lane}px`;
       dx = `${-90 - Math.random() * 30}vw`;
       dy = `${(Math.random() - 0.5) * 20}px`;
     } else if (mode === 2) {
-      const lane = (Math.random() - 0.5) * 70;
+      const lane = (Math.random() - 0.5) * 100;
       rot = '90deg';
       x0 = `${lane}px`;
       y0 = `${35 + Math.random() * 12}vh`;
       dx = `${(Math.random() - 0.5) * 24}px`;
       dy = `${-55 - Math.random() * 20}vh`;
     } else {
-      const lane = (Math.random() - 0.5) * 70;
+      const lane = (Math.random() - 0.5) * 100;
       rot = '-90deg';
       x0 = `${lane}px`;
       y0 = `${-35 - Math.random() * 12}vh`;
@@ -118,8 +120,8 @@ function spawnFishShadow(container, { big = false, underBoat = true } = {}) {
   el.style.setProperty('--fish-h', `${w * 0.32}px`);
   el.style.setProperty('--fish-scale', scale.toFixed(2));
   el.style.setProperty('--fish-dur', `${dur}s`);
-  el.style.setProperty('--fish-delay', `${Math.random() * dur}s`);
-  el.style.setProperty('--fish-opacity', big ? '0.38' : `${0.35 + Math.random() * 0.25}`);
+  el.style.setProperty('--fish-delay', `${delayRatio * dur}s`);
+  el.style.setProperty('--fish-opacity', big ? '0.42' : `${0.4 + Math.random() * 0.28}`);
   el.style.setProperty('--rot', rot);
   el.style.setProperty('--x0', x0);
   el.style.setProperty('--y0', y0);
