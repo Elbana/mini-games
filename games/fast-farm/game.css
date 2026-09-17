@@ -42,7 +42,9 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   padding-bottom: env(safe-area-inset-bottom, 0);
+  justify-content: flex-end;
 }
 
 .farm-top-bar {
@@ -132,18 +134,26 @@ html, body {
   cursor: pointer;
 }
 
-.farm-spacer-top { flex: 8 1 0; min-height: 8px; }
-.farm-spacer-bottom { flex: 2 1 0; min-height: 4px; }
+.farm-spacer-top {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.farm-spacer-bottom {
+  flex: 0 0 8px;
+}
 
 /* 3×3 plot grid — flush on background, no gaps (Flutter GridView spacing 0) */
 .farm-grid {
   width: 100%;
-  aspect-ratio: 1;
+  height: min(100vw, 430px);
+  max-height: 58vh;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
   gap: 0;
-  flex-shrink: 0;
+  margin: 0 auto;
 }
 
 .plot-cell {

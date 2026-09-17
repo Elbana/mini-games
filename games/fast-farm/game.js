@@ -70,9 +70,49 @@ function formatRemaining(ms) {
 
 async function refreshFarm() {
   const st = await Arcade.get('/api/fast-farm/state');
-  farm = st;
+  farm = normalizeState(st);
   renderHud();
   renderPlots();
+}
+
+/** Accept new API shape; reset if old session format is returned. */
+function normalizeState(st) {
+  if (st?.plots?.length && st.farm_coins != null) return st;
+  if (st?.farm?.plots?.length && st.farm.plots[0]?.crop !== undefined) {
+    return {
+      farm_coins: 100,
+      farm_xp: 0,
+      farm_level: 1,
+      plots: defaultPlotsFallback(),
+      inventory: [],
+    };
+  }
+  return {
+    farm_coins: st?.farm_coins ?? 100,
+    farm_xp: st?.farm_xp ?? 0,
+    farm_level: st?.farm_level ?? 1,
+    plots: st?.plots?.length ? st.plots : defaultPlotsFallback(),
+    inventory: st?.inventory ?? [],
+  };
+}
+
+function defaultPlotsFallback() {
+  const plots = [];
+  for (let i = 0; i < 9; i++) {
+    if (i >= 6) {
+      plots.push({ plot_index: i, state: 'empty', seed_id: null, planted_at: null, unlock_price: 0 });
+    } else {
+      const costs = [100, 300, 1000, 3000, 10000, 30000];
+      plots.push({
+        plot_index: i,
+        state: 'locked',
+        seed_id: null,
+        planted_at: null,
+        unlock_price: costs[5 - i] ?? 50000,
+      });
+    }
+  }
+  return plots;
 }
 
 function renderHud() {

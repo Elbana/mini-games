@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { PORT, GAMES_ROOT, ASSETS_ROOT, CORS_ORIGINS, IS_PRODUCTION } from './config.mjs';
 import { handleGetBalance } from './routes/wallet-api.mjs';
-import { handleGetMarket, handleSell } from './routes/market.mjs';
+import { handleGetMarket, handleSell as handleMarketSell } from './routes/market.mjs';
 import {
   handleGetCandyConfig,
   handleGetCandyState,
@@ -19,7 +19,7 @@ import {
   handleGetFarmState,
   handleBuySeed,
   handleHarvest,
-  handleSell,
+  handleSell as handleFarmSell,
   handleUnlockPlot,
 } from './routes/fast-farm.mjs';
 import {
@@ -60,7 +60,7 @@ app.get('/health', (_req, res) => {
 
 app.get('/api/v1/balance', handleGetBalance);
 app.get('/api/v1/market', handleGetMarket);
-app.post('/api/v1/market/sell', handleSell);
+app.post('/api/v1/market/sell', handleMarketSell);
 app.get('/api/v1/leaderboard/:game', handleGetLeaderboard);
 
 app.get('/api/candy-battle/config', handleGetCandyConfig);
@@ -75,7 +75,7 @@ app.get('/api/fast-farm/config', handleGetFarmConfig);
 app.get('/api/fast-farm/state', handleGetFarmState);
 app.post('/api/fast-farm/buy-seed', handleBuySeed);
 app.post('/api/fast-farm/harvest', handleHarvest);
-app.post('/api/fast-farm/sell', handleSell);
+app.post('/api/fast-farm/sell', handleFarmSell);
 app.post('/api/fast-farm/unlock-plot', handleUnlockPlot);
 
 app.get('/api/fishing/config', handleGetFishingConfig);

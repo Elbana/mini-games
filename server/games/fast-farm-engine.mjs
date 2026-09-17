@@ -148,7 +148,10 @@ export function createInitialFarm() {
 }
 
 export function normalizeFarm(raw) {
-  if (!raw?.plots?.length || raw.version !== 2) {
+  const looksLegacy =
+    raw?.plots?.length &&
+    (raw.plots[0]?.crop !== undefined || raw.plots[0]?.id !== undefined);
+  if (!raw?.plots?.length || raw.version !== 2 || looksLegacy) {
     return createInitialFarm();
   }
   const farm = {
