@@ -38,6 +38,12 @@ async function init() {
     sounds.play('click');
     closeResult();
   });
+  const sellBtn = document.getElementById('result-sell');
+  const marketUrl = new URL('/play/market', location.origin);
+  marketUrl.searchParams.set('token', Arcade.token);
+  marketUrl.searchParams.set('player', Arcade.player);
+  if (new URLSearchParams(location.search).get('host')) marketUrl.searchParams.set('host', 'riko');
+  sellBtn.href = marketUrl.pathname + marketUrl.search;
   document.getElementById('btn-help').addEventListener('click', openHelp);
   document.getElementById('help-close').addEventListener('click', closeHelp);
   document.getElementById('help-ok').addEventListener('click', closeHelp);
@@ -605,6 +611,7 @@ function showFightResult(r, cast) {
     const grade =
       r.result.grade === 'perfect' ? 'Perfect reel!' : r.result.grade === 'good' ? 'Solid fight!' : 'You landed it!';
     document.getElementById('result-sub').textContent = grade;
+    document.getElementById('result-sell').classList.remove('hidden');
     const hype = biteCallout(r.tierKey || cast.tierKey);
     showCallout(catchCallout(r.tierKey || cast.tierKey), { color: hype.color, glow: hype.glow });
     ArcadeFX.confetti(r.fish.rank === 'mythic' ? 14 : r.fish.rankStars >= 4 ? 10 : 6);
@@ -622,6 +629,7 @@ function showFightResult(r, cast) {
     document.getElementById('result-detail').textContent =
       r.result.reason === 'snapped' ? 'You pulled too hard' : 'Too much slack on the line';
     document.getElementById('result-sub').textContent = 'Try again — tap the sea to cast';
+    document.getElementById('result-sell').classList.add('hidden');
   }
 
   overlay.classList.remove('hidden');

@@ -103,6 +103,12 @@
   background-blend-mode: overlay;
 }
 
+.game-card.market .game-card-bg {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 213, 110, 0.25), transparent 50%),
+    linear-gradient(135deg, #2d1b4e 0%, #0f0a18 55%, #1a0a2e 100%);
+}
+
 .game-card > *:not(.game-card-bg) { position: relative; z-index: 1; }
 
 .game-icon {
@@ -253,8 +259,46 @@
 
 .leaderboard .score { margin-left: auto; font-weight: 800; color: var(--arcade-gold); }
 
-.market-section {
+.market-teaser {
   margin-bottom: 18px;
-  background: linear-gradient(160deg, rgba(0,0,0,0.35), rgba(40, 20, 60, 0.25));
-  border: 2px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(40, 20, 70, 0.45), rgba(10, 8, 20, 0.85));
+  border: 2px solid rgba(180, 120, 255, 0.2);
+}
+
+.market-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.market-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 12px;
+  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.market-preview-row .price { font-weight: 800; color: var(--arcade-gold); }
+.market-preview-row .trend.up { color: var(--arcade-green); margin-right: 4px; }
+.market-preview-row .trend.down { color: var(--arcade-red); margin-right: 4px; }
+
+.market-preview-owned {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  opacity: 0.65;
+  text-align: center;
+}
+
+.btn-market-open {
+  width: 100%;
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  padding: 12px;
+  font-size: 0.88rem;
 }

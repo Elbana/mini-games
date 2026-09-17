@@ -1,71 +1,50 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const balanceEl = document.getElementById('balance');
-  const marketList = document.getElementById('market-list');
-  const invSell = document.getElementById('inventory-sell');
+  const marketPreview = document.getElementById('market-preview');
   const lbEl = document.getElementById('leaderboard');
   let marketData = null;
 
   await Arcade.refreshBalance(balanceEl);
 
-  async function loadMarket() {
-    marketData = await Arcade.get('/api/v1/market');
-    marketList.innerHTML = marketData.items
-      .slice(0, 8)
-      .map(
-        (i) => `
-      <div class="market-row">
-        <span>${i.icon} ${i.name}</span>
-        <span>
-          <span class="trend ${i.trend}">${i.trend === 'up' ? '▲' : i.trend === 'down' ? '▼' : '—'}</span>
-          <span class="price">${Arcade.formatCoins(i.price)}</span>
-        </span>
-      </div>`
-      )
-      .join('');
-    renderInventory();
+  function marketUrl() {
+    const u = new URL('/play/market', location.origin);
+    u.searchParams.set('token', Arcade.token);
+    u.searchParams.set('player', Arcade.player);
+    if (new URLSearchParams(location.search).get('host')) u.searchParams.set('host', 'riko');
+    return u.pathname + u.search;
   }
 
-  function renderInventory() {
-    const inv = marketData?.inventory || {};
-    const keys = Object.keys(inv);
-    if (!keys.length) {
-      invSell.innerHTML = '<h3>Your loot</h3><p style="opacity:0.6;font-size:0.8rem">Play games to collect items to sell.</p>';
-      return;
-    }
-    invSell.innerHTML =
-      '<h3>Sell your loot</h3>' +
-      keys
-        .map((id) => {
-          const item = marketData.items.find((x) => x.id === id);
-          const name = item?.name || id;
-          const icon = item?.icon || '📦';
-          return `<div class="inv-row">
-          <span>${icon} ${name}</span>
-          <span class="qty">×${inv[id]}</span>
-          <button class="btn btn-gold btn-sm" data-sell="${id}">Sell 1</button>
-          <button class="btn btn-primary btn-sm" data-sell-all="${id}">All</button>
-        </div>`;
-        })
-        .join('');
-    invSell.querySelectorAll('[data-sell]').forEach((btn) => {
-      btn.addEventListener('click', () => sellItem(btn.dataset.sell, 1));
-    });
-    invSell.querySelectorAll('[data-sell-all]').forEach((btn) => {
-      btn.addEventListener('click', () => sellItem(btn.dataset.sellAll, inv[btn.dataset.sellAll]));
-    });
-  }
+  document.querySelectorAll('#market-card, #market-open').forEach((a) => {
+    a.href = marketUrl();
+  });
 
-  async function sellItem(itemId, qty) {
+  async function loadMarketPreview() {
     try {
-      const r = await Arcade.post('/api/v1/market/sell', { itemId, qty });
-      Arcade.toast(`+${Arcade.formatCoins(r.total)} coins!`, 'win');
-      balanceEl.textContent = Arcade.formatCoins(r.balance);
-      marketData.inventory = r.inventory;
-      marketData.items = r.market.items;
-      loadMarket();
-      ArcadeFX.burst(window.innerWidth / 2, window.innerHeight / 2, '🪙', 6);
-    } catch (e) {
-      Arcade.toast(e.message, 'lose');
+      marketData = await Arcade.get('/api/v1/market');
+      const top = [...marketData.items]
+        .sort((a, b) => {
+          const boost = (i) => (i.volume24h < 10 ? 1 : 0) + (i.trend === 'up' ? 2 : 0);
+          return boost(b) - boost(a) || b.price - a.price;
+        })
+        .slice(0, 4);
+
+      const owned = Object.keys(marketData.inventory || {}).length;
+      marketPreview.innerHTML =
+        top
+          .map((i) => {
+            const arrow = i.trend === 'up' ? '▲' : i.trend === 'down' ? '▼' : '—';
+            const cls = i.trend === 'up' ? 'up' : i.trend === 'down' ? 'down' : '';
+            return `<div class="market-preview-row">
+            <span>${i.icon} ${i.name}</span>
+            <span><span class="trend ${cls}">${arrow}</span> <span class="price">🪙${Arcade.formatCoins(i.price)}</span></span>
+          </div>`;
+          })
+          .join('') +
+        (owned
+          ? `<p class="market-preview-owned">You have loot to sell — open the exchange to cash in.</p>`
+          : '');
+    } catch {
+      marketPreview.innerHTML = '<p class="market-preview-owned">Open the exchange for live prices.</p>';
     }
   }
 
@@ -93,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  document.querySelectorAll('.game-card').forEach((a) => {
+  document.querySelectorAll('.game-card:not(.market)').forEach((a) => {
     const u = new URL(a.href);
     u.searchParams.set('token', Arcade.token);
     u.searchParams.set('player', Arcade.player);
@@ -101,7 +80,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     a.href = u.pathname + u.search;
   });
 
-  await loadMarket();
+  document.getElementById('market-card').href = marketUrl();
+
+  await loadMarketPreview();
   await loadLb('candy-battle');
-  setInterval(loadMarket, 30000);
+  setInterval(loadMarketPreview, 30000);
 });

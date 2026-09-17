@@ -58,7 +58,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     env: IS_PRODUCTION ? 'production' : 'development',
-    games: ['candy-battle', 'fast-farm', 'fishing'],
+    games: ['candy-battle', 'fast-farm', 'fishing', 'market'],
     features: ['black-market', 'leaderboards'],
   });
 });
@@ -100,6 +100,7 @@ app.use('/hub', express.static(path.join(GAMES_ROOT, 'hub')));
 app.use('/candy-battle', express.static(path.join(GAMES_ROOT, 'candy-battle'), { maxAge: IS_PRODUCTION ? '1d' : 0 }));
 app.use('/fast-farm', express.static(path.join(GAMES_ROOT, 'fast-farm')));
 app.use('/fishing', express.static(path.join(GAMES_ROOT, 'fishing')));
+app.use('/market', express.static(path.join(GAMES_ROOT, 'market')));
 
 function injectPlatform(html, req) {
   const qs = new URLSearchParams();
@@ -124,8 +125,9 @@ app.get('/', (req, res) => sendPage(res, path.join(GAMES_ROOT, 'hub', 'index.htm
 app.get('/play/candy-battle', (req, res) => sendPage(res, path.join(GAMES_ROOT, 'candy-battle', 'play.html'), req));
 app.get('/play/fast-farm', (req, res) => sendPage(res, path.join(GAMES_ROOT, 'fast-farm', 'play.html'), req));
 app.get('/play/fishing', (req, res) => sendPage(res, path.join(GAMES_ROOT, 'fishing', 'play.html'), req));
+app.get('/play/market', (req, res) => sendPage(res, path.join(GAMES_ROOT, 'market', 'index.html'), req));
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`arcade-games — http://0.0.0.0:${PORT}/`);
-  console.log('Games: candy-battle, fast-farm, fishing + black market');
+  console.log('Games: candy-battle, fast-farm, fishing, market exchange');
 });

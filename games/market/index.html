@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Black Market Exchange</title>
+  <link rel="stylesheet" href="/shared/arcade-shell.css">
+  <link rel="stylesheet" href="/market/market.css">
+  <script src="/shared/arcade-api.js"></script>
+  <script src="/shared/fx.js" defer></script>
+  <script src="/market/market.js" defer></script>
+</head>
+<body>
+  <div class="market-app">
+    <header class="mk-header">
+      <div class="mk-header-left">
+        <a class="mk-back" id="hub-link" href="/">← Arcade Hub</a>
+        <div class="mk-brand">
+          <span class="mk-logo">🖤</span>
+          <div>
+            <h1>Black Market Exchange</h1>
+            <p class="mk-tagline">Live prices · Smart timing · Sell when the crowd sleeps</p>
+          </div>
+        </div>
+      </div>
+      <div class="mk-header-right">
+        <span class="mk-live"><span class="mk-live-dot"></span> LIVE</span>
+        <div class="balance-pill" id="balance">…</div>
+      </div>
+    </header>
+
+    <div class="mk-scroll">
+      <section class="mk-hero card">
+        <div class="mk-hero-grid">
+          <div class="mk-stat">
+            <span class="mk-stat-label">Portfolio value</span>
+            <span class="mk-stat-value gold" id="stat-portfolio">—</span>
+          </div>
+          <div class="mk-stat">
+            <span class="mk-stat-label">Items in bag</span>
+            <span class="mk-stat-value" id="stat-owned">—</span>
+          </div>
+          <div class="mk-stat mk-stat-tip">
+            <span class="mk-stat-label">Market tip</span>
+            <span class="mk-stat-value tip" id="stat-tip">Loading…</span>
+          </div>
+        </div>
+        <p class="mk-hero-note">
+          Prices <strong>drop</strong> when everyone sells at once. <strong>Hold</strong> your loot on quiet days — low 24h volume pushes prices up.
+        </p>
+        <p class="mk-updated" id="last-updated">Updating…</p>
+      </section>
+
+      <section class="mk-toolbar card">
+        <div class="mk-search-wrap">
+          <span class="mk-search-icon" aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            id="search-input"
+            class="mk-search"
+            placeholder="Search items, fish, crops, candy…"
+            autocomplete="off"
+            spellcheck="false"
+          >
+        </div>
+        <div class="mk-filters">
+          <div class="mk-cats" id="category-tabs" role="tablist">
+            <button type="button" class="mk-cat active" data-cat="all" role="tab">All</button>
+            <button type="button" class="mk-cat" data-cat="fish" role="tab">🎣 Fish</button>
+            <button type="button" class="mk-cat" data-cat="crop" role="tab">🌾 Crops</button>
+            <button type="button" class="mk-cat" data-cat="candy" role="tab">🍬 Candy</button>
+          </div>
+          <label class="mk-sort-label">
+            Sort
+            <select id="sort-select" class="mk-sort">
+              <option value="name">Name A–Z</option>
+              <option value="price-desc">Price high → low</option>
+              <option value="price-asc">Price low → high</option>
+              <option value="change-desc">Best deals ↑</option>
+              <option value="change-asc">Worst deals ↓</option>
+              <option value="volume-asc">Quietest (hold)</option>
+              <option value="volume-desc">Most traded</option>
+              <option value="owned">You own most</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <div class="mk-layout">
+        <section class="mk-prices card">
+          <div class="mk-section-head">
+            <h2>Price board</h2>
+            <span class="mk-count" id="result-count">0 items</span>
+          </div>
+          <div class="mk-table-wrap">
+            <table class="mk-table" id="price-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Category</th>
+                  <th class="num">Base</th>
+                  <th class="num">Live</th>
+                  <th class="num">Change</th>
+                  <th class="num">24h vol</th>
+                  <th class="num">Owned</th>
+                </tr>
+              </thead>
+              <tbody id="price-body"></tbody>
+            </table>
+            <p class="mk-empty hidden" id="empty-state">No items match your search.</p>
+          </div>
+        </section>
+
+        <aside class="mk-portfolio card" id="portfolio-panel">
+          <div class="mk-section-head">
+            <h2>Your loot</h2>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-refresh" title="Refresh prices">↻</button>
+          </div>
+          <div id="portfolio-list" class="mk-portfolio-list">
+            <p class="mk-empty-portfolio">Play games to collect items, then sell here when prices look good.</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-zone" class="toast-zone"></div>
+</body>
+</html>
