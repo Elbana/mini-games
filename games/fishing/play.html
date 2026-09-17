@@ -65,10 +65,11 @@
       </div>
 
       <div class="fish-hud card">
-        <div class="hud-row">
-          <span>Bait: <strong id="bait-count">0</strong></span>
-          <button class="btn btn-ghost btn-sm" id="btn-bait">+ Bait Pack</button>
-        </div>
+        <button type="button" class="bait-chip" id="btn-bait-shop">
+          <span id="bait-chip-icon">🪱</span>
+          <span id="bait-chip-label">Worm</span>
+          <span class="bait-chip-count" id="bait-chip-count">×0</span>
+        </button>
         <p class="cast-hint" id="cast-hint">Tap the sea to cast your line</p>
       </div>
 
@@ -80,7 +81,6 @@
             </div>
           </div>
         </div>
-
         <div class="progress-wrap">
           <span class="progress-fish-start">🐟</span>
           <div class="progress-bar">
@@ -88,8 +88,29 @@
           </div>
           <span class="progress-goal">▶</span>
         </div>
-
         <p class="fight-hint">Hold to reel · Release when it pulls hard</p>
+      </div>
+    </div>
+
+    <div id="bait-sheet" class="sheet-overlay hidden">
+      <div class="sheet-panel card">
+        <div class="sheet-head">
+          <h3>Bait Shop</h3>
+          <button type="button" class="btn btn-ghost btn-sm" data-close="bait">✕</button>
+        </div>
+        <p class="sheet-intro">Select bait, then buy a pack. Better bait = rarer fish.</p>
+        <div id="bait-grid" class="bait-grid"></div>
+      </div>
+    </div>
+
+    <div id="result-overlay" class="result-overlay hidden">
+      <div class="result-card card" id="result-card">
+        <div id="result-icon" class="result-icon">🐟</div>
+        <div id="result-rank" class="result-rank">Common</div>
+        <h2 id="result-name">Sardine</h2>
+        <p id="result-detail" class="result-detail">★ · Sell at Black Market</p>
+        <p id="result-sub" class="result-sub"></p>
+        <button type="button" class="btn btn-primary" id="result-ok">Continue</button>
       </div>
     </div>
   </div>

@@ -30,6 +30,7 @@ import {
   handleGetFishingConfig,
   handleGetFishingState,
   handleBuyBait,
+  handleSelectBait,
   handleCast,
   handleReel,
 } from './routes/fishing.mjs';
@@ -89,6 +90,7 @@ app.post('/api/fast-farm/unlock-plot', handleUnlockPlot);
 app.get('/api/fishing/config', handleGetFishingConfig);
 app.get('/api/fishing/state', handleGetFishingState);
 app.post('/api/fishing/buy-bait', handleBuyBait);
+app.post('/api/fishing/select-bait', handleSelectBait);
 app.post('/api/fishing/cast', handleCast);
 app.post('/api/fishing/reel', handleReel);
 

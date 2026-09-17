@@ -2,26 +2,26 @@ import { requireGameAccess } from '../auth/operator-auth.mjs';
 import { buildContext, extractPlayerId } from '../auth/player-context.mjs';
 import { createWalletForOperator } from '../wallet/wallet-adapter.mjs';
 import {
-  CAST_COST,
-  BAIT_PACK_COST,
-  BAIT_PACK_SIZE,
+  BAIT_TABLE,
   FISH_TABLE,
+  FISH_RANKS,
   createCastSession,
   evaluateFight,
-  getFishById,
+  fishMeta,
+  getBaitById,
+  normalizeFishingGear,
+  resolveCatchFish,
 } from '../games/fishing-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
-import { rollFishingMisfortune } from '../economy/unfair-loss.mjs';
 
 const SLUG = 'fishing';
 
 export function handleGetFishingConfig(_req, res) {
   res.json({
-    castCost: CAST_COST,
-    baitPackCost: BAIT_PACK_COST,
-    baitPackSize: BAIT_PACK_SIZE,
+    baits: BAIT_TABLE,
     fish: FISH_TABLE,
+    ranks: FISH_RANKS,
   });
 }
 
@@ -30,6 +30,7 @@ export function handleGetFishingState(req, res) {
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
   const session = getPlayerData(ctx);
+  session.arcade.fishing = normalizeFishingGear(session.arcade.fishing);
   res.json({
     gear: session.arcade.fishing,
     pendingCast: session.arcade.pendingCast || null,
@@ -37,23 +38,42 @@ export function handleGetFishingState(req, res) {
   });
 }
 
+export async function handleSelectBait(req, res) {
+  const operator = requireGameAccess(req, res, SLUG);
+  if (!operator) return;
+  const ctx = buildContext(operator, extractPlayerId(req));
+  const { baitId } = req.body || {};
+  const session = getPlayerData(ctx);
+  session.arcade.fishing = normalizeFishingGear(session.arcade.fishing);
+  if (!BAIT_TABLE.some((b) => b.id === baitId)) {
+    return res.status(400).json({ error: 'Unknown bait type' });
+  }
+  session.arcade.fishing.selectedBait = baitId;
+  savePlayerData(ctx, session);
+  res.json({ gear: session.arcade.fishing });
+}
+
 export async function handleBuyBait(req, res) {
   const operator = requireGameAccess(req, res, SLUG);
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
+  const { baitId } = req.body || {};
+  const bait = getBaitById(baitId);
+  const session = getPlayerData(ctx);
+  session.arcade.fishing = normalizeFishingGear(session.arcade.fishing);
   const wallet = createWalletForOperator(operator);
   try {
     const debit = await wallet.debit(ctx, {
-      amount: BAIT_PACK_COST,
+      amount: bait.price,
       game: SLUG,
       roundId: 'buy_bait',
       transactionId: txId('bait'),
-      reason: 'Bait pack',
+      reason: `${bait.name} pack`,
     });
-    const session = getPlayerData(ctx);
-    session.arcade.fishing.bait += BAIT_PACK_SIZE;
+    session.arcade.fishing.baitStock[bait.id] += bait.packSize;
+    session.arcade.fishing.selectedBait = bait.id;
     savePlayerData(ctx, session);
-    res.json({ gear: session.arcade.fishing, balance: debit.balance });
+    res.json({ gear: session.arcade.fishing, balance: debit.balance, bought: bait });
   } catch (err) {
     res.status(400).json({ error: err.message, code: err.code });
   }
@@ -64,63 +84,58 @@ export async function handleCast(req, res) {
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
   const session = getPlayerData(ctx);
-  if (session.arcade.fishing.bait < 1) {
-    return res.status(400).json({ error: 'No bait — buy a pack' });
+  session.arcade.fishing = normalizeFishingGear(session.arcade.fishing);
+  const { x, y, baitId: reqBait } = req.body || {};
+  const baitId = reqBait || session.arcade.fishing.selectedBait;
+  const bait = getBaitById(baitId);
+  const stock = session.arcade.fishing.baitStock[bait.id] || 0;
+  if (stock < 1) {
+    return res.status(400).json({ error: `No ${bait.name} — open bait shop to buy` });
   }
-  const wallet = createWalletForOperator(operator);
-  try {
-    const debit = await wallet.debit(ctx, {
-      amount: CAST_COST,
-      game: SLUG,
-      roundId: 'cast',
-      transactionId: txId('cast'),
-      reason: 'Fishing cast',
-    });
-    session.arcade.fishing.bait -= 1;
-    const { x, y } = req.body || {};
-    const cast = createCastSession({ x, y });
-    session.arcade.pendingCast = cast;
-    savePlayerData(ctx, session);
-    res.json({ cast, balance: debit.balance, gear: session.arcade.fishing });
-  } catch (err) {
-    res.status(400).json({ error: err.message, code: err.code });
-  }
+  session.arcade.fishing.baitStock[bait.id] -= 1;
+  session.arcade.fishing.selectedBait = bait.id;
+  const cast = createCastSession({ x, y, baitId: bait.id });
+  session.arcade.pendingCast = cast;
+  savePlayerData(ctx, session);
+  res.json({ cast, gear: session.arcade.fishing });
 }
 
 export function handleReel(req, res) {
   const operator = requireGameAccess(req, res, SLUG);
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
-  const { castId, outcome, greenRatio } = req.body || {};
+  const { castId, outcome, greenRatio, progress } = req.body || {};
   const session = getPlayerData(ctx);
   const cast = session.arcade.pendingCast;
   if (!cast || cast.id !== castId || Date.now() > cast.expiresAt) {
-    return res.status(400).json({ error: 'Cast expired' });
+    return res.status(400).json({ error: 'Cast expired — cast again' });
   }
-  const result = evaluateFight(cast, { outcome, greenRatio });
+
+  const prog = Number(progress) || 0;
+  const won = prog >= 0.98 || outcome === 'caught';
+  const failReason = outcome === 'snapped' ? 'snapped' : 'escaped';
+  const result = evaluateFight(cast, { won, greenRatio, failReason });
+
   session.arcade.pendingCast = null;
   let fish = null;
-  let misfortune = null;
-  if (result.grade !== 'fail') {
-    if (outcome !== 'caught') {
-      misfortune = rollFishingMisfortune(result);
-    }
-    if (!misfortune) {
-      fish = getFishById(cast.fishId);
-      addInventory(session, fish.id, 1);
-      session.arcade.stats.fishCaught += 1;
-      addScore(SLUG, ctx.playerId, ctx.playerId, result.grade === 'perfect' ? 30 : 15, {
-        win: result.grade === 'perfect',
-      });
-    }
+
+  if (won) {
+    fish = resolveCatchFish(cast);
+    addInventory(session, fish.id, 1);
+    session.arcade.stats.fishCaught += 1;
+    addScore(SLUG, ctx.playerId, ctx.playerId, result.grade === 'perfect' ? 30 : 15, {
+      win: result.grade === 'perfect',
+    });
   }
+
   savePlayerData(ctx, session);
   res.json({
     result,
-    fish,
-    misfortune,
+    won,
+    fish: fish ? fishMeta(fish) : null,
     tierKey: cast.tierKey,
     tierLabel: cast.tierLabel,
+    baitId: cast.baitId,
     inventory: session.arcade.inventory,
   });
 }

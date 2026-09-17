@@ -42,15 +42,6 @@ export function biteCallout(tierKey) {
   return { word, color: tier.color, glow: tier.glow };
 }
 
-export function fightCallout(progress) {
-  let pick = null;
-  for (const step of FIGHT_WORDS) {
-    if (progress >= step.at) pick = step;
-  }
-  if (!pick) return null;
-  return pick.words[Math.floor(Math.random() * pick.words.length)];
-}
-
 export function catchCallout(tierKey) {
   const words = CATCH_WORDS[tierKey] || CATCH_WORDS.common;
   return words[Math.floor(Math.random() * words.length)];

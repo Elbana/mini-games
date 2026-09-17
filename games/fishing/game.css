@@ -238,7 +238,8 @@
   z-index: 5;
   animation: boat-bob 5.5s ease-in-out infinite;
   filter: drop-shadow(0 10px 20px rgba(0, 30, 50, 0.22));
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: default;
 }
 
 .boat-art {
@@ -279,14 +280,31 @@
   pointer-events: auto;
 }
 
-.hud-row {
+.bait-chip {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 14px;
   margin-bottom: 8px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.bait-chip.empty {
+  border-color: rgba(255, 120, 120, 0.45);
+  background: rgba(80, 20, 20, 0.25);
+}
+
+.bait-chip-count {
+  opacity: 0.85;
   font-size: 0.82rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
 }
 
 .cast-hint {
@@ -480,5 +498,183 @@
 }
 
 .fish-hud.hidden { display: none; }
+
+/* Bait shop sheet */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 20, 40, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.sheet-overlay.hidden { display: none; }
+
+.sheet-panel {
+  width: 100%;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.sheet-head h3 {
+  margin: 0;
+  font-family: 'Fredoka', sans-serif;
+}
+
+.sheet-intro {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.bait-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.bait-card {
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.bait-card.selected {
+  border-color: rgba(147, 230, 200, 0.55);
+  box-shadow: 0 0 0 1px rgba(147, 230, 200, 0.35);
+}
+
+.bait-select {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 2px 10px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bait-card-icon {
+  grid-row: span 2;
+  font-size: 1.8rem;
+  align-self: center;
+}
+
+.bait-card-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.bait-card-stock {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.bait-buy {
+  width: calc(100% - 16px);
+  margin: 0 8px 8px;
+}
+
+/* Catch result popup — game stays visible, taps blocked until Continue */
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: transparent;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  pointer-events: auto;
+}
+
+.result-overlay.hidden { display: none; }
+
+.result-card {
+  width: min(100%, 320px);
+  text-align: center;
+  padding: 18px 16px 14px;
+  border-radius: 18px;
+  box-shadow:
+    0 16px 48px rgba(0, 20, 40, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(14px);
+  animation: result-pop 0.5s cubic-bezier(0.34, 1.45, 0.64, 1);
+  pointer-events: auto;
+}
+
+@keyframes result-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.result-card.win {
+  border: 2px solid rgba(147, 230, 200, 0.5);
+  background: linear-gradient(165deg, rgba(12, 74, 110, 0.92), rgba(8, 40, 65, 0.94));
+}
+
+.result-card.lose {
+  border: 2px solid rgba(255, 150, 150, 0.4);
+  background: linear-gradient(165deg, rgba(50, 20, 30, 0.92), rgba(12, 30, 50, 0.94));
+}
+
+.result-icon {
+  font-size: 3.2rem;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.result-rank {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.result-card h2 {
+  margin: 0 0 6px;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 1.35rem;
+}
+
+.result-detail {
+  margin: 0 0 6px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.result-sub {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+#result-ok { width: 100%; }
 
 .top-bar a { text-decoration: none; }

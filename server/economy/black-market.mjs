@@ -15,11 +15,13 @@ export const MARKET_ITEMS = {
   crop_berry: { id: 'crop_berry', name: 'Berry Basket', basePrice: 38000, category: 'crop', icon: '🫐' },
   crop_pumpkin: { id: 'crop_pumpkin', name: 'Pumpkin', basePrice: 83600, category: 'crop', icon: '🎃' },
   crop_mushroom: { id: 'crop_mushroom', name: 'Mushroom Pack', basePrice: 152000, category: 'crop', icon: '🍄' },
-  fish_sardine: { id: 'fish_sardine', name: 'Sardine', basePrice: 8, category: 'fish', icon: '🐟' },
-  fish_bass: { id: 'fish_bass', name: 'Bass', basePrice: 25, category: 'fish', icon: '🐠' },
-  fish_tuna: { id: 'fish_tuna', name: 'Tuna', basePrice: 60, category: 'fish', icon: '🐡' },
-  fish_shark: { id: 'fish_shark', name: 'Shark', basePrice: 150, category: 'fish', icon: '🦈' },
-  fish_leviathan: { id: 'fish_leviathan', name: 'Leviathan', basePrice: 500, category: 'fish', icon: '🐋' },
+  fish_sardine: { id: 'fish_sardine', name: 'Sardine', basePrice: 12, category: 'fish', icon: '🐟' },
+  fish_bass: { id: 'fish_bass', name: 'Bass', basePrice: 28, category: 'fish', icon: '🐠' },
+  fish_tuna: { id: 'fish_tuna', name: 'Tuna', basePrice: 65, category: 'fish', icon: '🐡' },
+  fish_shark: { id: 'fish_shark', name: 'Shark', basePrice: 320, category: 'fish', icon: '🦈' },
+  fish_leviathan: { id: 'fish_leviathan', name: 'Leviathan', basePrice: 850, category: 'fish', icon: '🐋' },
+  fish_swordfish: { id: 'fish_swordfish', name: 'Swordfish', basePrice: 140, category: 'fish', icon: '🗡️' },
+  fish_phantom: { id: 'fish_phantom', name: 'Phantom Ray', basePrice: 5000, category: 'fish', icon: '👻' },
 };
 
 const STATE_FILE = path.join(MARKET_DIR, 'state.json');

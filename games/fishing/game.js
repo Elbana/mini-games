@@ -1,13 +1,14 @@
 import { biteCallout, catchCallout } from './bite-words.js';
 
-let gear = { bait: 0 };
+let gear = { baitStock: {}, selectedBait: 'bait_worm' };
 let activeCast = null;
-let config = {};
-let gameState = 'idle'; // idle | waiting | fighting
+let config = { baits: [] };
+let gameState = 'idle';
 let actionBusy = false;
 let isPulling = false;
 let fightAnim = null;
 let fightStats = { greenTime: 0, totalTime: 0 };
+let lastFightProgress = 0;
 let fightEnding = false;
 
 document.addEventListener('DOMContentLoaded', init);
@@ -20,7 +21,34 @@ async function init() {
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/fishing/config');
   await refreshState();
-  document.getElementById('btn-bait').addEventListener('click', buyBait);
+  document.getElementById('btn-bait-shop').addEventListener('click', openBaitShop);
+  document.getElementById('result-ok').addEventListener('click', closeResult);
+  document.querySelector('[data-close="bait"]').addEventListener('click', closeBaitShop);
+  document.getElementById('bait-sheet').addEventListener('click', (e) => {
+    if (e.target.id === 'bait-sheet') closeBaitShop();
+  });
+}
+
+function getBoatExclusionRect(sceneEl) {
+  const boat = document.querySelector('.boat-wrap');
+  if (!boat || !sceneEl) return null;
+  const sr = sceneEl.getBoundingClientRect();
+  const br = boat.getBoundingClientRect();
+  const pad = 12;
+  return {
+    left: (br.left - pad - sr.left) / sr.width,
+    top: (br.top - pad - sr.top) / sr.height,
+    right: (br.right + pad - sr.left) / sr.width,
+    bottom: (br.bottom + pad - sr.top) / sr.height,
+  };
+}
+
+function isSeaCastPoint(x, y, sceneEl) {
+  if (y < 0.1 || y > 0.82) return false;
+  const box = getBoatExclusionRect(sceneEl);
+  if (!box) return true;
+  const onBoat = x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+  return !onBoat;
 }
 
 function bindCastAndFightInput() {
@@ -28,18 +56,21 @@ function bindCastAndFightInput() {
 
   scene.addEventListener('pointerup', (e) => {
     if (gameState !== 'idle' || actionBusy) return;
-    if (e.target.closest('.fish-hud, .top-bar, .fight-panel, button, a')) return;
+    if (e.target.closest('.fish-hud, .top-bar, .fight-panel, .boat-wrap, .sheet-overlay, button, a')) return;
 
     const rect = scene.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-    if (y > 0.88) return;
+    if (!isSeaCastPoint(x, y, scene)) {
+      if (getBoatExclusionRect(scene)) Arcade.toast('Cast into the sea', 'lose');
+      return;
+    }
     castAt(x, y);
   });
 
   const pullStart = (e) => {
     if (gameState !== 'fighting') return;
-    if (e.target.closest('button, a')) return;
+    if (e.target.closest('button, a, .result-overlay, .sheet-overlay')) return;
     isPulling = true;
   };
   const pullEnd = () => {
@@ -186,19 +217,87 @@ function spawnRipple(container, nearBoat = false) {
   container.appendChild(el);
 }
 
+function getBait(id) {
+  return config.baits.find((b) => b.id === id);
+}
+
+function selectedBaitCount() {
+  return gear.baitStock?.[gear.selectedBait] || 0;
+}
+
+function updateBaitChip() {
+  const bait = getBait(gear.selectedBait) || config.baits[0];
+  if (!bait) return;
+  document.getElementById('bait-chip-icon').textContent = bait.icon;
+  document.getElementById('bait-chip-label').textContent = bait.name;
+  document.getElementById('bait-chip-count').textContent = `×${gear.baitStock[bait.id] || 0}`;
+  document.getElementById('btn-bait-shop').classList.toggle('empty', (gear.baitStock[bait.id] || 0) < 1);
+}
+
 async function refreshState() {
   const st = await Arcade.get('/api/fishing/state');
   gear = st.gear;
-  document.getElementById('bait-count').textContent = gear.bait;
+  updateBaitChip();
 }
 
-async function buyBait() {
+function renderBaitGrid() {
+  const grid = document.getElementById('bait-grid');
+  grid.innerHTML = config.baits.map((b) => {
+    const count = gear.baitStock[b.id] || 0;
+    const selected = gear.selectedBait === b.id;
+    return `<div class="bait-card${selected ? ' selected' : ''}" data-bait="${b.id}">
+      <button type="button" class="bait-select" data-action="select" data-bait="${b.id}">
+        <span class="bait-card-icon">${b.icon}</span>
+        <span class="bait-card-name">${b.name}</span>
+        <span class="bait-card-stock">In bag: ${count}</span>
+      </button>
+      <button type="button" class="btn btn-primary btn-sm bait-buy" data-action="buy" data-bait="${b.id}">
+        Buy pack · 🪙${Arcade.formatCoins(b.price)} (+${b.packSize})
+      </button>
+    </div>`;
+  }).join('');
+
+  grid.querySelectorAll('[data-action]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const baitId = btn.dataset.bait;
+      if (btn.dataset.action === 'select') selectBait(baitId);
+      else buyBaitPack(baitId);
+    });
+  });
+}
+
+function openBaitShop() {
+  if (actionBusy || gameState !== 'idle') return;
+  renderBaitGrid();
+  document.getElementById('bait-sheet').classList.remove('hidden');
+}
+
+function closeBaitShop() {
+  document.getElementById('bait-sheet').classList.add('hidden');
+}
+
+async function selectBait(baitId) {
   try {
-    const r = await Arcade.post('/api/fishing/buy-bait');
+    const r = await Arcade.post('/api/fishing/select-bait', { baitId });
     gear = r.gear;
-    document.getElementById('bait-count').textContent = gear.bait;
+    updateBaitChip();
+    renderBaitGrid();
+  } catch (e) {
+    Arcade.toast(e.message, 'lose');
+  }
+}
+
+async function buyBaitPack(baitId) {
+  const bait = getBait(baitId);
+  if (!bait) return;
+  try {
+    const r = await Arcade.post('/api/fishing/buy-bait', { baitId });
+    gear = r.gear;
+    updateBaitChip();
+    renderBaitGrid();
     Arcade.refreshBalance(document.getElementById('balance'));
-    Arcade.toast(`+${config.baitPackSize} bait!`, 'win');
+    Arcade.toast(`+${bait.packSize} ${bait.name}!`, 'win');
   } catch (e) {
     Arcade.toast(e.message, 'lose');
   }
@@ -238,14 +337,17 @@ function clearCastVisuals() {
 
 async function castAt(x, y) {
   if (gameState !== 'idle' || actionBusy) return;
+  if (selectedBaitCount() < 1) {
+    Arcade.toast('No bait — open bait shop', 'lose');
+    return;
+  }
   actionBusy = true;
 
   try {
-    const r = await Arcade.post('/api/fishing/cast', { x, y });
+    const r = await Arcade.post('/api/fishing/cast', { x, y, baitId: gear.selectedBait });
     activeCast = r.cast;
     gear = r.gear;
-    document.getElementById('bait-count').textContent = gear.bait;
-    Arcade.refreshBalance(document.getElementById('balance'));
+    updateBaitChip();
 
     placeCastVisuals(x, y);
     gameState = 'waiting';
@@ -288,6 +390,7 @@ function startFight() {
 
   let tension = 0.5;
   let progress = 0;
+  lastFightProgress = 0;
   fightStats = { greenTime: 0, totalTime: 0 };
   let fishPhase = Math.random() * Math.PI * 2;
   let last = performance.now();
@@ -318,6 +421,7 @@ function startFight() {
       progress = Math.max(0, progress - 0.05 * dt);
     }
 
+    lastFightProgress = progress;
     updateFightUI(tension, progress);
 
     if (progress >= 1) {
@@ -345,7 +449,46 @@ function updateFightUI(tension, progress) {
   marker.style.left = `${tension * 100}%`;
   marker.classList.toggle('danger-left', tension < 0.12);
   marker.classList.toggle('danger-right', tension > 0.88);
-  document.getElementById('progress-runner').style.left = `${Math.min(100, progress * 100)}%`;
+  document.getElementById('progress-runner').style.left = `${Math.min(100, Math.max(0, progress) * 100)}%`;
+}
+
+function showFightResult(r, cast) {
+  const overlay = document.getElementById('result-overlay');
+  const card = document.getElementById('result-card');
+
+  if (r.won && r.fish) {
+    card.className = 'result-card card win';
+    document.getElementById('result-icon').textContent = r.fish.icon;
+    document.getElementById('result-rank').textContent = r.fish.rankLabel;
+    document.getElementById('result-rank').style.color = r.fish.rankColor;
+    document.getElementById('result-name').textContent = r.fish.name;
+    const stars = '★'.repeat(r.fish.rankStars);
+    document.getElementById('result-detail').textContent =
+      `${stars} ${r.fish.rankLabel} · ~🪙${Arcade.formatCoins(r.fish.sellBase)} at market`;
+    const grade =
+      r.result.grade === 'perfect' ? 'Perfect reel!' : r.result.grade === 'good' ? 'Solid fight!' : 'You landed it!';
+    document.getElementById('result-sub').textContent = grade;
+    const hype = biteCallout(r.tierKey || cast.tierKey);
+    showCallout(catchCallout(r.tierKey || cast.tierKey), { color: hype.color, glow: hype.glow });
+    ArcadeFX.confetti(r.fish.rank === 'mythic' ? 14 : r.fish.rankStars >= 4 ? 10 : 6);
+    ArcadeFX.burst(window.innerWidth / 2, window.innerHeight * 0.38, r.fish.icon, 6);
+  } else {
+    card.className = 'result-card card lose';
+    document.getElementById('result-icon').textContent = r.result.reason === 'snapped' ? '🪢' : '💨';
+    document.getElementById('result-rank').textContent = 'Missed';
+    document.getElementById('result-rank').style.color = '#ffb3c1';
+    document.getElementById('result-name').textContent =
+      r.result.reason === 'snapped' ? 'Line snapped!' : 'Fish got away';
+    document.getElementById('result-detail').textContent =
+      r.result.reason === 'snapped' ? 'You pulled too hard' : 'Too much slack on the line';
+    document.getElementById('result-sub').textContent = 'Try again — tap the sea to cast';
+  }
+
+  overlay.classList.remove('hidden');
+}
+
+function closeResult() {
+  document.getElementById('result-overlay').classList.add('hidden');
 }
 
 async function endFight(outcome) {
@@ -359,6 +502,7 @@ async function endFight(outcome) {
 
   const cast = activeCast;
   const greenRatio = fightStats.totalTime > 0 ? fightStats.greenTime / fightStats.totalTime : 0;
+  const progress = lastFightProgress;
 
   document.getElementById('fight-panel').classList.add('hidden');
   document.getElementById('ocean-scene').classList.remove('fighting', 'waiting-bite');
@@ -368,35 +512,20 @@ async function endFight(outcome) {
   activeCast = null;
   actionBusy = false;
 
-  if (!cast) return;
+  if (!cast) {
+    fightEnding = false;
+    return;
+  }
 
   try {
     const r = await Arcade.post('/api/fishing/reel', {
       castId: cast.id,
       outcome,
       greenRatio,
+      progress,
     });
-
-    if (outcome === 'escaped') {
-      Arcade.toast('Fish got away — too much slack!', 'lose');
-      return;
-    }
-    if (outcome === 'snapped') {
-      Arcade.toast('Line snapped — you pulled too hard!', 'lose');
-      return;
-    }
-
-    if (r.fish) {
-      const hype = biteCallout(r.tierKey || cast.tierKey);
-      showCallout(catchCallout(r.tierKey || cast.tierKey), { color: hype.color, glow: hype.glow });
-      Arcade.toast(`${r.fish.icon} ${r.fish.name} — sell at Black Market!`, 'win');
-      const burst = r.tierKey === 'monster' || r.tierKey === 'super' ? 10 : 6;
-      ArcadeFX.confetti(burst);
-      ArcadeFX.burst(window.innerWidth / 2, window.innerHeight * 0.4, r.fish.icon, burst - 2);
-    } else {
-      const msg = r.misfortune?.message || 'The fish got away…';
-      Arcade.toast(msg, 'lose');
-    }
+    showFightResult(r, cast);
+    if (r.won) await refreshState();
   } catch (e) {
     Arcade.toast(e.message, 'lose');
   } finally {

@@ -7,7 +7,11 @@ export function getPlayerData(ctx) {
       inventory: {},
       candyBattle: null,
       farm: { version: 6, plots: [] },
-      fishing: { gear: { rod: 1, bait: 10 } },
+      fishing: {
+        gear: { rod: 1 },
+        baitStock: { bait_worm: 10, bait_shrimp: 0, bait_lure: 0, bait_golden: 0 },
+        selectedBait: 'bait_worm',
+      },
       stats: { candyWins: 0, farmHarvests: 0, fishCaught: 0, marketEarnings: 0 },
     };
   }
