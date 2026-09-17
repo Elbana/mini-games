@@ -1,27 +1,49 @@
 import { requireGameAccess } from '../auth/operator-auth.mjs';
 import { buildContext, extractPlayerId } from '../auth/player-context.mjs';
-import { createWalletForOperator } from '../wallet/wallet-adapter.mjs';
 import {
-  CROPS,
-  emptyPlots,
-  advancePlot,
-  HEAL_COST,
-  rollHarvestQty,
+  SEEDS,
+  PLOT_COUNT,
+  levelFromXp,
+  normalizeFarm,
+  applyGrowthState,
+  isReadyToHarvest,
+  addToInventory,
+  removeFromInventory,
 } from '../games/fast-farm-engine.mjs';
-import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
+import { getPlayerData, savePlayerData } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
 
 const SLUG = 'fast-farm';
 
 function ensureFarm(session) {
-  if (!session.arcade.farm?.plots?.length) {
-    session.arcade.farm = { plots: emptyPlots() };
-  }
+  session.arcade.farm = normalizeFarm(session.arcade.farm);
   return session.arcade.farm;
 }
 
+function farmPayload(farm) {
+  const plots = farm.plots.map(applyGrowthState);
+  return {
+    success: true,
+    farm_coins: farm.farm_coins,
+    farm_xp: farm.farm_xp,
+    farm_level: levelFromXp(farm.farm_xp),
+    plots: plots.map((p) => ({
+      plot_index: p.plot_index,
+      state: p.state,
+      seed_id: p.seed_id,
+      planted_at: p.planted_at,
+      unlock_price: p.unlock_price,
+    })),
+    inventory: farm.inventory.filter((i) => i.quantity > 0),
+  };
+}
+
 export function handleGetFarmConfig(_req, res) {
-  res.json({ crops: CROPS, plotCount: 6, healCost: HEAL_COST });
+  res.json({
+    seeds: Object.values(SEEDS),
+    plotCount: PLOT_COUNT,
+    levelXp: [0, 50, 200, 600, 1600, 4100, 9100, 19100],
+  });
 }
 
 export function handleGetFarmState(req, res) {
@@ -30,133 +52,161 @@ export function handleGetFarmState(req, res) {
   const ctx = buildContext(operator, extractPlayerId(req));
   const session = getPlayerData(ctx);
   const farm = ensureFarm(session);
-  const now = Date.now();
-  farm.plots = farm.plots.map((p) => advancePlot({ ...p }, now));
   savePlayerData(ctx, session);
-  res.json({ farm, inventory: session.arcade.inventory, crops: CROPS });
+  res.json(farmPayload(farm));
 }
 
-export async function handlePlant(req, res) {
+export function handleBuySeed(req, res) {
   const operator = requireGameAccess(req, res, SLUG);
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
-  const { plotId, cropId } = req.body || {};
-  const crop = CROPS[cropId];
-  if (!crop) return res.status(400).json({ error: 'Unknown crop' });
-  const session = getPlayerData(ctx);
-  const farm = ensureFarm(session);
-  const plot = farm.plots[plotId];
-  if (!plot || (plot.crop && !plot.dead)) {
-    return res.status(400).json({ error: 'Plot unavailable' });
+  const { seed_id, plot_index } = req.body || {};
+  const seed = SEEDS[seed_id];
+  if (!seed) return res.status(400).json({ success: false, error: 'Unknown seed' });
+  if (plot_index == null) {
+    return res.status(400).json({ success: false, error: 'plot_index required' });
   }
-  const wallet = createWalletForOperator(operator);
-  try {
-    const debit = await wallet.debit(ctx, {
-      amount: crop.seedCost,
-      game: SLUG,
-      roundId: `plant_${plotId}`,
-      transactionId: txId('plant'),
-      reason: `Plant ${crop.name}`,
-    });
-    const now = Date.now();
-    plot.crop = cropId;
-    plot.plantedAt = now;
-    plot.readyAt = now + crop.growSec * 1000;
-    plot.wiltAt = plot.readyAt + crop.wiltSec * 1000;
-    plot.dead = false;
-    plot.needsWater = false;
-    savePlayerData(ctx, session);
-    res.json({ farm, balance: debit.balance });
-  } catch (err) {
-    res.status(400).json({ error: err.message, code: err.code });
-  }
-}
 
-export async function handleWater(req, res) {
-  const operator = requireGameAccess(req, res, SLUG);
-  if (!operator) return;
-  const ctx = buildContext(operator, extractPlayerId(req));
-  const { plotId } = req.body || {};
   const session = getPlayerData(ctx);
   const farm = ensureFarm(session);
-  const plot = farm.plots[plotId];
-  if (!plot?.crop || plot.dead) {
-    return res.status(400).json({ error: 'Nothing to heal' });
+  const level = levelFromXp(farm.farm_xp);
+
+  if (level < seed.requiredLevel) {
+    return res.status(400).json({ success: false, error: `Requires farm level ${seed.requiredLevel}` });
   }
-  const wallet = createWalletForOperator(operator);
-  try {
-    const debit = await wallet.debit(ctx, {
-      amount: HEAL_COST,
-      game: SLUG,
-      roundId: `heal_${plotId}`,
-      transactionId: txId('heal'),
-      reason: 'Heal crop',
-    });
-    plot.needsWater = false;
-    plot.wiltAt += 8000;
-    savePlayerData(ctx, session);
-    res.json({ farm, balance: debit.balance });
-  } catch (err) {
-    res.status(400).json({ error: err.message, code: err.code });
+  if (farm.farm_coins < seed.price) {
+    return res.status(400).json({ success: false, error: 'Insufficient farm coins' });
   }
+
+  const plot = farm.plots[plot_index];
+  if (!plot || plot.state !== 'empty') {
+    return res.status(400).json({ success: false, error: 'Plot is not available' });
+  }
+
+  farm.farm_coins -= seed.price;
+  const now = new Date().toISOString();
+  farm.plots[plot_index] = {
+    ...plot,
+    state: 'growing',
+    seed_id,
+    planted_at: now,
+  };
+
+  savePlayerData(ctx, session);
+  res.json({
+    success: true,
+    farm_coins: farm.farm_coins,
+    plot: farm.plots[plot_index],
+  });
 }
 
 export function handleHarvest(req, res) {
   const operator = requireGameAccess(req, res, SLUG);
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
-  const { plotId } = req.body || {};
+  const { plot_index } = req.body || {};
+  if (plot_index == null) {
+    return res.status(400).json({ success: false, error: 'plot_index required' });
+  }
+
   const session = getPlayerData(ctx);
   const farm = ensureFarm(session);
-  const plot = advancePlot({ ...farm.plots[plotId] }, Date.now());
-  farm.plots[plotId] = plot;
-  if (!plot.crop || plot.dead) {
-    return res.status(400).json({ error: 'Crop dead — clear and replant' });
+  const plot = applyGrowthState({ ...farm.plots[plot_index] });
+
+  if (!plot?.seed_id || !plot.planted_at) {
+    return res.status(400).json({ success: false, error: 'Nothing to harvest' });
   }
-  const now = Date.now();
-  if (now < plot.readyAt) {
-    return res.status(400).json({ error: 'Not ready yet' });
+  if (!isReadyToHarvest(plot)) {
+    return res.status(400).json({ success: false, error: 'Not ready to harvest yet' });
   }
-  const crop = CROPS[plot.crop];
-  const qty = rollHarvestQty(plot.crop);
-  addInventory(session, crop.rewardItem, qty);
+
+  const seed = SEEDS[plot.seed_id];
+  addToInventory(farm, plot.seed_id, seed.harvestAmount);
   session.arcade.stats.farmHarvests += 1;
-  addScore(SLUG, ctx.playerId, ctx.playerId, qty * 15, { win: true });
-  farm.plots[plotId] = {
-    id: plotId,
-    crop: null,
-    plantedAt: null,
-    readyAt: null,
-    wiltAt: null,
-    dead: false,
-    needsWater: false,
+  addScore(SLUG, ctx.playerId, ctx.playerId, seed.harvestAmount * 10, { win: true });
+
+  farm.plots[plot_index] = {
+    plot_index,
+    state: 'empty',
+    seed_id: null,
+    planted_at: null,
+    unlock_price: plot.unlock_price,
   };
+
   savePlayerData(ctx, session);
   res.json({
-    ok: true,
-    qty,
-    itemId: crop.rewardItem,
-    farm,
-    inventory: session.arcade.inventory,
+    success: true,
+    harvested: { crop_id: plot.seed_id, amount: seed.harvestAmount },
+    inventory: farm.inventory.filter((i) => i.quantity > 0),
   });
 }
 
-export function handleClearPlot(req, res) {
+export function handleSell(req, res) {
   const operator = requireGameAccess(req, res, SLUG);
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
-  const { plotId } = req.body || {};
+  const { crop_id, quantity } = req.body || {};
+  const seed = SEEDS[crop_id];
+  if (!seed || !quantity || quantity <= 0) {
+    return res.status(400).json({ success: false, error: 'crop_id and positive quantity required' });
+  }
+
   const session = getPlayerData(ctx);
   const farm = ensureFarm(session);
-  farm.plots[plotId] = {
-    id: plotId,
-    crop: null,
-    plantedAt: null,
-    readyAt: null,
-    wiltAt: null,
-    dead: false,
-    needsWater: false,
-  };
+  if (!removeFromInventory(farm, crop_id, quantity)) {
+    return res.status(400).json({ success: false, error: 'Insufficient crop quantity' });
+  }
+
+  const totalPrice = quantity * seed.sellPrice;
+  const xpGained = Math.ceil((quantity * seed.sellPrice) / 2);
+  const oldLevel = levelFromXp(farm.farm_xp);
+  farm.farm_coins += totalPrice;
+  farm.farm_xp += xpGained;
+  const newLevel = levelFromXp(farm.farm_xp);
+
   savePlayerData(ctx, session);
-  res.json({ farm });
+  res.json({
+    success: true,
+    earned_coins: totalPrice,
+    earned_xp: xpGained,
+    farm_coins: farm.farm_coins,
+    farm_xp: farm.farm_xp,
+    farm_level: newLevel,
+    leveled_up: newLevel > oldLevel,
+    inventory: farm.inventory.filter((i) => i.quantity > 0),
+  });
+}
+
+export function handleUnlockPlot(req, res) {
+  const operator = requireGameAccess(req, res, SLUG);
+  if (!operator) return;
+  const ctx = buildContext(operator, extractPlayerId(req));
+  const { plot_index } = req.body || {};
+  if (plot_index == null) {
+    return res.status(400).json({ success: false, error: 'plot_index required' });
+  }
+
+  const session = getPlayerData(ctx);
+  const farm = ensureFarm(session);
+  const plot = farm.plots[plot_index];
+
+  if (!plot || plot.state !== 'locked') {
+    return res.status(400).json({ success: false, error: 'Plot is not locked' });
+  }
+  if (farm.farm_coins < plot.unlock_price) {
+    return res.status(400).json({ success: false, error: 'Insufficient farm coins' });
+  }
+
+  farm.farm_coins -= plot.unlock_price;
+  farm.plots[plot_index] = {
+    ...plot,
+    state: 'empty',
+  };
+
+  savePlayerData(ctx, session);
+  res.json({
+    success: true,
+    farm_coins: farm.farm_coins,
+    plot: farm.plots[plot_index],
+  });
 }

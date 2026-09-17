@@ -2,34 +2,113 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Fast Farm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/shared/arcade-shell.css">
   <link rel="stylesheet" href="/fast-farm/game.css">
   <script src="/shared/arcade-api.js"></script>
-  <script src="/shared/fx.js" defer></script>
   <script src="/fast-farm/game.js" defer></script>
 </head>
 <body>
-  <div class="arcade-shell farm-shell">
-    <header class="top-bar">
-      <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
-      <h1>Fast Farm</h1>
-      <div class="balance-pill" id="balance">…</div>
-    </header>
-    <div class="farm-bg"></div>
-    <div class="content-scroll farm-content">
-      <p class="farm-tagline">Crops grow in seconds — miss the window, lose your stake!</p>
-      <div id="plots" class="plot-grid"></div>
-      <div class="card seed-shop">
-        <h2>🌱 Seed Shop</h2>
-        <div id="seed-list" class="seed-list"></div>
+  <div id="app" class="farm-screen">
+    <div class="farm-bg" aria-hidden="true"></div>
+    <div class="farm-gradient" aria-hidden="true"></div>
+
+    <div class="farm-ui">
+      <header class="farm-top-bar">
+        <a class="farm-back-btn" id="btn-hub" href="/" aria-label="Back to hub">‹</a>
+        <div class="farm-level-badge">
+          <span>🌿</span>
+          <span id="farm-level">Lv.1</span>
+        </div>
+        <div class="farm-coins-pill">
+          <span class="coin-icon">🪙</span>
+          <span id="farm-coins">0</span>
+        </div>
+      </header>
+
+      <div id="seed-banner" class="seed-banner hidden">
+        <img id="seed-banner-img" src="" alt="">
+        <span id="seed-banner-text">Tap a plot to plant</span>
+        <button type="button" class="seed-banner-close" id="seed-banner-close" aria-label="Clear selection">×</button>
+      </div>
+
+      <div class="farm-spacer farm-spacer-top"></div>
+      <div id="farm-grid" class="farm-grid" role="grid" aria-label="Farm plots"></div>
+      <div class="farm-spacer farm-spacer-bottom"></div>
+
+      <nav class="farm-bottom-bar">
+        <button type="button" class="farm-action-btn" id="btn-shop" data-color="green">
+          <span class="farm-action-emoji">🌱</span>
+          <span class="farm-action-label">Seeds</span>
+        </button>
+        <button type="button" class="farm-action-btn" id="btn-backpack" data-color="orange">
+          <span class="farm-action-emoji">🎒</span>
+          <span class="farm-action-label">Bag</span>
+          <span class="farm-action-badge hidden" id="bag-badge">0</span>
+        </button>
+        <button type="button" class="farm-action-btn" id="btn-sell" data-color="gold">
+          <span class="farm-action-emoji">💰</span>
+          <span class="farm-action-label">Sell</span>
+        </button>
+      </nav>
+    </div>
+
+    <div id="fx-layer" aria-hidden="true"></div>
+
+    <!-- Seed shop bottom sheet -->
+    <div id="sheet-shop" class="farm-sheet hidden" role="dialog" aria-modal="true" aria-label="Seed shop">
+      <div class="sheet-backdrop" data-close="sheet-shop"></div>
+      <div class="sheet-panel sheet-shop">
+        <div class="sheet-handle"></div>
+        <header class="sheet-header">
+          <div class="sheet-header-icon shop">🛒</div>
+          <div>
+            <h2>Seed Shop</h2>
+            <p>Buy seeds and grow your farm</p>
+          </div>
+          <div class="sheet-coins"><span class="coin-icon">🪙</span> <span id="shop-coins">0</span></div>
+        </header>
+        <div id="seed-grid" class="seed-grid"></div>
       </div>
     </div>
-    <div id="plant-modal" class="overlay hidden">
-      <div class="card modal-card">
-        <h3>Plant on plot <span id="modal-plot"></span></h3>
-        <div id="modal-seeds"></div>
-        <button class="btn btn-ghost btn-sm" id="modal-close">Cancel</button>
+
+    <!-- Backpack bottom sheet -->
+    <div id="sheet-backpack" class="farm-sheet hidden" role="dialog" aria-modal="true" aria-label="Backpack">
+      <div class="sheet-backdrop" data-close="sheet-backpack"></div>
+      <div class="sheet-panel sheet-backpack">
+        <div class="sheet-handle"></div>
+        <header class="sheet-header">
+          <div class="sheet-header-icon bag">🎒</div>
+          <div>
+            <h2>My Backpack</h2>
+            <p id="backpack-count">0 items collected</p>
+          </div>
+          <div class="sheet-coins"><span class="coin-icon">🪙</span> <span id="bag-coins">0</span></div>
+        </header>
+        <div class="sheet-tabs">
+          <button type="button" class="sheet-tab active" data-tab="inventory">📦 Inventory</button>
+          <button type="button" class="sheet-tab" data-tab="sell">💰 Sell</button>
+        </div>
+        <div id="tab-inventory" class="sheet-tab-panel"></div>
+        <div id="tab-sell" class="sheet-tab-panel hidden"></div>
+      </div>
+    </div>
+
+    <!-- Unlock plot dialog -->
+    <div id="dialog-unlock" class="farm-dialog hidden" role="dialog" aria-modal="true">
+      <div class="dialog-backdrop" data-close="dialog-unlock"></div>
+      <div class="dialog-card">
+        <h3>🔓 Unlock Plot</h3>
+        <img src="/assets/farm/plot-tile.webp" alt="" class="dialog-plot-img">
+        <p>Unlock this plot for farming</p>
+        <div class="dialog-price"><span class="coin-icon">🪙</span> <span id="unlock-price">0</span></div>
+        <div class="dialog-actions">
+          <button type="button" class="btn-dialog ghost" data-close="dialog-unlock">Cancel</button>
+          <button type="button" class="btn-dialog primary" id="btn-unlock-confirm">Unlock</button>
+        </div>
       </div>
     </div>
   </div>

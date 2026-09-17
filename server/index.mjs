@@ -17,10 +17,10 @@ import {
 import {
   handleGetFarmConfig,
   handleGetFarmState,
-  handlePlant,
-  handleWater,
+  handleBuySeed,
   handleHarvest,
-  handleClearPlot,
+  handleSell,
+  handleUnlockPlot,
 } from './routes/fast-farm.mjs';
 import {
   handleGetFishingConfig,
@@ -73,10 +73,10 @@ app.post('/api/candy-battle/abandon', handleAbandonFight);
 
 app.get('/api/fast-farm/config', handleGetFarmConfig);
 app.get('/api/fast-farm/state', handleGetFarmState);
-app.post('/api/fast-farm/plant', handlePlant);
-app.post('/api/fast-farm/water', handleWater);
+app.post('/api/fast-farm/buy-seed', handleBuySeed);
 app.post('/api/fast-farm/harvest', handleHarvest);
-app.post('/api/fast-farm/clear', handleClearPlot);
+app.post('/api/fast-farm/sell', handleSell);
+app.post('/api/fast-farm/unlock-plot', handleUnlockPlot);
 
 app.get('/api/fishing/config', handleGetFishingConfig);
 app.get('/api/fishing/state', handleGetFishingState);
