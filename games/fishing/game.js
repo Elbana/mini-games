@@ -1,4 +1,4 @@
-import { biteCallout, catchCallout, FIGHT_WORDS } from './bite-words.js';
+import { biteCallout, catchCallout } from './bite-words.js';
 
 let gear = { bait: 0 };
 let activeCast = null;
@@ -8,7 +8,6 @@ let actionBusy = false;
 let isPulling = false;
 let fightAnim = null;
 let fightStats = { greenTime: 0, totalTime: 0 };
-let fightMilestones = new Set();
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -255,7 +254,7 @@ async function castAt(x, y) {
     const biteMs = activeCast.biteDelay;
     const waitTimer = setTimeout(() => {
       if (!activeCast || gameState !== 'waiting') return;
-      gameState = 'fighting';
+      gameState = 'bite';
       document.getElementById('cast-hint').textContent = 'Tap the sea to cast your line';
       document.getElementById('bobber').classList.add('biting');
 
@@ -279,34 +278,39 @@ async function castAt(x, y) {
 
 function startFight() {
   const cast = activeCast;
-  if (!cast) return;
+  if (!cast || gameState !== 'bite') return;
 
+  gameState = 'fighting';
+  isPulling = false;
   document.getElementById('fight-panel').classList.remove('hidden');
   document.getElementById('ocean-scene').classList.add('fighting');
 
   let tension = 0.5;
   let progress = 0;
   fightStats = { greenTime: 0, totalTime: 0 };
-  fightMilestones = new Set();
   let fishPhase = Math.random() * Math.PI * 2;
   let last = performance.now();
+  let graceLeft = 2.2;
 
-  const fishPull = cast.fishPull || 0.45;
-  const playerPull = 0.58;
-  const greenHalf = cast.greenHalf || 0.18;
-  const progressRate = cast.progressRate || 0.16;
+  const fishPull = cast.fishPull || 0.35;
+  const playerPull = 0.48;
+  const greenHalf = cast.greenHalf || 0.2;
+  const progressRate = cast.progressRate || 0.22;
 
   function tick(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     fightStats.totalTime += dt;
+    graceLeft = Math.max(0, graceLeft - dt);
 
-    fishPhase += dt * (2.2 + fishPull * 2.5);
-    const struggle = Math.sin(fishPhase) * 0.38 + Math.sin(fishPhase * 2.1) * 0.14;
-    const fishForce = fishPull * (0.65 + struggle);
+    fishPhase += dt * (1.8 + fishPull * 1.8);
+    const surge = Math.max(0, Math.sin(fishPhase)) * fishPull * 0.55;
+    const steadyDrift = fishPull * 0.22;
+    const fishForce = steadyDrift + surge;
     const playerForce = isPulling ? playerPull : 0;
 
-    tension += (playerForce - fishForce) * dt * 1.2;
+    tension += (playerForce - fishForce) * dt;
+    tension += (0.5 - tension) * 0.35 * dt;
     tension = Math.max(0, Math.min(1, tension));
 
     const inGreen = Math.abs(tension - 0.5) <= greenHalf;
@@ -314,19 +318,20 @@ function startFight() {
       fightStats.greenTime += dt;
       progress += progressRate * dt;
     } else {
-      progress = Math.max(0, progress - 0.05 * dt);
+      progress = Math.max(0, progress - 0.03 * dt);
     }
 
     updateFightUI(tension, progress);
-    checkFightMilestones(progress, cast.tierKey);
 
-    if (tension <= 0.06) {
-      endFight('escaped');
-      return;
-    }
-    if (tension >= 0.94) {
-      endFight('snapped');
-      return;
+    if (graceLeft <= 0) {
+      if (tension <= 0.05) {
+        endFight('escaped');
+        return;
+      }
+      if (tension >= 0.95) {
+        endFight('snapped');
+        return;
+      }
     }
     if (progress >= 1) {
       endFight('caught');
@@ -338,17 +343,6 @@ function startFight() {
 
   cancelAnimationFrame(fightAnim);
   fightAnim = requestAnimationFrame(tick);
-}
-
-function checkFightMilestones(progress, tierKey) {
-  for (const step of FIGHT_WORDS) {
-    if (progress < step.at || fightMilestones.has(step.at)) continue;
-    fightMilestones.add(step.at);
-    const word = step.words[Math.floor(Math.random() * step.words.length)];
-    const hype = biteCallout(tierKey);
-    showCallout(word, { color: hype.color, glow: hype.glow, small: true });
-    break;
-  }
 }
 
 function updateFightUI(tension, progress) {

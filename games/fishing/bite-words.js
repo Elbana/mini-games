@@ -28,13 +28,6 @@ export const BITE_TIERS = {
   },
 };
 
-export const FIGHT_WORDS = [
-  { at: 0.22, words: ['NICE!', 'STEADY!'] },
-  { at: 0.45, words: ['GOOD!', 'KEEP GOING!'] },
-  { at: 0.68, words: ['ALMOST!', 'SO CLOSE!'] },
-  { at: 0.88, words: ['GOT IT!', 'LAND IT!'] },
-];
-
 export const CATCH_WORDS = {
   common: ['CAUGHT!', 'NICE!'],
   nice: ['NICE CATCH!', 'GOOD ONE!'],
