@@ -1,14 +1,7 @@
 const STORAGE_KEY = 'deep-cast-sound';
-const REEL_PREF_KEY = 'deep-cast-reel';
+const REEL_FILE = 'reel-pro-winding.mp3';
 
-export const REEL_VARIANTS = [
-  { id: 'reel.ogg', label: 'Fast roll', desc: 'Quick continuous spinning crank' },
-  { id: 'reel-smooth.ogg', label: 'Medium roll', desc: 'Steady smooth reel rotation' },
-  { id: 'reel-slow.ogg', label: 'Slow roll', desc: 'Slow heavy crank' },
-  { id: 'reel-clicks.ogg', label: 'Ratchet clicks', desc: 'Classic click-click reel' },
-];
-
-/** Deep Cast audio — real OGG samples when present, synthesizes otherwise. */
+/** Deep Cast audio — real samples when present, synthesizes otherwise. */
 export class FishingSounds {
   constructor(manifest) {
     this.base = `${manifest?.baseUrl || '/fishing/assets'}/sounds`;
@@ -17,15 +10,7 @@ export class FishingSounds {
     this.muted = localStorage.getItem(STORAGE_KEY) === 'off';
     this._ready = this._init();
     this._reelLoop = null;
-    this._reelPreview = null;
     this._lureLoop = null;
-    this._reelSynthTimer = null;
-    this._reelFile = 'reel.ogg';
-    this.reelBuffers = new Map();
-  }
-
-  getSelectedReelFile() {
-    return this._reelFile;
   }
 
   isMuted() {
@@ -37,7 +22,6 @@ export class FishingSounds {
     localStorage.setItem(STORAGE_KEY, muted ? 'off' : 'on');
     if (muted) {
       this.stopReel();
-      this.stopReelPreview();
       this.stopLureIdle();
     }
   }
@@ -53,70 +37,6 @@ export class FishingSounds {
     const data = await res.arrayBuffer();
     if (data.byteLength < 256) throw new Error(`empty ${file}`);
     return this.ctx.decodeAudioData(data.slice(0));
-  }
-
-  async _loadAllReelBuffers() {
-    await Promise.all(
-      REEL_VARIANTS.map(async ({ id }) => {
-        try {
-          const buf = await this._loadBuffer(id);
-          this.reelBuffers.set(id, buf);
-        } catch {
-          /* missing variant */
-        }
-      })
-    );
-  }
-
-  setReelVariant(file, save = true) {
-    const buf = this.reelBuffers.get(file);
-    if (!buf) return false;
-    this.cache.set('reel', buf);
-    this._reelFile = file;
-    if (save) localStorage.setItem(REEL_PREF_KEY, file);
-    return true;
-  }
-
-  async previewReel(file, seconds = 4) {
-    if (this.muted) return;
-    this.stopReelPreview();
-    await this._ready;
-    await this.unlock();
-    const buf = this.reelBuffers.get(file);
-    if (!buf || !this.ctx) return;
-
-    const src = this.ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    src.playbackRate.value = 1.1;
-    const g = this.ctx.createGain();
-    g.gain.value = 2.6;
-    src.connect(g).connect(this.ctx.destination);
-    src.start(0);
-    this._reelPreview = { src, g };
-
-    this._reelPreviewTimer = setTimeout(() => this.stopReelPreview(), seconds * 1000);
-  }
-
-  stopReelPreview() {
-    if (this._reelPreviewTimer) {
-      clearTimeout(this._reelPreviewTimer);
-      this._reelPreviewTimer = null;
-    }
-    if (!this._reelPreview || !this.ctx) return;
-    const { src, g } = this._reelPreview;
-    const t = this.ctx.currentTime;
-    g.gain.cancelScheduledValues(t);
-    g.gain.setValueAtTime(g.gain.value, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-    setTimeout(() => {
-      try {
-        src.stop();
-      } catch {
-        /* already stopped */
-      }
-      this._reelPreview = null;
-    }, 70);
   }
 
   async _init() {
@@ -135,19 +55,16 @@ export class FishingSounds {
       return;
     }
 
-    await this._loadAllReelBuffers();
-    const saved = localStorage.getItem(REEL_PREF_KEY);
-    const preferred = saved || files.reel || 'reel.ogg';
-    if (!this.setReelVariant(preferred, false)) {
-      for (const { id } of REEL_VARIANTS) {
-        if (this.setReelVariant(id, false)) break;
-      }
+    try {
+      const reelBuf = await this._loadBuffer(files.reel || REEL_FILE);
+      this.cache.set('reel', reelBuf);
+    } catch {
+      /* synth fallback during fight */
     }
 
     await Promise.all(
       Object.entries(files).map(async ([key, file]) => {
         if (key === 'reel' || !file || typeof file !== 'string') return;
-        if (REEL_VARIANTS.some((v) => v.id === file)) return;
         try {
           const buf = await this._loadBuffer(file);
           this.cache.set(key, buf);
@@ -192,10 +109,9 @@ export class FishingSounds {
     return { src, g };
   }
 
-  /** Continuous rolling reel — loops while the player holds to pull. */
+  /** Continuous pro reel — runs for the whole fight until catch or snap. */
   async startReel() {
     if (this.muted || this._reelLoop) return;
-    this.stopReelPreview();
     await this._ready;
     await this.unlock();
 
@@ -204,24 +120,16 @@ export class FishingSounds {
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
-      src.playbackRate.value = 1.1;
+      src.playbackRate.value = 1.15;
       const g = this.ctx.createGain();
       g.gain.value = 2.6;
       src.connect(g).connect(this.ctx.destination);
       src.start(0);
       this._reelLoop = { src, g };
-      return;
     }
-
-    this._reelSynthFallback();
   }
 
   stopReel() {
-    if (this._reelSynthTimer) {
-      clearInterval(this._reelSynthTimer);
-      this._reelSynthTimer = null;
-    }
-
     if (!this._reelLoop || !this.ctx) {
       this._reelLoop = null;
       return;
@@ -240,11 +148,6 @@ export class FishingSounds {
       }
       this._reelLoop = null;
     }, 80);
-  }
-
-  _reelSynthFallback() {
-    this.play('reel', { volume: 0.35 });
-    this._reelSynthTimer = setInterval(() => this.play('reel', { volume: 0.28 }), 220);
   }
 
   /** Gentle lure-in-water ambience while waiting for a bite. */
@@ -296,8 +199,6 @@ export class FishingSounds {
       lure: { f: 180, f2: 90, dur: 0.25, type: 'sine' },
       splash: { f: 180, f2: 90, dur: 0.2, type: 'sine' },
       bite: { f: 520, f2: 880, dur: 0.16, type: 'square' },
-      fight: { f: 220, f2: 330, dur: 0.22, type: 'sawtooth' },
-      reel: { f: 140, f2: 165, dur: 0.08, type: 'triangle' },
       catch: { f: 523, f2: 784, dur: 0.32, type: 'triangle' },
       catchRare: { f: 440, f2: 988, dur: 0.45, type: 'triangle' },
       escape: { f: 280, f2: 180, dur: 0.24, type: 'sine' },
