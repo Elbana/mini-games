@@ -205,8 +205,6 @@ function renderPlots() {
       const seed = plot.seed_id ? seeds[plot.seed_id] : null;
       const cropCls = cropVisualClass(plot);
       const badge = careLabel(plot);
-      const step = plot.care_step || 0;
-      const steps = careRules.stepsToHarvest || 10;
 
       let cropHtml = '';
       if (growing && !plotIsReady(plot) && seed) {
@@ -228,19 +226,11 @@ function renderPlots() {
         .filter(Boolean)
         .join(' ');
 
-      const progressHtml =
-        growing && !plotIsReady(plot)
-          ? `<div class="care-pips">${Array.from({ length: steps }, (_, j) =>
-              `<span class="care-pip ${j < step ? 'done' : j === step && plot.needs_care ? 'now' : ''}"></span>`,
-            ).join('')}</div>`
-          : '';
-
       return `<div class="${cls}" data-plot="${i}" role="gridcell">
         <div class="plot-stack">
           <img class="plot-img" src="${plotBaseAsset(plot, seed)}" alt="">
           ${cropHtml}
           ${badge ? `<span class="plot-badge care">${badge}</span>` : ''}
-          ${progressHtml}
         </div>
       </div>`;
     })
