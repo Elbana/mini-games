@@ -81,29 +81,92 @@
   100% { transform: scale(0) rotate(25deg); opacity: 0; }
 }
 
-.energy-path {
-  stroke-dasharray: 200;
-  animation: energy-draw 0.32s ease forwards;
-  filter: drop-shadow(0 0 8px currentColor);
-}
-
-@keyframes energy-draw {
-  from { stroke-dashoffset: 200; opacity: 0.3; }
-  to { stroke-dashoffset: 0; opacity: 1; }
-}
-
-.energy-spark {
+.magic-orb {
   position: fixed;
-  width: 8px;
-  height: 8px;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 212;
+  background: radial-gradient(circle at 35% 35%, #fff 0%, var(--orb-color) 45%, transparent 72%);
+  box-shadow:
+    0 0 12px var(--orb-color),
+    0 0 28px var(--orb-color),
+    inset 0 0 6px rgba(255, 255, 255, 0.9);
+  animation: orb-pulse 0.12s ease-in-out infinite alternate;
+}
+
+.magic-orb-big {
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  box-shadow:
+    0 0 18px var(--orb-color),
+    0 0 42px var(--orb-color),
+    0 0 64px color-mix(in srgb, var(--orb-color) 60%, transparent);
+}
+
+@keyframes orb-pulse {
+  from { transform: scale(0.92); }
+  to { transform: scale(1.08); }
+}
+
+.magic-trail {
+  position: fixed;
+  margin: -3px 0 0 -3px;
   border-radius: 50%;
   pointer-events: none;
   z-index: 211;
-  animation: spark-fly 0.48s ease forwards;
+  background: var(--trail-color);
+  opacity: 0.75;
+  animation: trail-fade 0.28s ease forwards;
+  filter: blur(1px);
 }
 
-@keyframes spark-fly {
-  to { transform: translate(var(--tx), var(--ty)); opacity: 0; scale: 0.2; }
+@keyframes trail-fade {
+  to { transform: scale(0.2); opacity: 0; }
+}
+
+.magic-impact {
+  position: fixed;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 213;
+  background: radial-gradient(circle, #fff 0%, var(--orb-color) 35%, transparent 70%);
+  animation: impact-flash 0.36s ease forwards;
+}
+
+.magic-impact-big {
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+}
+
+@keyframes impact-flash {
+  0% { transform: scale(0.3); opacity: 1; }
+  60% { transform: scale(1.4); opacity: 0.85; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.magic-spark {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 212;
+  background: var(--orb-color);
+  box-shadow: 0 0 8px var(--orb-color);
+  animation: magic-spark-burst 0.42s ease-out forwards;
+}
+
+@keyframes magic-spark-burst {
+  to { transform: translate(var(--sx), var(--sy)); opacity: 0; scale: 0.1; }
 }
 
 .color-field-wipe {
@@ -313,12 +376,51 @@
   padding: 4px 0;
 }
 
+.specials-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  justify-content: center;
+  font-size: 0.68rem;
+  color: rgba(255, 220, 240, 0.85);
+  margin: 0 4px 6px;
+  line-height: 1.3;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.legend-item img {
+  flex-shrink: 0;
+}
+
+.legend-stripe {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #ff6bcb, #7c3aed);
+  font-weight: 900;
+  font-size: 0.75rem;
+  color: #fff;
+}
+
 .board {
   display: grid;
   gap: 3px;
   width: min(100%, 360px);
   aspect-ratio: 1;
   padding: 8px;
+  touch-action: none;
+  user-select: none;
   background:
     linear-gradient(145deg, rgba(255, 200, 230, 0.12), rgba(100, 50, 120, 0.2)),
     rgba(0, 0, 0, 0.55);

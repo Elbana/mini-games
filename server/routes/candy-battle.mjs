@@ -134,7 +134,7 @@ export async function handleCandyTurn(req, res) {
     const size = Math.min(36, Math.max(3, Number(w.size) || 3));
     combo = Math.min(20, Math.max(combo + 1, Number(w.combo) || 1));
     let dmg = damageFromMatch(size >= 5 ? 5 : size >= 4 ? 4 : 3, combo);
-    if (w.effect === 'colorWipe') dmg += Math.min(80, Number(w.bonusDmg) || 0);
+    if (w.effect === 'colorWipe') dmg += Math.min(22, Number(w.bonusDmg) || 0);
     if (w.effect === 'buyin') {
       buyinGained += 2 + Math.min(3, size - 3);
     }

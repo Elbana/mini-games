@@ -47,7 +47,7 @@ function emptyGrid() {
 
 export function randomCandy(grid, r, c, buyinChance = 0) {
   if (buyinChance > 0 && Math.random() < buyinChance) return BUYIN;
-  if (Math.random() < 0.04) return ENERGY;
+  if (Math.random() < 0.025) return ENERGY;
   let t;
   let guard = 0;
   do {
@@ -237,7 +237,7 @@ export function expandEffects(grid, groups) {
         }
       }
       effects.push({ kind: 'colorWipe', color: g.color, count: wiped.length });
-      waveMeta.push({ kind: 'colorWipe', color: g.color, size: wiped.length, bonusDmg: wiped.length * 3 });
+      waveMeta.push({ kind: 'colorWipe', color: g.color, size: wiped.length, bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)) });
     }
 
     for (const { r, c } of g.cells) {

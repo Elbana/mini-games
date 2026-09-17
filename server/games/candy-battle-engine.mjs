@@ -31,12 +31,12 @@ export const CANDY_TIERS = {
 };
 
 export const MONSTERS = [
-  { level: 1, name: 'Gummy Slime', hp: 60, attack: [4, 8], tier: 'sugar', bonusCandyChance: 0.15 },
-  { level: 2, name: 'Jelly Bat', hp: 80, attack: [5, 10], tier: 'sugar', bonusCandyChance: 0.18 },
-  { level: 3, name: 'Caramel Golem', hp: 110, attack: [6, 12], tier: 'crystal', bonusCandyChance: 0.2 },
-  { level: 4, name: 'Licorice Dragon', hp: 140, attack: [8, 14], tier: 'crystal', bonusCandyChance: 0.22 },
-  { level: 5, name: 'Marshmallow King', hp: 180, attack: [10, 16], tier: 'royal', bonusCandyChance: 0.25 },
-  { level: 6, name: 'Dark Fudge Titan', hp: 220, attack: [12, 18], tier: 'royal', bonusCandyChance: 0.28 },
+  { level: 1, name: 'Gummy Slime', hp: 220, attack: [8, 14], tier: 'sugar', bonusCandyChance: 0.12 },
+  { level: 2, name: 'Jelly Bat', hp: 300, attack: [10, 16], tier: 'sugar', bonusCandyChance: 0.14 },
+  { level: 3, name: 'Caramel Golem', hp: 400, attack: [12, 18], tier: 'crystal', bonusCandyChance: 0.16 },
+  { level: 4, name: 'Licorice Dragon', hp: 520, attack: [14, 22], tier: 'crystal', bonusCandyChance: 0.18 },
+  { level: 5, name: 'Marshmallow King', hp: 650, attack: [16, 24], tier: 'royal', bonusCandyChance: 0.2 },
+  { level: 6, name: 'Dark Fudge Titan', hp: 800, attack: [18, 28], tier: 'royal', bonusCandyChance: 0.22 },
 ];
 
 export function monsterForLevel(level) {
@@ -44,8 +44,8 @@ export function monsterForLevel(level) {
 }
 
 export function damageFromMatch(matchSize, combo = 1) {
-  const base = { 3: 8, 4: 14, 5: 22, 6: 32 }[matchSize] || matchSize * 5;
-  return Math.round(base * (1 + (combo - 1) * 0.25));
+  const base = { 3: 4, 4: 7, 5: 12, 6: 18 }[matchSize] || matchSize * 3;
+  return Math.round(base * (1 + (combo - 1) * 0.12));
 }
 
 export function rollMonsterAttack(monster) {

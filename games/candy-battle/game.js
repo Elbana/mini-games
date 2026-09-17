@@ -62,6 +62,57 @@ async function init() {
   board.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
   board.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
   animator = new BoardAnimator(board, manifest, sounds);
+  setupBoardInput(board);
+}
+
+let dragStart = null;
+
+function setupBoardInput(board) {
+  board.addEventListener('pointerdown', (e) => {
+    if (busy || !fight?.active) return;
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    dragStart = {
+      r: Number(cell.dataset.r),
+      c: Number(cell.dataset.c),
+      x: e.clientX,
+      y: e.clientY,
+    };
+    try {
+      board.setPointerCapture(e.pointerId);
+    } catch (_) {}
+  });
+
+  board.addEventListener('pointerup', (e) => {
+    if (!dragStart || busy || !fight?.active) {
+      dragStart = null;
+      return;
+    }
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    const dist = Math.hypot(dx, dy);
+    const { r: r0, c: c0 } = dragStart;
+    dragStart = null;
+
+    if (dist >= 24) {
+      let r1 = r0;
+      let c1 = c0;
+      if (Math.abs(dx) > Math.abs(dy)) c1 += dx > 0 ? 1 : -1;
+      else r1 += dy > 0 ? 1 : -1;
+      selectedCell = null;
+      highlightSelected();
+      if (r1 >= 0 && r1 < ROWS && c1 >= 0 && c1 < COLS) {
+        attemptSwap(r0, c0, r1, c1);
+      }
+      return;
+    }
+
+    onCellTap(r0, c0);
+  });
+
+  board.addEventListener('pointercancel', () => {
+    dragStart = null;
+  });
 }
 
 async function refreshState() {
@@ -203,13 +254,12 @@ function renderBoard() {
         }
         cell.appendChild(wrap);
       }
-      cell.addEventListener('click', () => onCellClick(r, c));
       board.appendChild(cell);
     }
   }
 }
 
-function onCellClick(r, c) {
+function onCellTap(r, c) {
   if (busy || !fight?.active) return;
   if (selectedCell === null) {
     selectedCell = { r, c };
@@ -264,9 +314,9 @@ async function attemptSwap(r0, c0, r1, c1) {
 }
 
 function estimateDamage(size, combo, bonus = 0) {
-  const s = size >= 5 ? 5 : size >= 4 ? 4 : 3;
-  const base = { 3: 8, 4: 14, 5: 22 }[s] || s * 5;
-  return Math.round(base * (1 + (combo - 1) * 0.28) + bonus);
+  const s = size >= 6 ? 6 : size >= 5 ? 5 : size >= 4 ? 4 : 3;
+  const base = { 3: 4, 4: 7, 5: 12, 6: 18 }[s] || s * 3;
+  return Math.round(base * (1 + (combo - 1) * 0.12) + bonus);
 }
 
 async function runFullCascadeTurn() {
@@ -294,16 +344,37 @@ async function runFullCascadeTurn() {
 
     await animator.popCells(cells, combo);
 
+    const colorWipeFx = effects.find((e) => e.kind === 'colorWipe');
+    const wipeBonus = colorWipeFx ? Math.min(22, Math.round((colorWipeFx.count || 0) * 1.2)) : 0;
+    let waveDamage = 0;
+    let strikeFrom = groups[0].cells[Math.floor(groups[0].cells.length / 2)];
+    let strikeColor = groups[0].color ?? 0;
+    let strikeBig = false;
+    let largestSize = groups[0].size;
+    let wipeBonusApplied = false;
+
     for (const g of groups) {
       const center = g.cells[Math.floor(g.cells.length / 2)];
-      const bonus = g.hasEnergy ? (effects.find((e) => e.kind === 'colorWipe')?.count || 0) * 3 : 0;
+      let bonus = 0;
+      if (g.hasEnergy && !wipeBonusApplied) {
+        bonus = wipeBonus;
+        wipeBonusApplied = true;
+      }
       const dmg = estimateDamage(g.size, combo, bonus);
+      waveDamage += dmg;
+      if (g.size >= largestSize) {
+        largestSize = g.size;
+        strikeFrom = center;
+        strikeColor = g.color ?? 0;
+      }
+      if (g.hasEnergy || g.size >= 5) strikeBig = true;
+
       waves.push({
         size: g.size,
         combo,
         type: g.color ?? 0,
         effect: g.hasEnergy ? 'colorWipe' : g.hasBuyin ? 'buyin' : 'match',
-        wipeCount: bonus / 3 || 0,
+        wipeCount: colorWipeFx?.count || 0,
         bonusDmg: bonus,
       });
 
@@ -311,9 +382,10 @@ async function runFullCascadeTurn() {
         const pt = animator.cellCenter(center.r, center.c);
         animator.showBuyinBonus(pt.x, pt.y, 2 + Math.min(3, g.size - 3));
       }
+    }
 
-      await animator.energyStrike(center.r, center.c, g.color ?? 0, dmg, monsterEl, g.hasEnergy || g.size >= 5);
-      await sleep(50);
+    if (waveDamage > 0) {
+      await animator.energyStrike(strikeFrom.r, strikeFrom.c, strikeColor, waveDamage, monsterEl, strikeBig);
     }
 
     const createKeys = new Set(creates.map((c) => `${c.r},${c.c}`));

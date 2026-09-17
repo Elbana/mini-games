@@ -123,53 +123,86 @@ export class BoardAnimator {
     const toRect = monsterEl.getBoundingClientRect();
     const toX = toRect.left + toRect.width / 2;
     const toY = toRect.top + toRect.height / 2;
-    const beamColor = COLOR_BEAM[color] ?? '#ff6bcb';
+    const orbColor = COLOR_BEAM[color] ?? '#ff6bcb';
+    const duration = big ? 260 : 175;
+    const arc = big ? 90 : 55;
 
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('energy-beam');
-    svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
-    svg.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:210;';
+    const orb = document.createElement('div');
+    orb.className = `magic-orb${big ? ' magic-orb-big' : ''}`;
+    orb.style.setProperty('--orb-color', orbColor);
+    orb.style.left = `${from.x}px`;
+    orb.style.top = `${from.y}px`;
+    this.fxLayer.appendChild(orb);
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const mx = (from.x + toX) / 2;
-    const my = Math.min(from.y, toY) - (big ? 120 : 70);
-    path.setAttribute(
-      'd',
-      `M ${from.x} ${from.y} Q ${mx} ${my} ${toX} ${toY}`
-    );
-    path.setAttribute('stroke', beamColor);
-    path.setAttribute('stroke-width', big ? '8' : '5');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke-linecap', 'round');
-    path.classList.add('energy-path');
-    svg.appendChild(path);
+    this.sounds?.play('projectile', { volume: big ? 0.42 : 0.3 });
 
-    for (let i = 0; i < (big ? 12 : 6); i++) {
-      const p = document.createElement('div');
-      p.className = 'energy-spark';
-      p.style.background = beamColor;
-      p.style.left = `${from.x}px`;
-      p.style.top = `${from.y}px`;
-      p.style.setProperty('--tx', `${toX - from.x + (Math.random() - 0.5) * 30}px`);
-      p.style.setProperty('--ty', `${toY - from.y}px`);
-      p.style.animationDelay = `${i * 0.04}s`;
-      this.fxLayer.appendChild(p);
-      setTimeout(() => p.remove(), 500);
+    await new Promise((resolve) => {
+      const start = performance.now();
+      let lastTrail = 0;
+
+      const tick = (now) => {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - (1 - t) ** 3;
+        const x = from.x + (toX - from.x) * eased;
+        const y = from.y + (toY - from.y) * eased - Math.sin(t * Math.PI) * arc;
+        orb.style.left = `${x}px`;
+        orb.style.top = `${y}px`;
+
+        if (now - lastTrail > 22) {
+          lastTrail = now;
+          this._spawnTrail(x, y, orbColor, big);
+        }
+
+        if (t < 1) requestAnimationFrame(tick);
+        else {
+          orb.remove();
+          this._impactBurst(toX, toY, orbColor, big);
+          monsterEl.classList.add('monster-hit');
+          setTimeout(() => monsterEl.classList.remove('monster-hit'), 420);
+          this.sounds?.play('hit', { volume: 0.45 });
+          if (window.ArcadeFX) {
+            ArcadeFX.floatText(toX, toY - 24, `-${damage}`, orbColor);
+          }
+          resolve();
+        }
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
+  _spawnTrail(x, y, color, big) {
+    const p = document.createElement('div');
+    p.className = 'magic-trail';
+    p.style.setProperty('--trail-color', color);
+    p.style.left = `${x}px`;
+    p.style.top = `${y}px`;
+    p.style.width = p.style.height = `${big ? 10 : 7}px`;
+    this.fxLayer.appendChild(p);
+    setTimeout(() => p.remove(), 280);
+  }
+
+  _impactBurst(x, y, color, big) {
+    const burst = document.createElement('div');
+    burst.className = `magic-impact${big ? ' magic-impact-big' : ''}`;
+    burst.style.setProperty('--orb-color', color);
+    burst.style.left = `${x}px`;
+    burst.style.top = `${y}px`;
+    this.fxLayer.appendChild(burst);
+    const count = big ? 14 : 8;
+    for (let i = 0; i < count; i++) {
+      const spark = document.createElement('div');
+      spark.className = 'magic-spark';
+      spark.style.setProperty('--orb-color', color);
+      spark.style.left = `${x}px`;
+      spark.style.top = `${y}px`;
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const dist = (big ? 48 : 32) + Math.random() * 24;
+      spark.style.setProperty('--sx', `${Math.cos(angle) * dist}px`);
+      spark.style.setProperty('--sy', `${Math.sin(angle) * dist}px`);
+      this.fxLayer.appendChild(spark);
+      setTimeout(() => spark.remove(), 420);
     }
-
-    this.fxLayer.appendChild(svg);
-    this.sounds?.play('projectile', { volume: big ? 0.45 : 0.3 });
-
-    await sleep(big ? 420 : 320);
-
-    svg.remove();
-    monsterEl.classList.add('monster-hit');
-    setTimeout(() => monsterEl.classList.remove('monster-hit'), 400);
-    this.sounds?.play('hit', { volume: 0.45 });
-
-    if (window.ArcadeFX) {
-      ArcadeFX.floatText(toX, toY - 24, `-${damage}`, beamColor);
-    }
+    setTimeout(() => burst.remove(), 380);
   }
 
   showBuyinBonus(x, y, amount) {
