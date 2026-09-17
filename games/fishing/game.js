@@ -1,6 +1,6 @@
 import { biteCallout, catchCallout } from './bite-words.js';
 import { loadFishingManifest, baitImage, fishImage, waterBackground } from './assets.mjs';
-import { FishingSounds } from './sounds.js';
+import { FishingSounds, REEL_VARIANTS } from './sounds.js';
 
 let gear = { baitStock: {}, selectedBait: 'bait_worm' };
 let activeCast = null;
@@ -44,6 +44,23 @@ async function init() {
   document.getElementById('help-overlay').addEventListener('click', (e) => {
     if (e.target.id === 'help-overlay') closeHelp();
   });
+  document.getElementById('help-reel-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    e.stopPropagation();
+    const file = btn.dataset.file;
+    if (btn.dataset.action === 'preview-reel') {
+      sounds.unlock();
+      sounds.previewReel(file, 4);
+    } else if (btn.dataset.action === 'use-reel') {
+      sounds.stopReelPreview();
+      if (sounds.setReelVariant(file)) {
+        sounds.play('click', { volume: 0.2 });
+        renderHelpPanel();
+        Arcade.toast(`Reel: ${REEL_VARIANTS.find((v) => v.id === file)?.label || file}`, 'win');
+      }
+    }
+  });
   bindSoundToggle();
   bindBaitChipRow();
 }
@@ -80,6 +97,7 @@ function openHelp() {
 }
 
 function closeHelp() {
+  sounds.stopReelPreview();
   sounds.play('click', { volume: 0.15 });
   document.getElementById('help-overlay').classList.add('hidden');
 }
@@ -104,6 +122,19 @@ function renderHelpPanel() {
         <div class="help-fish-rank" style="color:${rank.color || '#fff'}">${stars} ${rank.label || f.rank}</div>
       </div>
       <div class="help-fish-price">~🪙${Arcade.formatCoins(f.sellBase)}</div>
+    </div>`;
+  }).join('');
+
+  const selectedReel = sounds?.getSelectedReelFile() || 'reel.ogg';
+  document.getElementById('help-reel-list').innerHTML = REEL_VARIANTS.map((v) => {
+    const active = selectedReel === v.id;
+    return `<div class="help-reel-row${active ? ' selected' : ''}">
+      <div class="help-reel-info">
+        <div class="help-fish-name">${v.label}${active ? ' ✓' : ''}</div>
+        <div class="help-bait-meta">${v.desc}</div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm help-reel-preview" data-action="preview-reel" data-file="${v.id}" aria-label="Preview ${v.label}">▶</button>
+      <button type="button" class="btn btn-primary btn-sm help-reel-use" data-action="use-reel" data-file="${v.id}">${active ? 'Active' : 'Use'}</button>
     </div>`;
   }).join('');
 

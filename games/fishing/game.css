@@ -787,11 +787,47 @@
   opacity: 0.85;
 }
 
+.help-reel-intro {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  opacity: 0.82;
+  line-height: 1.4;
+}
+
 .help-fish-list,
-.help-bait-list {
+.help-bait-list,
+.help-reel-list {
   display: grid;
   gap: 6px;
   margin-bottom: 14px;
+}
+
+.help-reel-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.help-reel-row.selected {
+  border-color: rgba(147, 230, 200, 0.45);
+  background: rgba(147, 230, 200, 0.08);
+}
+
+.help-reel-preview {
+  min-width: 40px;
+  padding: 6px 10px !important;
+  font-size: 0.85rem;
+}
+
+.help-reel-use {
+  min-width: 56px;
+  padding: 6px 10px !important;
+  font-size: 0.75rem;
 }
 
 .help-fish-row,
