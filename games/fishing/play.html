@@ -65,11 +65,7 @@
       </div>
 
       <div class="fish-hud card">
-        <button type="button" class="bait-chip" id="btn-bait-shop">
-          <span id="bait-chip-icon">🪱</span>
-          <span id="bait-chip-label">Worm</span>
-          <span class="bait-chip-count" id="bait-chip-count">×0</span>
-        </button>
+        <div id="bait-chip-row" class="bait-chip-row" role="toolbar" aria-label="Select bait"></div>
         <p class="cast-hint" id="cast-hint">Tap the sea to cast your line</p>
       </div>
 
@@ -89,17 +85,6 @@
           <span class="progress-goal">▶</span>
         </div>
         <p class="fight-hint">Hold to reel · Release when it pulls hard</p>
-      </div>
-    </div>
-
-    <div id="bait-sheet" class="sheet-overlay hidden">
-      <div class="sheet-panel card">
-        <div class="sheet-head">
-          <h3>Bait Shop</h3>
-          <button type="button" class="btn btn-ghost btn-sm" data-close="bait">✕</button>
-        </div>
-        <p class="sheet-intro">Select bait, then buy a pack. Better bait = rarer fish.</p>
-        <div id="bait-grid" class="bait-grid"></div>
       </div>
     </div>
 

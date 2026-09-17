@@ -21,12 +21,8 @@ async function init() {
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/fishing/config');
   await refreshState();
-  document.getElementById('btn-bait-shop').addEventListener('click', openBaitShop);
   document.getElementById('result-ok').addEventListener('click', closeResult);
-  document.querySelector('[data-close="bait"]').addEventListener('click', closeBaitShop);
-  document.getElementById('bait-sheet').addEventListener('click', (e) => {
-    if (e.target.id === 'bait-sheet') closeBaitShop();
-  });
+  bindBaitChipRow();
 }
 
 function getBoatExclusionRect(sceneEl) {
@@ -44,7 +40,7 @@ function getBoatExclusionRect(sceneEl) {
 }
 
 function isSeaCastPoint(x, y, sceneEl) {
-  if (y < 0.1 || y > 0.82) return false;
+  if (y < 0.1 || y > 0.78) return false;
   const box = getBoatExclusionRect(sceneEl);
   if (!box) return true;
   const onBoat = x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
@@ -56,7 +52,7 @@ function bindCastAndFightInput() {
 
   scene.addEventListener('pointerup', (e) => {
     if (gameState !== 'idle' || actionBusy) return;
-    if (e.target.closest('.fish-hud, .top-bar, .fight-panel, .boat-wrap, .sheet-overlay, button, a')) return;
+    if (e.target.closest('.fish-hud, .top-bar, .fight-panel, .boat-wrap, button, a')) return;
 
     const rect = scene.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
@@ -70,7 +66,7 @@ function bindCastAndFightInput() {
 
   const pullStart = (e) => {
     if (gameState !== 'fighting') return;
-    if (e.target.closest('button, a, .result-overlay, .sheet-overlay')) return;
+    if (e.target.closest('button, a, .result-overlay')) return;
     isPulling = true;
   };
   const pullEnd = () => {
@@ -225,65 +221,64 @@ function selectedBaitCount() {
   return gear.baitStock?.[gear.selectedBait] || 0;
 }
 
-function updateBaitChip() {
-  const bait = getBait(gear.selectedBait) || config.baits[0];
-  if (!bait) return;
-  document.getElementById('bait-chip-icon').textContent = bait.icon;
-  document.getElementById('bait-chip-label').textContent = bait.name;
-  document.getElementById('bait-chip-count').textContent = `×${gear.baitStock[bait.id] || 0}`;
-  document.getElementById('btn-bait-shop').classList.toggle('empty', (gear.baitStock[bait.id] || 0) < 1);
+const BAIT_CHIP_SHORT = {
+  bait_worm: 'Worm',
+  bait_shrimp: 'Shrimp',
+  bait_lure: 'Lure',
+  bait_golden: 'Golden',
+};
+
+function renderBaitRow() {
+  const row = document.getElementById('bait-chip-row');
+  if (!row || !config.baits.length) return;
+
+  row.innerHTML = config.baits.map((b) => {
+    const count = gear.baitStock[b.id] || 0;
+    const selected = gear.selectedBait === b.id;
+    const label = BAIT_CHIP_SHORT[b.id] || b.name;
+    return `<div class="bait-chip-wrap${selected ? ' selected' : ''}${count < 1 ? ' empty' : ''}" data-bait="${b.id}">
+      <button type="button" class="bait-chip-item" data-action="select" data-bait="${b.id}" aria-pressed="${selected}" aria-label="${b.name}, ${count} left">
+        <span class="bait-chip-item-icon">${b.icon}</span>
+        <span class="bait-chip-item-count">×${count}</span>
+        <span class="bait-chip-item-name">${label}</span>
+      </button>
+      <button type="button" class="bait-chip-add" data-action="buy" data-bait="${b.id}" aria-label="Buy ${b.name} pack, ${Arcade.formatCoins(b.price)} coins" title="Buy +${b.packSize} · 🪙${Arcade.formatCoins(b.price)}">+</button>
+    </div>`;
+  }).join('');
+}
+
+function bindBaitChipRow() {
+  const row = document.getElementById('bait-chip-row');
+  if (!row) return;
+
+  row.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    e.stopPropagation();
+    if (gameState !== 'idle' || actionBusy) return;
+
+    const baitId = btn.dataset.bait;
+    if (btn.dataset.action === 'select') selectBait(baitId);
+    else buyBaitPack(baitId);
+  });
 }
 
 async function refreshState() {
   const st = await Arcade.get('/api/fishing/state');
   gear = st.gear;
-  updateBaitChip();
-}
-
-function renderBaitGrid() {
-  const grid = document.getElementById('bait-grid');
-  grid.innerHTML = config.baits.map((b) => {
-    const count = gear.baitStock[b.id] || 0;
-    const selected = gear.selectedBait === b.id;
-    return `<div class="bait-card${selected ? ' selected' : ''}" data-bait="${b.id}">
-      <button type="button" class="bait-select" data-action="select" data-bait="${b.id}">
-        <span class="bait-card-icon">${b.icon}</span>
-        <span class="bait-card-name">${b.name}</span>
-        <span class="bait-card-stock">In bag: ${count}</span>
-      </button>
-      <button type="button" class="btn btn-primary btn-sm bait-buy" data-action="buy" data-bait="${b.id}">
-        Buy pack · 🪙${Arcade.formatCoins(b.price)} (+${b.packSize})
-      </button>
-    </div>`;
-  }).join('');
-
-  grid.querySelectorAll('[data-action]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const baitId = btn.dataset.bait;
-      if (btn.dataset.action === 'select') selectBait(baitId);
-      else buyBaitPack(baitId);
-    });
-  });
-}
-
-function openBaitShop() {
-  if (actionBusy || gameState !== 'idle') return;
-  renderBaitGrid();
-  document.getElementById('bait-sheet').classList.remove('hidden');
-}
-
-function closeBaitShop() {
-  document.getElementById('bait-sheet').classList.add('hidden');
+  renderBaitRow();
 }
 
 async function selectBait(baitId) {
+  if (gear.selectedBait === baitId) return;
+  gear.selectedBait = baitId;
+  renderBaitRow();
   try {
     const r = await Arcade.post('/api/fishing/select-bait', { baitId });
     gear = r.gear;
-    updateBaitChip();
-    renderBaitGrid();
+    renderBaitRow();
   } catch (e) {
+    await refreshState();
     Arcade.toast(e.message, 'lose');
   }
 }
@@ -294,8 +289,7 @@ async function buyBaitPack(baitId) {
   try {
     const r = await Arcade.post('/api/fishing/buy-bait', { baitId });
     gear = r.gear;
-    updateBaitChip();
-    renderBaitGrid();
+    renderBaitRow();
     Arcade.refreshBalance(document.getElementById('balance'));
     Arcade.toast(`+${bait.packSize} ${bait.name}!`, 'win');
   } catch (e) {
@@ -338,7 +332,7 @@ function clearCastVisuals() {
 async function castAt(x, y) {
   if (gameState !== 'idle' || actionBusy) return;
   if (selectedBaitCount() < 1) {
-    Arcade.toast('No bait — open bait shop', 'lose');
+    Arcade.toast('No bait — tap + on a chip to buy', 'lose');
     return;
   }
   actionBusy = true;
@@ -347,7 +341,7 @@ async function castAt(x, y) {
     const r = await Arcade.post('/api/fishing/cast', { x, y, baitId: gear.selectedBait });
     activeCast = r.cast;
     gear = r.gear;
-    updateBaitChip();
+    renderBaitRow();
 
     placeCastVisuals(x, y);
     gameState = 'waiting';
