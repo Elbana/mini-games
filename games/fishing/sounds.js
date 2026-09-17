@@ -52,7 +52,8 @@ export class FishingSounds {
     this._reelAudio = new Audio(`${this.base}/${reelFile}`);
     this._reelAudio.preload = 'auto';
     this._reelAudio.loop = true;
-    this._reelAudio.volume = 0.85;
+    this._reelAudio.volume = 0.82;
+    this._reelAudio.playbackRate = 1.05;
 
     if (!this.ctx) return;
 
@@ -116,7 +117,8 @@ export class FishingSounds {
     if (this._reelAudio) {
       try {
         this._reelAudio.currentTime = 0;
-        this._reelAudio.volume = 0.85;
+        this._reelAudio.volume = 0.82;
+        this._reelAudio.playbackRate = 1.05;
         await this._reelAudio.play();
         this._reelLoop = 'html';
         return;
@@ -130,15 +132,11 @@ export class FishingSounds {
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
-      src.playbackRate.value = 1.15;
-      if (buf.duration > 2) {
-        src.loopStart = 0.2;
-        src.loopEnd = Math.min(buf.duration - 0.1, 4.5);
-      }
+      src.playbackRate.value = 1.05;
       const g = this.ctx.createGain();
-      g.gain.value = 0.75;
+      g.gain.value = 0.78;
       src.connect(g).connect(this.ctx.destination);
-      src.start(0, 0.2);
+      src.start(0);
       this._reelLoop = { src, g };
       return;
     }
