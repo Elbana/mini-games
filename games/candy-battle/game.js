@@ -1,12 +1,25 @@
 import {
   COLS,
   ROWS,
+  COLORS,
+  ENERGY,
+  BUYIN,
+  STRIPE_H,
+  STRIPE_V,
+  isNormal,
+  isEnergy,
+  isBuyin,
+  isStripe,
+  colorOf,
   createBoard,
-  findMatchGroups,
+  findTurnResult,
+  expandEffects,
   swapCells,
-  clearClusters,
+  clearCells,
   applyGravity,
-  clusterCenter,
+  applyCreates,
+  findMatchGroups,
+  maybeSpawnBuyin,
 } from './board-engine.js';
 import { BoardAnimator } from './animator.js';
 import { CandySounds } from './sounds.js';
@@ -30,11 +43,7 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
   document.querySelector('.top-bar a').href = `/?token=${Arcade.token}&player=${Arcade.player}`;
   sounds = new CandySounds();
-  document.body.addEventListener(
-    'pointerdown',
-    () => sounds.unlock(),
-    { once: true }
-  );
+  document.body.addEventListener('pointerdown', () => sounds.unlock(), { once: true });
 
   manifest = await fetch('/candy-battle/assets/manifest.json').then((r) => r.json());
   await Arcade.refreshBalance(document.getElementById('balance'));
@@ -132,9 +141,8 @@ async function startFight() {
     document.getElementById('monster-preview').textContent = emoji;
     document.getElementById('monster-sprite').textContent = emoji;
     updateHud(r.buyInCandies || buyIn);
-    grid = createBoard();
+    grid = createBoard(true);
     renderBoard();
-    animator.measure();
   } catch (e) {
     Arcade.toast(e.message, 'lose');
   }
@@ -149,11 +157,24 @@ function showLobby() {
 
 function updateHud(bi) {
   buyIn = bi || buyIn;
-  const pctP = (fight.playerHp / fight.playerMaxHp) * 100;
-  const pctM = (fight.monsterHp / fight.monsterMaxHp) * 100;
-  document.getElementById('player-hp').style.width = `${pctP}%`;
-  document.getElementById('monster-hp').style.width = `${pctM}%`;
+  document.getElementById('player-hp').style.width = `${(fight.playerHp / fight.playerMaxHp) * 100}%`;
+  document.getElementById('monster-hp').style.width = `${(fight.monsterHp / fight.monsterMaxHp) * 100}%`;
   document.getElementById('fight-ammo').textContent = buyIn[selectedTier] || 0;
+}
+
+function pieceClass(v) {
+  if (isBuyin(v)) return 'piece piece-buyin';
+  if (isEnergy(v)) return 'piece piece-energy';
+  if (isStripe(v)) return `piece piece-stripe ${v >= STRIPE_V ? 'stripe-v' : 'stripe-h'}`;
+  return 'piece';
+}
+
+function pieceSrc(v) {
+  if (isEnergy(v)) return manifest.special.energy;
+  if (isBuyin(v)) return manifest.special.buyin;
+  const col = colorOf(v);
+  if (col != null) return manifest.candyPath.replace('{color}', manifest.candies[col]);
+  return manifest.candyPath.replace('{color}', 'red');
 }
 
 function renderBoard() {
@@ -161,18 +182,26 @@ function renderBoard() {
   board.innerHTML = '';
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      const t = grid[r][c];
+      const v = grid[r][c];
       const cell = document.createElement('div');
       cell.className = 'cell';
       cell.dataset.r = r;
       cell.dataset.c = c;
-      if (t != null) {
+      if (v != null) {
+        const wrap = document.createElement('div');
+        wrap.className = pieceClass(v);
         const img = document.createElement('img');
-        img.className = 'candy-img';
         img.draggable = false;
-        img.src = manifest.candyPath.replace('{color}', manifest.candies[t]);
+        img.src = pieceSrc(v);
         img.alt = '';
-        cell.appendChild(img);
+        wrap.appendChild(img);
+        if (isStripe(v)) {
+          const stripe = document.createElement('span');
+          stripe.className = 'stripe-mark';
+          stripe.textContent = v >= STRIPE_V ? '|' : '—';
+          wrap.appendChild(stripe);
+        }
+        cell.appendChild(wrap);
       }
       cell.addEventListener('click', () => onCellClick(r, c));
       board.appendChild(cell);
@@ -185,7 +214,6 @@ function onCellClick(r, c) {
   if (selectedCell === null) {
     selectedCell = { r, c };
     highlightSelected();
-    sounds.play('click', { volume: 0.15 });
     return;
   }
   const { r: r0, c: c0 } = selectedCell;
@@ -204,8 +232,12 @@ function onCellClick(r, c) {
 
 function highlightSelected() {
   document.querySelectorAll('.cell').forEach((el) => el.classList.remove('selected'));
-  if (!selectedCell) return;
-  document.querySelector(`[data-r="${selectedCell.r}"][data-c="${selectedCell.c}"]`)?.classList.add('selected');
+  selectedCell &&
+    document.querySelector(`[data-r="${selectedCell.r}"][data-c="${selectedCell.c}"]`)?.classList.add('selected');
+}
+
+function hasAnyMatch() {
+  return findMatchGroups(grid).length > 0;
 }
 
 async function attemptSwap(r0, c0, r1, c1) {
@@ -217,7 +249,7 @@ async function attemptSwap(r0, c0, r1, c1) {
   swapCells(grid, r0, c0, r1, c1);
   renderBoard();
 
-  if (!findMatchGroups(grid).length) {
+  if (!hasAnyMatch()) {
     swapCells(grid, r0, c0, r1, c1);
     renderBoard();
     await animator.invalidSwap(r0, c0, r1, c1);
@@ -226,43 +258,74 @@ async function attemptSwap(r0, c0, r1, c1) {
   }
 
   await runFullCascadeTurn();
+  if (fight?.active && Math.random() < 0.35) maybeSpawnBuyin(grid);
+  renderBoard();
   busy = false;
 }
 
-function estimateDamage(size, combo) {
+function estimateDamage(size, combo, bonus = 0) {
   const s = size >= 5 ? 5 : size >= 4 ? 4 : 3;
   const base = { 3: 8, 4: 14, 5: 22 }[s] || s * 5;
-  return Math.round(base * (1 + (combo - 1) * 0.25));
+  return Math.round(base * (1 + (combo - 1) * 0.28) + bonus);
 }
 
-/** One player move: full Candy Crush cascades — each cluster pops, falls, and strikes the monster. */
 async function runFullCascadeTurn() {
   const waves = [];
   let combo = 0;
   const monsterEl = document.getElementById('monster-sprite');
 
   while (true) {
-    const groups = findMatchGroups(grid);
+    const { groups, creates } = findTurnResult(grid);
     if (!groups.length) break;
     combo++;
 
-    await Promise.all(groups.map((cluster) => animator.popCluster(cluster, combo)));
-
-    for (const cluster of groups) {
-      const center = clusterCenter(cluster);
-      const r = Math.round(center.r);
-      const c = Math.round(center.c);
-      const size = cluster.length;
-      waves.push({ size, combo, type: center.type, r, c });
-      const est = estimateDamage(size, combo);
-      await animator.launchProjectile(r, c, center.type, est, monsterEl);
-      await sleep(60);
+    if (combo >= 2) {
+      const maxSize = Math.max(...groups.map((g) => g.size));
+      animator.showComboWord(combo, maxSize);
     }
 
-    clearClusters(grid, groups);
-    const moves = applyGravity(grid);
+    const { cells, effects } = expandEffects(grid, groups);
+
+    for (const fx of effects) {
+      if (fx.kind === 'colorWipe') await animator.colorFieldWipe(fx.color);
+      if (fx.kind === 'rowBlast') await animator.rowColBlast(fx.row, 0, true, fx.color);
+      if (fx.kind === 'colBlast') await animator.rowColBlast(0, fx.col, false, fx.color);
+    }
+
+    await animator.popCells(cells, combo);
+
+    for (const g of groups) {
+      const center = g.cells[Math.floor(g.cells.length / 2)];
+      const bonus = g.hasEnergy ? (effects.find((e) => e.kind === 'colorWipe')?.count || 0) * 3 : 0;
+      const dmg = estimateDamage(g.size, combo, bonus);
+      waves.push({
+        size: g.size,
+        combo,
+        type: g.color ?? 0,
+        effect: g.hasEnergy ? 'colorWipe' : g.hasBuyin ? 'buyin' : 'match',
+        wipeCount: bonus / 3 || 0,
+        bonusDmg: bonus,
+      });
+
+      if (g.hasBuyin) {
+        const pt = animator.cellCenter(center.r, center.c);
+        animator.showBuyinBonus(pt.x, pt.y, 2 + Math.min(3, g.size - 3));
+      }
+
+      await animator.energyStrike(center.r, center.c, g.color ?? 0, dmg, monsterEl, g.hasEnergy || g.size >= 5);
+      await sleep(50);
+    }
+
+    const createKeys = new Set(creates.map((c) => `${c.r},${c.c}`));
+    const toClear = cells.filter(({ r, c }) => !createKeys.has(`${r},${c}`));
+    clearCells(grid, toClear);
+    applyCreates(grid, creates);
+
+    const moves = applyGravity(grid, 0.08);
     renderBoard();
     await animator.fallMoves(moves);
+
+    await sleep(80);
   }
 
   if (!waves.length) return;
@@ -272,10 +335,14 @@ async function runFullCascadeTurn() {
     fight = r.fight;
     updateHud(r.buyInCandies);
 
-    const msg = document.getElementById('battle-msg');
-    msg.textContent = `${waves.length} match${waves.length > 1 ? 'es' : ''} → ${r.totalDamage} total dmg!${
-      r.monsterAttack ? ` Monster hits ${r.monsterAttack}` : ''
-    }${r.bonusCandies ? ` +${r.bonusCandies} free candies!` : ''}`;
+    if (r.buyinGained) {
+      Arcade.toast(`+${r.buyinGained} buy-in candies!`, 'win');
+    }
+
+    document.getElementById('battle-msg').textContent =
+      `${waves.length} hit${waves.length > 1 ? 's' : ''} → ${r.totalDamage} dmg!` +
+      (r.monsterAttack ? ` Monster -${r.monsterAttack}` : '') +
+      (r.bonusCandies ? ` +${r.bonusCandies} bonus` : '');
 
     if (r.monsterAttack) {
       ArcadeFX.shake(document.getElementById('app'));
@@ -288,8 +355,7 @@ async function runFullCascadeTurn() {
 }
 
 function showResult(r) {
-  const overlay = document.getElementById('overlay-result');
-  overlay.classList.remove('hidden');
+  document.getElementById('overlay-result').classList.remove('hidden');
   if (r.won) {
     document.getElementById('result-icon').textContent = '🏆';
     document.getElementById('result-title').textContent = 'Monster Defeated!';

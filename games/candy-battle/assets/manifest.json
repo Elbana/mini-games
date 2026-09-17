@@ -2,6 +2,10 @@
   "source": "OpenGameArt CC0 — yaycandies jelly pack + MELLE candy match background",
   "candies": ["red", "blue", "yellow", "green", "purple", "orange"],
   "candyPath": "/candy-battle/assets/candies/{color}.png",
+  "special": {
+    "energy": "/candy-battle/assets/special/energy.svg",
+    "buyin": "/candy-battle/assets/special/buyin.svg"
+  },
   "background": "/candy-battle/assets/bg-board.png",
   "explosion": [
     "/candy-battle/assets/explosion-1.png",

@@ -106,7 +106,7 @@ export async function handleCandyTurn(req, res) {
   if (!operator) return;
   const ctx = buildContext(operator, extractPlayerId(req));
   const { waves = [] } = req.body || {};
-  if (!Array.isArray(waves) || waves.length < 1 || waves.length > 24) {
+  if (!Array.isArray(waves) || waves.length < 1 || waves.length > 40) {
     return res.status(400).json({ error: 'Invalid turn' });
   }
   const session = getPlayerData(ctx);
@@ -128,12 +128,22 @@ export async function handleCandyTurn(req, res) {
   const waveDamage = [];
   let combo = 0;
 
+  let buyinGained = 0;
+
   for (const w of waves) {
     const size = Math.min(36, Math.max(3, Number(w.size) || 3));
     combo = Math.min(20, Math.max(combo + 1, Number(w.combo) || 1));
-    const dmg = damageFromMatch(size >= 5 ? 5 : size >= 4 ? 4 : 3, combo);
+    let dmg = damageFromMatch(size >= 5 ? 5 : size >= 4 ? 4 : 3, combo);
+    if (w.effect === 'colorWipe') dmg += Math.min(80, Number(w.bonusDmg) || 0);
+    if (w.effect === 'buyin') {
+      buyinGained += 2 + Math.min(3, size - 3);
+    }
     waveDamage.push(dmg);
     totalDamage += dmg;
+  }
+
+  if (buyinGained > 0) {
+    session.arcade.candyBuyIn[tierId] = (session.arcade.candyBuyIn[tierId] || 0) + buyinGained;
   }
 
   fight.monsterHp = Math.max(0, fight.monsterHp - totalDamage);
@@ -178,6 +188,7 @@ export async function handleCandyTurn(req, res) {
     won,
     lost,
     buyInCandies: session.arcade.candyBuyIn,
+    buyinGained,
   });
 }
 
