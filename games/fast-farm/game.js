@@ -237,15 +237,33 @@ function canUseToolOnPlot(tool, plot) {
   return { ok: false, msg: 'Unknown tool' };
 }
 
+function getPlotVisualAnchor(plotIndex) {
+  const plotCell = document.querySelector(`.plot-cell[data-plot="${plotIndex}"]`);
+  if (!plotCell) return null;
+
+  const sprite = plotCell.querySelector('.crop-sprite');
+  const cropBox = plotCell.querySelector('.plot-crop');
+  const stack = plotCell.querySelector('.plot-stack');
+  const anchorEl = sprite || cropBox || stack || plotCell;
+  const rect = anchorEl.getBoundingClientRect();
+  if (rect.width <= 0 && rect.height <= 0) return null;
+
+  return {
+    cx: rect.left + rect.width * 0.5,
+    cy: rect.top + rect.height * 0.48,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
 function playToolUseAnimation(plotIndex, tool) {
   const plotCell = document.querySelector(`.plot-cell[data-plot="${plotIndex}"]`);
   const layer = document.getElementById('fx-layer');
   const cfg = TOOL_FX[tool];
-  if (!plotCell || !layer || !cfg) return Promise.resolve();
+  const anchor = getPlotVisualAnchor(plotIndex);
+  if (!plotCell || !layer || !cfg || !anchor) return Promise.resolve();
 
-  const rect = plotCell.getBoundingClientRect();
-  const cx = rect.left + rect.width * 0.5;
-  const cy = rect.top + rect.height * 0.32;
+  const { cx, cy } = anchor;
 
   const el = document.createElement('div');
   el.className = `farm-tool-fx ${cfg.class}`;
@@ -475,15 +493,15 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
   const layer = document.getElementById('fx-layer');
   if (!plotCell || !targetRow || !iconEl || !layer || !countEl) return Promise.resolve();
 
-  const from = plotCell.getBoundingClientRect();
+  const anchor = getPlotVisualAnchor(plotIndex);
   const countBox = countEl.getBoundingClientRect();
   const iconSrc = iconEl.src;
   const harvestAmt = Math.max(1, Math.round(amount));
   const visualCount = Math.min(harvestAmt, tier === 'jackpot' ? 14 : tier === 'great' ? 12 : 10);
   const isJackpot = tier === 'jackpot' || tier === 'great';
+  if (!anchor) return Promise.resolve();
 
-  const cx = from.left + from.width * 0.5;
-  const cy = from.top + from.height * 0.36;
+  const { cx, cy } = anchor;
   const tx = countBox.left + countBox.width * 0.5;
   const ty = countBox.top + countBox.height * 0.5;
   const size = isJackpot ? 38 : 34;
