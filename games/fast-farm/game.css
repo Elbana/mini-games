@@ -416,11 +416,6 @@ html, body {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.plot-stack.tool-target .plot-mound {
-  border-color: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-}
-
 .plot-cell:nth-child(-n+3) .plot-mound {
   top: 10%;
   height: 52%;

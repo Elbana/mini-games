@@ -12,7 +12,12 @@ let tickTimer = null;
 let actionBusy = false;
 let skipPlotRender = false;
 let lastPlotsJson = '';
+let farmSounds = null;
 const FARM_TICK_MS = 1500;
+
+function sfx(name, opts) {
+  farmSounds?.play(name, opts);
+}
 
 const TOOL_FX = {
   water: { emoji: '🪣', class: 'fx-water', particles: 'water' },
@@ -34,6 +39,8 @@ async function init() {
   if (cfg.careRules) careRules = cfg.careRules;
 
   setupFarmToast();
+  farmSounds = new FarmSounds();
+  document.body.addEventListener('pointerdown', () => farmSounds?.unlock(), { once: true });
   buildCropStack();
   bindUi();
   await refreshFarm();
@@ -45,7 +52,11 @@ async function init() {
   };
   document.addEventListener('visibilitychange', syncFarmTick);
   document.addEventListener('pagehide', stopFarmTick);
-  registerArcadeGameShutdown(stopFarmTick);
+  registerArcadeGameShutdown(() => {
+    stopFarmTick();
+    farmSounds?.destroy();
+    farmSounds = null;
+  });
 }
 
 function startFarmTick() {
@@ -136,10 +147,10 @@ function selectTool(tool) {
     btn.classList.toggle('selected', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  document.querySelectorAll('.plot-stack.tool-target').forEach((el) => el.classList.remove('tool-target'));
   if (!tool) return;
 
-  highlightToolTargets(tool);
+  if (changed) sfx('toolSelect', { volume: 0.24 });
+
   if (!changed) return;
 
   const labels = {
@@ -149,14 +160,6 @@ function selectTool(tool) {
     clear: 'Tap a dead plot to clear',
   };
   Arcade.toast(labels[tool] || 'Tap a plot');
-}
-
-function highlightToolTargets(tool) {
-  (farm.plots || []).forEach((plot, i) => {
-    if (canUseToolOnPlot(tool, plot).ok) {
-      document.querySelector(`.plot-cell[data-plot="${i}"] .plot-stack`)?.classList.add('tool-target');
-    }
-  });
 }
 
 function countPlotsNeedingTool(tool) {
@@ -189,7 +192,6 @@ function updateToolbarBadges() {
     }
   });
 
-  if (activeTool) highlightToolTargets(activeTool);
 }
 
 function canUseToolOnPlot(tool, plot) {
@@ -270,6 +272,8 @@ function playToolUseAnimation(plotIndex, tool) {
   const cx = anchor.cx;
   const cy = anchor.cy - anchor.height * 0.06;
 
+  sfx(tool, { volume: 0.28 });
+
   const el = document.createElement('div');
   el.className = `farm-tool-fx ${cfg.class}`;
   el.textContent = cfg.emoji;
@@ -305,13 +309,10 @@ function playToolUseAnimation(plotIndex, tool) {
     }
   }
 
-  const plotStack = plotCell.querySelector('.plot-stack');
-  plotStack?.classList.add('tool-target');
   return new Promise((resolve) => {
     setTimeout(() => {
       el.remove();
       particles.forEach((p) => p.remove());
-      plotStack?.classList.remove('tool-target');
       resolve();
     }, tool === 'water' || tool === 'harvest' ? 900 : 820);
   });
@@ -466,6 +467,7 @@ function bumpCountQuick(countEl, value, row) {
   countEl.classList.remove('count-bump', 'count-tick');
   void countEl.offsetWidth;
   countEl.classList.add('count-tick');
+  sfx('harvestTick', { volume: 0.07 });
   row?.classList.add('crop-stack-pop');
   setTimeout(() => row?.classList.remove('crop-stack-pop'), 320);
 }
@@ -508,6 +510,7 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
   if (!anchor) return Promise.resolve();
 
   const { cx, cy } = anchor;
+  sfx('harvest', { volume: 0.26 });
   const tx = countBox.left + countBox.width * 0.5;
   const ty = countBox.top + countBox.height * 0.5;
   const size = isJackpot ? 38 : 34;
@@ -725,6 +728,7 @@ async function handlePlotTap(index) {
   if (!plot) return;
 
   if (plot.state === 'empty') {
+    sfx('click', { volume: 0.2 });
     openPlotSheet(index);
     return;
   }
@@ -743,6 +747,7 @@ async function handlePlotTap(index) {
 
   const check = canUseToolOnPlot(activeTool, plot);
   if (!check.ok) {
+    sfx('error', { volume: 0.2 });
     Arcade.toast(check.msg, 'lose');
     return;
   }
@@ -870,6 +875,7 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
     if (action === 'plant') {
       if (!seedId) return;
       await Arcade.post('/api/fast-farm/buy-seed', { seed_id: seedId, plot_index: index });
+      sfx('plant', { volume: 0.3 });
       Arcade.toast('🌱 Planted!', 'win');
       closeSheet('sheet-plot');
       return;
@@ -885,6 +891,7 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
 
     const r = await Arcade.post(routes[action], { plot_index: index });
     if (r.unfair_loss) {
+      sfx('blight', { volume: 0.32 });
       Arcade.toast('🌪️ Sudden blight — crop died!', 'lose');
     } else if (action === 'water') Arcade.toast('💧 Watered!', 'win');
     else if (action === 'fertilize') Arcade.toast('🌿 Fed!', 'win');
@@ -904,6 +911,9 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
         farm.inventory = r.inventory;
         await playHarvestCollectAnimation(index, itemId, amt, tier, prevTotal, newTotal);
       }
+      if (tier === 'jackpot') sfx('harvestJackpot', { volume: 0.34 });
+      else if (tier === 'great') sfx('harvestGreat', { volume: 0.3 });
+
       const hype =
         tier === 'jackpot' ? '🎉 JACKPOT harvest!' :
         tier === 'great' ? '✨ Great haul!' :
@@ -913,6 +923,7 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
       closeSheet('sheet-plot');
     }
   } catch (e) {
+    sfx('error', { volume: 0.22 });
     Arcade.toast(e.message || 'Action failed', 'lose');
   } finally {
     skipPlotRender = false;
