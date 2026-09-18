@@ -177,9 +177,9 @@ html[data-arcade-embed='1'] .board {
 /* Fast Farm — absolute layout (not flex column), plots above UI chrome */
 html[data-arcade-embed='1'] .farm-screen {
   display: block !important;
-  --toolbar-h: clamp(88px, 13vh, 102px);
-  --field-top: clamp(34%, 38vh, 42%);
-  --field-bottom: calc(var(--toolbar-h) + max(4px, env(safe-area-inset-bottom, 4px)));
+  --toolbar-h: clamp(86px, 12.5vh, 104px);
+  --field-top: clamp(40%, 43vh, 47%);
+  --field-bottom: calc(var(--toolbar-h) + max(8px, env(safe-area-inset-bottom, 8px)));
   --field-side: clamp(2%, 2vw, 4%);
   touch-action: manipulation;
 }
@@ -216,8 +216,18 @@ html[data-arcade-embed='1'] .farm-grid {
 }
 
 html[data-arcade-embed='1'] .farm-top-bar,
-html[data-arcade-embed='1'] .farm-crop-stack {
+html[data-arcade-embed='1'] .farm-crop-stack,
+html[data-arcade-embed='1'] .farm-toolbar {
   pointer-events: auto;
+}
+
+html[data-arcade-embed='1'] .farm-toolbar {
+  z-index: 24;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 18, 10, 0.62) 0%,
+    rgba(6, 14, 8, 0.96) 100%
+  );
 }
 
 html[data-arcade-embed='1'] .farm-crop-stack {
@@ -317,7 +327,8 @@ html[data-arcade-embed='1'] .mk-table-wrap {
 
 @media (max-height: 640px) {
   html[data-arcade-embed='1'] .farm-screen {
-    --field-top: clamp(50%, 52vh, 56%);
+    --field-top: clamp(39%, 41vh, 44%);
+    --toolbar-h: 82px;
   }
 
   html[data-arcade-embed='1'] .board {

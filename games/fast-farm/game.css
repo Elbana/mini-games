@@ -9,9 +9,9 @@ html, body {
 }
 
 .farm-screen {
-  --toolbar-h: clamp(92px, 14vh, 108px);
-  --field-top: clamp(34%, 38vh, 42%);
-  --field-bottom: calc(var(--toolbar-h) + max(6px, env(safe-area-inset-bottom, 6px)));
+  --toolbar-h: clamp(88px, 13vh, 106px);
+  --field-top: clamp(39%, 42vh, 45%);
+  --field-bottom: calc(var(--toolbar-h) + max(8px, env(safe-area-inset-bottom, 8px)));
   --field-side: clamp(0.5%, 1vw, 2%);
   position: relative;
   width: 100%;
@@ -615,26 +615,27 @@ html, body {
   background: linear-gradient(180deg, #5d4037, rgba(93, 64, 55, 0.3));
 }
 
-/* Bottom tool bar — pick a tool, then tap a plot */
+/* Bottom tool bar — anchored to screen bottom (outside .farm-ui for WebView) */
 .farm-toolbar {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 14;
+  z-index: 20;
   display: flex;
-  justify-content: space-evenly;
+  justify-content: space-between;
   align-items: flex-end;
-  gap: 2px;
-  padding: 8px 6px max(8px, env(safe-area-inset-bottom, 8px));
+  gap: 0;
+  min-height: var(--toolbar-h);
+  padding: 10px 4px max(10px, env(safe-area-inset-bottom, 10px));
   pointer-events: auto;
   background: linear-gradient(
     180deg,
-    transparent 0%,
-    rgba(8, 18, 10, 0.42) 28%,
-    rgba(6, 14, 8, 0.72) 100%
+    rgba(8, 18, 10, 0.55) 0%,
+    rgba(6, 14, 8, 0.92) 100%
   );
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  box-sizing: border-box;
 }
 
 .farm-tool {
@@ -642,14 +643,15 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  justify-content: flex-end;
+  gap: 4px;
   min-width: 0;
-  flex: 1;
-  max-width: 58px;
+  flex: 1 1 0;
+  max-width: 64px;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0;
+  padding: 0 1px;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -658,14 +660,15 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(44px, 11vw, 52px);
-  height: clamp(44px, 11vw, 52px);
+  width: clamp(42px, 12vw, 50px);
+  height: clamp(42px, 12vw, 50px);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.38);
-  font-size: clamp(1.35rem, 4.2vw, 1.55rem);
+  background: rgba(0, 0, 0, 0.55);
+  font-size: clamp(1.4rem, 4.5vw, 1.65rem);
   line-height: 1;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1499,19 +1502,32 @@ html, body {
 
 @media (max-height: 640px) {
   .farm-screen {
-    --field-top: 32%;
-    --toolbar-h: 86px;
+    --field-top: clamp(38%, 40vh, 43%);
+    --toolbar-h: 84px;
   }
   .plot-cell:nth-child(n+4):nth-child(-n+6) .plot-stack { transform: translateY(-18%); }
   .plot-cell:nth-child(n+7) .plot-stack { transform: translateY(-34%); }
+  .farm-tool-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.35rem;
+  }
+  .farm-tool-label { font-size: 0.56rem; }
 }
 
 @media (min-height: 820px) {
-  .farm-screen { --field-top: 40%; }
+  .farm-screen { --field-top: clamp(41%, 43vh, 46%); }
 }
 
-@media (max-width: 430px) {
-  .farm-screen { --field-top: clamp(32%, 36vh, 38%); }
+@media (max-width: 390px) {
+  .farm-screen { --field-top: clamp(38%, 41vh, 44%); }
+  .farm-toolbar { padding-left: 2px; padding-right: 2px; }
+  .farm-tool-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.3rem;
+  }
+  .farm-tool-label { font-size: 0.55rem; }
 }
 
 @media (max-width: 360px) {
