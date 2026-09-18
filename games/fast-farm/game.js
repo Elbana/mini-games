@@ -237,7 +237,7 @@ function canUseToolOnPlot(tool, plot) {
   return { ok: false, msg: 'Unknown tool' };
 }
 
-function getPlotVisualAnchor(plotIndex) {
+function getPlotVisualAnchor(plotIndex, mode = 'center') {
   const plotCell = document.querySelector(`.plot-cell[data-plot="${plotIndex}"]`);
   if (!plotCell) return null;
 
@@ -249,9 +249,11 @@ function getPlotVisualAnchor(plotIndex) {
   const rect = anchorEl.getBoundingClientRect();
   if (rect.width <= 0 && rect.height <= 0) return null;
 
+  const yRatio = mode === 'tool' ? 0.32 : mode === 'harvest' ? 0.38 : 0.5;
+
   return {
     cx: rect.left + rect.width * 0.5,
-    cy: rect.top + rect.height * 0.5,
+    cy: rect.top + rect.height * yRatio,
     width: rect.width,
     height: rect.height,
   };
@@ -261,10 +263,11 @@ function playToolUseAnimation(plotIndex, tool) {
   const plotCell = document.querySelector(`.plot-cell[data-plot="${plotIndex}"]`);
   const layer = document.getElementById('fx-layer');
   const cfg = TOOL_FX[tool];
-  const anchor = getPlotVisualAnchor(plotIndex);
+  const anchor = getPlotVisualAnchor(plotIndex, 'tool');
   if (!plotCell || !layer || !cfg || !anchor) return Promise.resolve();
 
-  const { cx, cy } = anchor;
+  const cx = anchor.cx;
+  const cy = anchor.cy - anchor.height * 0.06;
 
   const el = document.createElement('div');
   el.className = `farm-tool-fx ${cfg.class}`;
@@ -495,7 +498,7 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
   const layer = document.getElementById('fx-layer');
   if (!plotCell || !targetRow || !iconEl || !layer || !countEl) return Promise.resolve();
 
-  const anchor = getPlotVisualAnchor(plotIndex);
+  const anchor = getPlotVisualAnchor(plotIndex, 'harvest');
   const countBox = countEl.getBoundingClientRect();
   const iconSrc = iconEl.src;
   const harvestAmt = Math.max(1, Math.round(amount));

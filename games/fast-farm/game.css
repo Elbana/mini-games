@@ -790,10 +790,10 @@ html, body {
 }
 
 @keyframes fx-water-can {
-  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.5) rotate(-18deg); }
-  20% { opacity: 1; transform: translate(-50%, -55%) scale(1) rotate(-28deg); }
-  55% { transform: translate(-50%, -52%) scale(1.05) rotate(-32deg); }
-  100% { opacity: 0; transform: translate(-50%, -40%) scale(0.85) rotate(-12deg); }
+  0% { opacity: 0; transform: translate(-50%, -58%) scale(0.5) rotate(-18deg); }
+  20% { opacity: 1; transform: translate(-50%, -72%) scale(1) rotate(-28deg); }
+  55% { transform: translate(-50%, -68%) scale(1.05) rotate(-32deg); }
+  100% { opacity: 0; transform: translate(-50%, -58%) scale(0.85) rotate(-12deg); }
 }
 
 @keyframes fx-water-drop {
@@ -803,9 +803,9 @@ html, body {
 }
 
 @keyframes fx-fertilize {
-  0% { opacity: 0; transform: translate(-50%, -20%) scale(0.5) rotate(8deg); }
-  25% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-12deg); }
-  100% { opacity: 0; transform: translate(-50%, -35%) scale(0.8) rotate(6deg); }
+  0% { opacity: 0; transform: translate(-50%, -48%) scale(0.5) rotate(8deg); }
+  25% { opacity: 1; transform: translate(-50%, -62%) scale(1) rotate(-12deg); }
+  100% { opacity: 0; transform: translate(-50%, -52%) scale(0.8) rotate(6deg); }
 }
 
 @keyframes fx-fert-spark {
@@ -815,9 +815,9 @@ html, body {
 }
 
 @keyframes fx-heal {
-  0% { opacity: 0; transform: translate(-50%, -20%) scale(0.4); }
-  30% { opacity: 1; transform: translate(-50%, -55%) scale(1.1); }
-  100% { opacity: 0; transform: translate(-50%, -70%) scale(0.6); }
+  0% { opacity: 0; transform: translate(-50%, -48%) scale(0.4); }
+  30% { opacity: 1; transform: translate(-50%, -66%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -72%) scale(0.6); }
 }
 
 @keyframes fx-harvest {
@@ -834,9 +834,9 @@ html, body {
 }
 
 @keyframes fx-clear {
-  0% { opacity: 0; transform: translate(-50%, -20%) scale(0.5) rotate(-20deg); }
-  30% { opacity: 1; transform: translate(-50%, -48%) scale(1) rotate(12deg); }
-  100% { opacity: 0; transform: translate(-50%, -35%) scale(0.75) rotate(-8deg); }
+  0% { opacity: 0; transform: translate(-50%, -46%) scale(0.5) rotate(-20deg); }
+  30% { opacity: 1; transform: translate(-50%, -62%) scale(1) rotate(12deg); }
+  100% { opacity: 0; transform: translate(-50%, -52%) scale(0.75) rotate(-8deg); }
 }
 
 /* Toasts — pinned under top bar, stack downward, never over plots */
