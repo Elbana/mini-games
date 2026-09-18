@@ -123,13 +123,13 @@ function bindUi() {
 function bindToolbar() {
   document.querySelectorAll('.farm-tool[data-tool]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const tool = btn.dataset.tool;
-      selectTool(activeTool === tool ? null : tool);
+      selectTool(btn.dataset.tool);
     });
   });
 }
 
 function selectTool(tool) {
+  const changed = activeTool !== tool;
   activeTool = tool;
   document.querySelectorAll('.farm-tool[data-tool]').forEach((btn) => {
     const on = btn.dataset.tool === tool;
@@ -137,16 +137,18 @@ function selectTool(tool) {
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
   document.querySelectorAll('.plot-stack.tool-target').forEach((el) => el.classList.remove('tool-target'));
-  if (tool) {
-    highlightToolTargets(tool);
-    const labels = {
-      water: 'Tap a thirsty plot to water',
-      fertilize: 'Tap a hungry plot to feed',
-      heal: 'Tap a sick or dead plot to heal',
-      clear: 'Tap a dead plot to clear',
-    };
-    Arcade.toast(labels[tool] || 'Tap a plot');
-  }
+  if (!tool) return;
+
+  highlightToolTargets(tool);
+  if (!changed) return;
+
+  const labels = {
+    water: 'Tap a thirsty plot to water',
+    fertilize: 'Tap a hungry plot to feed',
+    heal: 'Tap a sick or dead plot to heal',
+    clear: 'Tap a dead plot to clear',
+  };
+  Arcade.toast(labels[tool] || 'Tap a plot');
 }
 
 function highlightToolTargets(tool) {
@@ -181,7 +183,6 @@ function updateToolbarBadges() {
     const tool = btn.dataset.tool;
     const badge = btn.querySelector('.farm-tool-badge');
     const n = counts[tool] || 0;
-    btn.classList.toggle('needs-attention', n > 0 && activeTool !== tool);
     if (badge) {
       badge.textContent = String(n);
       badge.classList.toggle('hidden', n <= 0);
