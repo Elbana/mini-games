@@ -143,8 +143,6 @@ function selectTool(tool) {
       water: 'Tap a thirsty plot to water',
       fertilize: 'Tap a hungry plot to feed',
       heal: 'Tap a sick or dead plot to heal',
-      harvest: 'Tap a ready plot to pick',
-      plant: 'Tap an empty plot to plant',
       clear: 'Tap a dead plot to clear',
     };
     Arcade.toast(labels[tool] || 'Tap a plot');
@@ -168,11 +166,9 @@ function updateToolbarBadges() {
     water: 0,
     fertilize: 0,
     heal: 0,
-    harvest: 0,
   };
   for (const plot of farm.plots || []) {
-    if (plot.ready || plot.state === 'ready') counts.harvest += 1;
-    else if (plot.state === 'dead') counts.heal += 1;
+    if (plot.state === 'dead') counts.heal += 1;
     else if (careIsActive(plot)) {
       const action = careActionForPlot(plot);
       if (action === 'water') counts.water += 1;
@@ -703,24 +699,26 @@ async function handlePlotTap(index) {
   const plot = farm.plots[index];
   if (!plot) return;
 
+  if (plot.state === 'empty') {
+    openPlotSheet(index);
+    return;
+  }
+
+  if (plot.ready || plot.state === 'ready') {
+    await runPlotAction('harvest', index);
+    return;
+  }
+
   if (!activeTool) {
-    if (plot.state === 'empty') {
-      selectTool('plant');
-      openPlotSheet(index);
-      return;
+    if (careIsActive(plot) || plot.state === 'dead') {
+      Arcade.toast('Pick a tool from the bar below');
     }
-    Arcade.toast('Pick a tool from the bar below');
     return;
   }
 
   const check = canUseToolOnPlot(activeTool, plot);
   if (!check.ok) {
     Arcade.toast(check.msg, 'lose');
-    return;
-  }
-
-  if (activeTool === 'plant') {
-    openPlotSheet(index);
     return;
   }
 
@@ -760,8 +758,7 @@ async function openPlotSheet(index, show = true) {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
       if (action === 'plant') {
-        selectTool('plant');
-        applyToolToPlot('plant', index, btn.dataset.seed);
+        runPlotAction('plant', index, btn.dataset.seed);
         return;
       }
       selectTool(action);
@@ -847,7 +844,6 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
   try {
     if (action === 'plant') {
       if (!seedId) return;
-      if (!skipToolFx) await playToolUseAnimation(index, 'plant');
       await Arcade.post('/api/fast-farm/buy-seed', { seed_id: seedId, plot_index: index });
       Arcade.toast('🌱 Planted!', 'win');
       closeSheet('sheet-plot');
