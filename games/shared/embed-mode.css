@@ -223,11 +223,7 @@ html[data-arcade-embed='1'] .farm-toolbar {
 
 html[data-arcade-embed='1'] .farm-toolbar {
   z-index: 24;
-  background: linear-gradient(
-    180deg,
-    rgba(8, 18, 10, 0.62) 0%,
-    rgba(6, 14, 8, 0.96) 100%
-  );
+  background: transparent;
 }
 
 html[data-arcade-embed='1'] .farm-crop-stack {
