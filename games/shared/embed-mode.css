@@ -76,13 +76,13 @@ html[data-arcade-embed='1'] .screen {
   overflow: hidden !important;
 }
 
-html[data-arcade-embed='1'] #screen-lobby {
+html[data-arcade-embed='1'] #screen-lobby:not(.hidden) {
+  display: flex !important;
+  flex-direction: column;
+  overflow-x: hidden !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
-}
-
-html[data-arcade-embed='1'] #screen-fight {
-  overflow: hidden !important;
+  padding: 0 8px 12px !important;
 }
 
 html[data-arcade-embed='1'] .screen.hidden {
@@ -136,23 +136,63 @@ html[data-arcade-embed='1'] .monster-sprite {
   font-size: 2.2rem;
 }
 
+html[data-arcade-embed='1'] #screen-fight:not(.hidden) {
+  display: flex !important;
+  flex-direction: column;
+  padding: 0 4px 6px !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+html[data-arcade-embed='1'] .candy-ammo {
+  margin: 0 0 2px;
+  font-size: 0.68rem;
+  flex-shrink: 0;
+}
+
+html[data-arcade-embed='1'] .battle-msg {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  margin: 2px 0 0;
+}
+
 html[data-arcade-embed='1'] .board-wrap {
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 0;
+  width: 100%;
+  padding: 2px 0 4px;
   touch-action: none;
 }
 
 html[data-arcade-embed='1'] .board {
-  width: min(100%, calc(var(--arcade-vh, 100vh) * 0.42));
-  max-height: min(100%, calc(var(--arcade-vh, 100vh) * 0.42));
+  width: min(100%, calc(var(--arcade-vh, 100vh) * 0.88));
+  height: min(100%, calc(var(--arcade-vh, 100vh) * 0.72));
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1;
+  padding: 6px;
+  gap: 2px;
 }
 
 /* Fast Farm — absolute layout (not flex column), plots above UI chrome */
 html[data-arcade-embed='1'] .farm-screen {
   display: block !important;
-  --field-top: 34%;
-  --field-bottom: 2%;
+  --field-top: clamp(46%, 48vh, 52%);
+  --field-bottom: clamp(1%, 1vh, 2%);
+  --field-side: clamp(2%, 2vw, 4%);
   touch-action: manipulation;
+}
+
+html[data-arcade-embed='1'] .plot-cell:nth-child(-n+3) .plot-stack {
+  transform: translateY(6%);
+}
+
+html[data-arcade-embed='1'] .plot-cell:nth-child(n+4):nth-child(-n+6) .plot-stack {
+  transform: translateY(-12%);
+}
+
+html[data-arcade-embed='1'] .plot-cell:nth-child(n+7) .plot-stack {
+  transform: translateY(-28%);
 }
 
 html[data-arcade-embed='1'] .farm-ui {
@@ -188,8 +228,17 @@ html[data-arcade-embed='1'] .plot-stack {
 }
 
 /* Fishing — touch-friendly in WebView */
+html[data-arcade-embed='1'] .fish-shell {
+  max-width: 100% !important;
+}
+
 html[data-arcade-embed='1'] .ocean-scene {
   touch-action: none;
+}
+
+html[data-arcade-embed='1'] .boat-wrap {
+  width: min(34vw, 140px);
+  top: 48%;
 }
 
 html[data-arcade-embed='1'] .ocean-scene.fighting .fish-hud {
@@ -201,13 +250,27 @@ html[data-arcade-embed='1'] .fight-panel {
   pointer-events: none;
 }
 
-html[data-arcade-embed='1'] .bait-chip-row {
-  flex-shrink: 0;
+html[data-arcade-embed='1'] .fish-hud {
+  left: 6px;
+  right: 6px;
+  bottom: 8px;
+  padding: 10px 6px;
+  max-height: none;
+  overflow: visible;
 }
 
-html[data-arcade-embed='1'] .fish-hud {
-  max-height: 28%;
-  overflow-y: auto;
+html[data-arcade-embed='1'] .bait-chip-row {
+  flex-shrink: 0;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 16px 10px;
+  overflow: visible;
+}
+
+html[data-arcade-embed='1'] .cast-hint {
+  font-size: 0.72rem;
+  margin: 0;
+  padding: 0 4px;
 }
 
 /* Black Market — single column in panel */
@@ -234,4 +297,15 @@ html[data-arcade-embed='1'] .mk-portfolio-list {
 html[data-arcade-embed='1'] .mk-table-wrap {
   max-height: min(280px, calc(var(--arcade-vh, 400px) * 0.35));
   overflow: auto;
+}
+
+@media (max-height: 640px) {
+  html[data-arcade-embed='1'] .farm-screen {
+    --field-top: clamp(50%, 52vh, 56%);
+  }
+
+  html[data-arcade-embed='1'] .board {
+    width: min(100%, calc(var(--arcade-vh, 100vh) * 0.92));
+    max-height: min(100%, calc(var(--arcade-vh, 100vh) * 0.78));
+  }
 }

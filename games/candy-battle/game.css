@@ -525,7 +525,7 @@
 .board {
   display: grid;
   gap: 3px;
-  width: min(100%, 360px);
+  width: min(100%, 360px, 88vw, 72vh);
   aspect-ratio: 1;
   padding: 8px;
   touch-action: none;

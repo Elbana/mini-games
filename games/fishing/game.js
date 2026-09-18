@@ -150,17 +150,22 @@ function getBoatExclusionRect(sceneEl) {
   if (!boat || !sceneEl) return null;
   const sr = sceneEl.getBoundingClientRect();
   const br = boat.getBoundingClientRect();
-  const pad = 12;
+  // Match SVG hull/deck footprint — block the boat body, not the mast/rope above.
+  const hullW = br.width * 0.68;
+  const hullH = br.height * 0.60;
+  const cx = br.left + br.width * 0.5;
+  const cy = br.top + br.height * 0.577;
+  const pad = 8;
   return {
-    left: (br.left - pad - sr.left) / sr.width,
-    top: (br.top - pad - sr.top) / sr.height,
-    right: (br.right + pad - sr.left) / sr.width,
-    bottom: (br.bottom + pad - sr.top) / sr.height,
+    left: (cx - hullW / 2 - pad - sr.left) / sr.width,
+    top: (cy - hullH / 2 - pad - sr.top) / sr.height,
+    right: (cx + hullW / 2 + pad - sr.left) / sr.width,
+    bottom: (cy + hullH / 2 + pad - sr.top) / sr.height,
   };
 }
 
 function isSeaCastPoint(x, y, sceneEl) {
-  if (y < 0.1 || y > 0.78) return false;
+  if (y < 0.08 || y > 0.86) return false;
   const box = getBoatExclusionRect(sceneEl);
   if (!box) return true;
   const onBoat = x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
@@ -171,7 +176,7 @@ let lastCastAt = 0;
 
 function isInputBlocked(target) {
   return target?.closest?.(
-    '.fish-hud, .top-bar, .fight-panel, .boat-wrap, .help-overlay, button, a, .result-overlay'
+    '.fish-hud, .top-bar, .fight-panel, .help-overlay, button, a, .result-overlay'
   );
 }
 

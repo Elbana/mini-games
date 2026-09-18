@@ -250,12 +250,12 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: min(50vw, 210px);
+  width: min(40vw, 168px);
   transform: translate(-50%, -52%);
   z-index: 5;
   animation: boat-bob 5.5s ease-in-out infinite;
   filter: drop-shadow(0 10px 20px rgba(0, 30, 50, 0.22));
-  pointer-events: auto;
+  pointer-events: none;
   cursor: default;
 }
 
@@ -284,11 +284,14 @@
 /* ── HUD — light, calm ── */
 .fish-hud {
   position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  left: max(8px, env(safe-area-inset-left, 8px));
+  right: max(8px, env(safe-area-inset-right, 8px));
+  bottom: max(10px, env(safe-area-inset-bottom, 10px));
   margin: 0;
-  padding: 12px 16px;
+  padding: 12px 10px;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: visible;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -303,14 +306,12 @@
   gap: 12px;
   justify-content: center;
   align-items: flex-end;
-  overflow-x: auto;
-  padding: 6px 4px 10px;
-  margin-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  overflow: visible;
+  padding: 8px 18px 10px;
+  margin: 0 0 4px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
-
-.bait-chip-row::-webkit-scrollbar { display: none; }
 
 .bait-chip-wrap {
   position: relative;
@@ -880,3 +881,14 @@
 #help-ok { width: 100%; }
 
 .top-bar a { text-decoration: none; }
+
+@media (max-width: 420px) {
+  .boat-wrap { width: min(38vw, 150px); }
+  .bait-chip-item { width: 58px; height: 58px; }
+  .bait-chip-item-img { width: 26px; height: 26px; }
+  .bait-chip-row { gap: 6px; }
+}
+
+@media (max-height: 640px) {
+  .boat-wrap { width: min(36vw, 138px); top: 47%; }
+}
