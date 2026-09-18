@@ -57,7 +57,7 @@
       osc.stop(start + dur + 0.03);
     }
 
-    _noise(t, { dur, volume, freq, q = 0.8, type = 'bandpass', delay = 0, falloff = true }) {
+    _noise(t, { dur, volume, freq, freqEnd, q = 0.8, type = 'bandpass', delay = 0, falloff = true }) {
       const start = t + delay;
       const sampleRate = this.ctx.sampleRate;
       const len = Math.max(1, Math.floor(sampleRate * dur));
@@ -71,12 +71,18 @@
       src.buffer = buf;
       const filter = this.ctx.createBiquadFilter();
       filter.type = type;
-      filter.frequency.value = freq;
+      filter.frequency.setValueAtTime(freq, start);
+      if (freqEnd) filter.frequency.linearRampToValueAtTime(freqEnd, start + dur);
       filter.Q.value = q;
       const g = this._out(start, volume, dur);
       src.connect(filter).connect(g);
       src.start(start);
       src.stop(start + dur + 0.03);
+    }
+
+    _splash(t, delay, volume) {
+      this._noise(t, { dur: 0.045, volume, freq: 2200, q: 1.4, delay, falloff: true });
+      this._tone(t, { f: 520, f2: 280, dur: 0.05, type: 'sine', volume: volume * 0.45, delay: delay + 0.008 });
     }
 
     _sfxToolSelect(t, v) {
@@ -89,23 +95,37 @@
     }
 
     _sfxPlant(t, v) {
-      this._tone(t, { f: 520, f2: 280, dur: 0.06, type: 'sine', volume: v * 0.35, delay: 0 });
-      this._noise(t, { dur: 0.07, volume: v * 0.55, freq: 380, type: 'lowpass', delay: 0.04 });
-      this._tone(t, { f: 140, f2: 90, dur: 0.12, type: 'triangle', volume: v * 0.7, delay: 0.05 });
+      this._noise(t, { dur: 0.07, volume: v * 0.42, freq: 180, type: 'lowpass', delay: 0 });
+      this._tone(t, { f: 95, f2: 58, dur: 0.09, type: 'triangle', volume: v * 0.62, delay: 0.02 });
+      this._tone(t, { f: 760, f2: 540, dur: 0.022, type: 'sine', volume: v * 0.28, delay: 0.09 });
+      this._noise(t, { dur: 0.11, volume: v * 0.38, freq: 420, freqEnd: 260, type: 'bandpass', delay: 0.11 });
+      this._tone(t, { f: 88, f2: 72, dur: 0.07, type: 'sine', volume: v * 0.48, delay: 0.13 });
     }
 
     _sfxWater(t, v) {
-      for (let i = 0; i < 5; i++) {
-        this._noise(t, {
-          dur: 0.09,
-          volume: v * (0.42 - i * 0.04),
-          freq: 900 - i * 60,
-          delay: i * 0.055,
-        });
-      }
-      [0.12, 0.2, 0.28, 0.36].forEach((d, i) => {
-        this._noise(t, { dur: 0.05, volume: v * 0.28, freq: 1400, q: 1.2, delay: d });
-        this._tone(t, { f: 680 - i * 40, f2: 420, dur: 0.04, type: 'sine', volume: v * 0.12, delay: d + 0.01 });
+      this._tone(t, { f: 360, f2: 210, dur: 0.1, type: 'sine', volume: v * 0.22, delay: 0 });
+      this._noise(t, {
+        dur: 0.42,
+        volume: v * 0.55,
+        freq: 1150,
+        freqEnd: 650,
+        q: 0.6,
+        type: 'bandpass',
+        delay: 0.04,
+        falloff: false,
+      });
+      this._noise(t, {
+        dur: 0.38,
+        volume: v * 0.28,
+        freq: 480,
+        freqEnd: 320,
+        q: 0.5,
+        type: 'lowpass',
+        delay: 0.05,
+        falloff: false,
+      });
+      [0.1, 0.18, 0.26, 0.34, 0.4].forEach((d, i) => {
+        this._splash(t, d, v * (0.32 - i * 0.03));
       });
     }
 
@@ -145,31 +165,32 @@
       this._tone(t, { f: 200, f2: 110, dur: 0.2, type: 'sawtooth', volume: v * 0.18, delay: 0.04 });
     }
 
+    _sfxHarvestPop(t, v, delay, volScale = 1) {
+      this._noise(t, { dur: 0.018, volume: v * 0.35 * volScale, freq: 2400, q: 2, delay });
+      this._tone(t, { f: 1180, f2: 720, dur: 0.018, type: 'square', volume: v * 0.12 * volScale, delay });
+      this._tone(t, { f: 920, f2: 580, dur: 0.02, type: 'square', volume: v * 0.1 * volScale, delay: delay + 0.014 });
+      this._tone(t, { f: 310, f2: 145, dur: 0.1, type: 'sine', volume: v * 0.52 * volScale, delay: delay + 0.035 });
+      this._noise(t, { dur: 0.07, volume: v * 0.28 * volScale, freq: 680, type: 'lowpass', delay: delay + 0.05 });
+      this._tone(t, { f: 165, f2: 105, dur: 0.08, type: 'triangle', volume: v * 0.38 * volScale, delay: delay + 0.09 });
+    }
+
     _sfxHarvest(t, v) {
-      this._noise(t, { dur: 0.04, volume: v * 0.35, freq: 1800, q: 1.5 });
-      this._tone(t, { f: 420, f2: 260, dur: 0.07, type: 'triangle', volume: v * 0.45, delay: 0.03 });
-      this._noise(t, { dur: 0.08, volume: v * 0.3, freq: 600, type: 'lowpass', delay: 0.06 });
-      this._tone(t, { f: 180, f2: 120, dur: 0.1, type: 'sine', volume: v * 0.35, delay: 0.08 });
+      this._sfxHarvestPop(t, v, 0, 1);
     }
 
     _sfxHarvestGreat(t, v) {
-      this._sfxHarvest(t, v * 0.85);
-      [0.14, 0.22, 0.3].forEach((d) => {
-        this._tone(t, { f: 360, f2: 220, dur: 0.06, type: 'triangle', volume: v * 0.3, delay: d });
-        this._noise(t, { dur: 0.06, volume: v * 0.22, freq: 700, type: 'lowpass', delay: d + 0.02 });
-      });
+      this._sfxHarvestPop(t, v, 0, 0.9);
+      [0.13, 0.22].forEach((d) => this._sfxHarvestPop(t, v * 0.75, d, 0.7));
     }
 
     _sfxHarvestJackpot(t, v) {
-      this._sfxHarvestGreat(t, v * 0.9);
-      [523, 659, 784, 988].forEach((f, i) => {
-        this._tone(t, { f, f2: f * 1.02, dur: 0.14, type: 'triangle', volume: v * 0.28, delay: 0.35 + i * 0.08 });
-      });
+      this._sfxHarvestPop(t, v, 0, 0.85);
+      [0.12, 0.2, 0.28, 0.36].forEach((d) => this._sfxHarvestPop(t, v * 0.7, d, 0.6));
     }
 
     _sfxHarvestTick(t, v) {
-      this._tone(t, { f: 260, f2: 180, dur: 0.035, type: 'sine', volume: v });
-      this._noise(t, { dur: 0.025, volume: v * 0.6, freq: 900, delay: 0.005 });
+      this._tone(t, { f: 240, f2: 155, dur: 0.04, type: 'sine', volume: v * 1.1 });
+      this._noise(t, { dur: 0.02, volume: v * 0.5, freq: 1100, q: 1.2, delay: 0.004 });
     }
 
     _sfxBlight(t, v) {
