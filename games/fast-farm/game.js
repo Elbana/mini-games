@@ -136,7 +136,7 @@ function selectTool(tool) {
     btn.classList.toggle('selected', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  document.querySelectorAll('.plot-cell.tool-target').forEach((el) => el.classList.remove('tool-target'));
+  document.querySelectorAll('.plot-stack.tool-target').forEach((el) => el.classList.remove('tool-target'));
   if (tool) {
     highlightToolTargets(tool);
     const labels = {
@@ -152,7 +152,7 @@ function selectTool(tool) {
 function highlightToolTargets(tool) {
   (farm.plots || []).forEach((plot, i) => {
     if (canUseToolOnPlot(tool, plot).ok) {
-      document.querySelector(`.plot-cell[data-plot="${i}"]`)?.classList.add('tool-target');
+      document.querySelector(`.plot-cell[data-plot="${i}"] .plot-stack`)?.classList.add('tool-target');
     }
   });
 }
@@ -241,16 +241,17 @@ function getPlotVisualAnchor(plotIndex) {
   const plotCell = document.querySelector(`.plot-cell[data-plot="${plotIndex}"]`);
   if (!plotCell) return null;
 
+  const mound = plotCell.querySelector('.plot-mound');
   const sprite = plotCell.querySelector('.crop-sprite');
-  const cropBox = plotCell.querySelector('.plot-crop');
-  const stack = plotCell.querySelector('.plot-stack');
-  const anchorEl = sprite || cropBox || stack || plotCell;
+  const anchorEl = mound || sprite || plotCell.querySelector('.plot-crop') || plotCell.querySelector('.plot-stack');
+  if (!anchorEl) return null;
+
   const rect = anchorEl.getBoundingClientRect();
   if (rect.width <= 0 && rect.height <= 0) return null;
 
   return {
     cx: rect.left + rect.width * 0.5,
-    cy: rect.top + rect.height * 0.48,
+    cy: rect.top + rect.height * 0.44,
     width: rect.width,
     height: rect.height,
   };
@@ -300,12 +301,13 @@ function playToolUseAnimation(plotIndex, tool) {
     }
   }
 
-  plotCell.classList.add('tool-target');
+  const plotStack = plotCell.querySelector('.plot-stack');
+  plotStack?.classList.add('tool-target');
   return new Promise((resolve) => {
     setTimeout(() => {
       el.remove();
       particles.forEach((p) => p.remove());
-      plotCell.classList.remove('tool-target');
+      plotStack?.classList.remove('tool-target');
       resolve();
     }, tool === 'water' || tool === 'harvest' ? 900 : 820);
   });
@@ -703,6 +705,7 @@ function renderPlots() {
 
       return `<div class="${cls}" data-plot="${i}" role="gridcell">
         <div class="plot-stack">
+          <div class="plot-mound" aria-hidden="true"></div>
           <img class="plot-img" src="${plotBaseAsset(plot, seed)}" alt="" decoding="async">
           ${cropHtml}
           ${badge ? `<span class="plot-badge care">${badge}</span>` : ''}

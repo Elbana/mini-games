@@ -401,6 +401,38 @@ html, body {
   pointer-events: auto;
 }
 
+/* Visible tilled mound — tool highlight + FX anchor */
+.plot-mound {
+  position: absolute;
+  left: 10%;
+  width: 80%;
+  top: 28%;
+  height: 50%;
+  z-index: 4;
+  border: 2px dashed transparent;
+  border-radius: 46% 46% 52% 52% / 42% 42% 58% 58%;
+  pointer-events: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.plot-stack.tool-target .plot-mound {
+  border-color: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 14px rgba(255, 220, 100, 0.28);
+}
+
+.plot-cell:nth-child(n+4):nth-child(-n+6) .plot-mound {
+  top: 26%;
+  height: 48%;
+}
+
+.plot-cell:nth-child(n+7) .plot-mound {
+  top: 24%;
+  height: 46%;
+}
+
 .plot-cell:nth-child(n+4):nth-child(-n+6) .plot-stack {
   transform: translateY(-22%);
 }
@@ -802,11 +834,6 @@ html, body {
   0% { opacity: 0; transform: translate(-50%, -20%) scale(0.5) rotate(-20deg); }
   30% { opacity: 1; transform: translate(-50%, -48%) scale(1) rotate(12deg); }
   100% { opacity: 0; transform: translate(-50%, -35%) scale(0.75) rotate(-8deg); }
-}
-
-.plot-cell.tool-target {
-  outline: 2px dashed rgba(255, 255, 255, 0.45);
-  outline-offset: -2px;
 }
 
 /* Toasts — pinned under top bar, stack downward, never over plots */
