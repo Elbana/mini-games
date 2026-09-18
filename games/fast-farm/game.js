@@ -12,16 +12,6 @@ let actionBusy = false;
 let skipPlotRender = false;
 let lastPlotsJson = '';
 const FARM_TICK_MS = 1500;
-const MARKET_TO_SEED = {
-  crop_carrot: 'carrot',
-  crop_potato: 'potato',
-  crop_beans: 'beans',
-  crop_corn: 'corn',
-  crop_cabbage: 'cabbage',
-  crop_berry: 'berry',
-  crop_pumpkin: 'pumpkin',
-  crop_mushroom: 'mushroom',
-};
 
 document.addEventListener('DOMContentLoaded', init);
 
