@@ -34,6 +34,7 @@ async function init() {
   if (cfg.careRules) careRules = cfg.careRules;
 
   setupFarmToast();
+  buildCropStack();
   bindUi();
   await refreshFarm();
   await refreshWallet();
@@ -79,7 +80,6 @@ function setupFarmToast() {
 }
 
 function bindUi() {
-  document.getElementById('btn-harvest').addEventListener('click', openBackpack);
   document.querySelectorAll('[data-close]').forEach((el) => {
     el.addEventListener('click', () => closeSheet(el.dataset.close));
   });
@@ -187,30 +187,116 @@ function defaultPlots() {
   }));
 }
 
+function orderedSeeds() {
+  return [...seedList].sort((a, b) => a.price - b.price);
+}
+
+function buildCropStack() {
+  const stack = document.getElementById('farm-crop-stack');
+  if (!stack) return;
+  stack.innerHTML = orderedSeeds()
+    .map((seed) => {
+      const itemId = seed.marketItem;
+      return `<div class="crop-stack-row" data-item="${itemId}" id="crop-row-${itemId}">
+        <img class="crop-stack-icon" src="${assetIcon(seed.assets.icon)}" alt="${seed.name}">
+        <span class="crop-stack-count" id="count-${itemId}" data-value="0">0</span>
+      </div>`;
+    })
+    .join('');
+}
+
+function setCropCount(itemId, count, animate = false) {
+  const el = document.getElementById(`count-${itemId}`);
+  const row = document.getElementById(`crop-row-${itemId}`);
+  if (!el) return;
+
+  const next = Math.max(0, Number(count) || 0);
+  const prev = Number(el.dataset.value || 0);
+  row?.classList.toggle('has-stock', next > 0);
+
+  if (animate && next > prev) {
+    el.classList.remove('count-bump');
+    void el.offsetWidth;
+    el.classList.add('count-bump');
+    animateCountRoll(el, prev, next);
+    row?.classList.remove('crop-stack-pop');
+    void row?.offsetWidth;
+    row?.classList.add('crop-stack-pop');
+  } else {
+    el.textContent = String(next);
+  }
+  el.dataset.value = String(next);
+}
+
+function animateCountRoll(el, from, to) {
+  const start = performance.now();
+  const duration = 420;
+  function tick(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - (1 - t) ** 3;
+    el.textContent = String(Math.round(from + (to - from) * eased));
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = String(to);
+  }
+  requestAnimationFrame(tick);
+}
+
 function renderHud() {
   const inv = farm.inventory || {};
-  const entries = Object.entries(inv).filter(([, qty]) => qty > 0);
-  const total = entries.reduce((s, [, n]) => s + n, 0);
-  const chip = document.getElementById('btn-harvest');
-  const chipText = document.getElementById('harvest-chip-text');
-
-  if (total > 0) {
-    chip.classList.remove('hidden');
-    const top = entries
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 2)
-      .map(([itemId, qty]) => {
-        const seed = seeds[MARKET_TO_SEED[itemId]];
-        return seed ? `${seed.name} ×${qty}` : `×${qty}`;
-      });
-    const extra = entries.length > 2 ? ` +${entries.length - 2}` : '';
-    chipText.textContent = top.join(' · ') + extra;
-  } else {
-    chip.classList.add('hidden');
+  for (const seed of orderedSeeds()) {
+    setCropCount(seed.marketItem, inv[seed.marketItem] || 0, false);
   }
+}
 
-  document.getElementById('backpack-count').textContent =
-    total > 0 ? `${total} crops harvested — sell in Hub` : '0 crops harvested';
+function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal') {
+  const plotCell = document.querySelector(`.plot-cell[data-plot="${plotIndex}"]`);
+  const targetRow = document.getElementById(`crop-row-${itemId}`);
+  const iconEl = targetRow?.querySelector('.crop-stack-icon');
+  const layer = document.getElementById('fx-layer');
+  if (!plotCell || !targetRow || !iconEl || !layer) return Promise.resolve();
+
+  const from = plotCell.getBoundingClientRect();
+  const to = targetRow.getBoundingClientRect();
+  const iconSrc = iconEl.src;
+  const flies = Math.min(Math.max(amount, 1), tier === 'jackpot' ? 10 : tier === 'great' ? 7 : 5);
+  const isJackpot = tier === 'jackpot' || tier === 'great';
+
+  const tasks = [];
+  for (let i = 0; i < flies; i++) {
+    tasks.push(
+      new Promise((resolve) => {
+        const el = document.createElement('img');
+        el.className = `harvest-fly${isJackpot ? ' jackpot' : ''}`;
+        el.src = iconSrc;
+        el.alt = '';
+        const sx = from.left + from.width * 0.5 + (Math.random() - 0.5) * 36;
+        const sy = from.top + from.height * 0.42 + (Math.random() - 0.5) * 20;
+        const tx = to.left + to.width * 0.22;
+        const ty = to.top + to.height * 0.5;
+        el.style.transform = `translate(${sx}px, ${sy}px) scale(0.35)`;
+        el.style.opacity = '0';
+        layer.appendChild(el);
+
+        const delay = i * 55;
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            el.style.transition =
+              'transform 0.72s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.72s ease';
+            el.style.opacity = '1';
+            el.style.transform = `translate(${tx}px, ${ty}px) scale(${isJackpot ? 1.05 : 0.9})`;
+          });
+          setTimeout(() => {
+            el.style.opacity = '0';
+            setTimeout(() => {
+              el.remove();
+              resolve();
+            }, 120);
+          }, 720);
+        }, delay);
+      })
+    );
+  }
+  return Promise.all(tasks);
 }
 
 function plotIsReady(plot) {
@@ -466,8 +552,14 @@ async function runPlotAction(action, index, seedId) {
     }
     if (action === 'harvest') {
       const seed = seeds[farm.plots[index]?.seed_id];
+      const itemId = r.harvested?.itemId;
       const amt = r.harvested?.amount || 1;
-      const tier = r.harvested?.tier;
+      const tier = r.harvested?.tier || 'normal';
+      if (itemId && r.inventory) {
+        farm.inventory = r.inventory;
+        await playHarvestCollectAnimation(index, itemId, amt, tier);
+        setCropCount(itemId, r.inventory[itemId] || 0, true);
+      }
       const hype =
         tier === 'jackpot' ? '🎉 JACKPOT harvest!' :
         tier === 'great' ? '✨ Great haul!' :
@@ -484,39 +576,6 @@ async function runPlotAction(action, index, seedId) {
     await refreshWallet();
     await refreshFarm();
   }
-}
-
-async function openBackpack() {
-  renderBackpack();
-  document.getElementById('sheet-backpack').classList.remove('hidden');
-}
-
-function renderBackpack() {
-  const inv = farm.inventory || {};
-  const invEl = document.getElementById('tab-inventory');
-  const entries = Object.entries(inv).filter(([, qty]) => qty > 0);
-
-  if (!entries.length) {
-    invEl.innerHTML = `<div class="empty-backpack">
-      <div class="emoji">🌱</div>
-      <h3>Bag empty</h3>
-      <p>Grow crops, harvest, sell at Black Market — some days pay big!</p>
-    </div>`;
-    return;
-  }
-
-  invEl.innerHTML = `<div class="inv-grid">${entries
-    .map(([itemId, qty]) => {
-      const seedId = MARKET_TO_SEED[itemId];
-      const seed = seeds[seedId];
-      if (!seed) return '';
-      return `<div class="inv-card">
-        <span class="inv-qty">x${qty}</span>
-        <img src="${assetIcon(seed.assets.icon)}" alt="">
-        <span>${seed.name}</span>
-      </div>`;
-    })
-    .join('')}</div>`;
 }
 
 function closeSheet(id) {

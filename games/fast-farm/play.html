@@ -24,11 +24,8 @@
       <header class="farm-top-bar">
         <a class="farm-back-btn" id="btn-hub" href="/" aria-label="Back to hub">‹</a>
         <p class="farm-daily-mood" id="farm-daily-mood">🌤️ Loading farm mood…</p>
-        <button type="button" class="harvest-chip hidden" id="btn-harvest" aria-label="View harvest bag">
-          <span class="harvest-chip-icon">🎒</span>
-          <span id="harvest-chip-text">0 harvested</span>
-        </button>
       </header>
+      <div id="farm-crop-stack" class="farm-crop-stack" aria-label="Harvested crops"></div>
     </div>
 
     <div id="toast-zone" class="farm-toast-zone" aria-live="polite"></div>
@@ -45,21 +42,6 @@
       </div>
     </div>
 
-    <div id="sheet-backpack" class="farm-sheet hidden" role="dialog" aria-modal="true">
-      <div class="sheet-backdrop" data-close="sheet-backpack"></div>
-      <div class="sheet-panel sheet-backpack">
-        <div class="sheet-handle"></div>
-        <header class="sheet-header">
-          <div class="sheet-header-icon bag">🎒</div>
-          <div>
-            <h2>Harvest Bag</h2>
-            <p id="backpack-count">0 crops harvested</p>
-          </div>
-        </header>
-        <p class="market-hint">Sell at the <strong>Black Market Exchange</strong> — open from the Hub (new tab)</p>
-        <div id="tab-inventory" class="sheet-tab-panel"></div>
-      </div>
-    </div>
   </div>
 </body>
 </html>
