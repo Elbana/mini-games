@@ -218,9 +218,8 @@ function setCropCount(itemId, count, animate = false) {
   el.dataset.value = String(next);
 }
 
-function animateCountRoll(el, from, to) {
+function animateCountRoll(el, from, to, duration = 280) {
   const start = performance.now();
-  const duration = 420;
   function tick(now) {
     const t = Math.min(1, (now - start) / duration);
     const eased = 1 - (1 - t) ** 3;
@@ -231,6 +230,31 @@ function animateCountRoll(el, from, to) {
   requestAnimationFrame(tick);
 }
 
+function bumpCountQuick(countEl, value, row) {
+  if (!countEl) return;
+  countEl.textContent = String(value);
+  countEl.dataset.value = String(value);
+  countEl.classList.remove('count-bump', 'count-tick');
+  void countEl.offsetWidth;
+  countEl.classList.add('count-tick');
+  row?.classList.add('crop-stack-pop');
+  setTimeout(() => row?.classList.remove('crop-stack-pop'), 320);
+}
+
+function easeOutBack(t) {
+  const c1 = 1.525;
+  const c3 = c1 + 1;
+  return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
+}
+
+function easeInQuad(t) {
+  return t * t;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
 function renderHud() {
   const inv = farm.inventory || {};
   for (const seed of orderedSeeds()) {
@@ -238,55 +262,149 @@ function renderHud() {
   }
 }
 
-function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal') {
+function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal', prevTotal = 0, newTotal = 0) {
   const plotCell = document.querySelector(`.plot-cell[data-plot="${plotIndex}"]`);
   const targetRow = document.getElementById(`crop-row-${itemId}`);
+  const countEl = document.getElementById(`count-${itemId}`);
   const iconEl = targetRow?.querySelector('.crop-stack-icon');
   const layer = document.getElementById('fx-layer');
-  if (!plotCell || !targetRow || !iconEl || !layer) return Promise.resolve();
+  if (!plotCell || !targetRow || !iconEl || !layer || !countEl) return Promise.resolve();
 
   const from = plotCell.getBoundingClientRect();
   const to = targetRow.getBoundingClientRect();
   const iconSrc = iconEl.src;
-  const flies = Math.min(Math.max(amount, 1), tier === 'jackpot' ? 10 : tier === 'great' ? 7 : 5);
+  const harvestAmt = Math.max(1, Math.round(amount));
+  const visualCount = Math.min(harvestAmt, tier === 'jackpot' ? 14 : tier === 'great' ? 12 : 10);
   const isJackpot = tier === 'jackpot' || tier === 'great';
 
-  const tasks = [];
-  for (let i = 0; i < flies; i++) {
-    tasks.push(
-      new Promise((resolve) => {
-        const el = document.createElement('img');
-        el.className = `harvest-fly${isJackpot ? ' jackpot' : ''}`;
-        el.src = iconSrc;
-        el.alt = '';
-        const sx = from.left + from.width * 0.5 + (Math.random() - 0.5) * 36;
-        const sy = from.top + from.height * 0.42 + (Math.random() - 0.5) * 20;
-        const tx = to.left + to.width * 0.22;
-        const ty = to.top + to.height * 0.5;
-        el.style.transform = `translate(${sx}px, ${sy}px) scale(0.35)`;
-        el.style.opacity = '0';
-        layer.appendChild(el);
+  const cx = from.left + from.width * 0.5;
+  const cy = from.top + from.height * 0.36;
+  const tx = to.left + to.width * 0.12;
+  const ty = to.top + to.height * 0.5;
+  const size = isJackpot ? 38 : 34;
 
-        const delay = i * 55;
-        setTimeout(() => {
-          requestAnimationFrame(() => {
-            el.style.transition =
-              'transform 0.72s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.72s ease';
-            el.style.opacity = '1';
-            el.style.transform = `translate(${tx}px, ${ty}px) scale(${isJackpot ? 1.05 : 0.9})`;
-          });
-          setTimeout(() => {
-            el.style.opacity = '0';
-            setTimeout(() => {
-              el.remove();
-              resolve();
-            }, 120);
-          }, 720);
-        }, delay);
-      })
-    );
+  const addPerLand = [];
+  let remaining = harvestAmt;
+  for (let i = 0; i < visualCount; i++) {
+    const slice = Math.ceil(remaining / (visualCount - i));
+    addPerLand.push(slice);
+    remaining -= slice;
   }
-  return Promise.all(tasks);
+
+  let runningCount = prevTotal;
+  setCropCount(itemId, prevTotal, false);
+
+  const plusFloat = document.createElement('div');
+  plusFloat.className = `harvest-float-plus${isJackpot ? ' jackpot' : ''}`;
+  plusFloat.textContent = `+${harvestAmt}`;
+  plusFloat.style.left = `${cx}px`;
+  plusFloat.style.top = `${cy - 28}px`;
+  layer.appendChild(plusFloat);
+
+  const burst = document.createElement('div');
+  burst.className = 'harvest-burst-ring';
+  burst.style.left = `${cx}px`;
+  burst.style.top = `${cy}px`;
+  layer.appendChild(burst);
+
+  const particles = [];
+  for (let i = 0; i < visualCount; i++) {
+    const angle = (Math.PI * 2 * i) / visualCount - Math.PI / 2 + (Math.random() - 0.5) * 0.25;
+    const spreadR = 38 + (i % 3) * 10;
+    const clusterX = cx + Math.cos(angle) * spreadR;
+    const clusterY = cy + Math.sin(angle) * spreadR * 0.72;
+    const el = document.createElement('img');
+    el.className = `harvest-fly${isJackpot ? ' jackpot' : ''}`;
+    el.src = iconSrc;
+    el.alt = '';
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    layer.appendChild(el);
+    particles.push({
+      el,
+      cx,
+      cy,
+      clusterX,
+      clusterY,
+      x: cx,
+      y: cy,
+      scale: 0,
+      opacity: 0,
+      landed: false,
+      landIndex: i,
+      rushOffset: i * 28,
+    });
+  }
+
+  const SPAWN_MS = 340;
+  const CLUSTER_MS = 220;
+  const RUSH_MS = 340;
+  const start = performance.now();
+
+  return new Promise((resolve) => {
+    function frame(now) {
+      const elapsed = now - start;
+
+      if (elapsed < SPAWN_MS) {
+        const t = elapsed / SPAWN_MS;
+        const e = easeOutBack(t);
+        for (const p of particles) {
+          p.x = lerp(p.cx, p.clusterX, e);
+          p.y = lerp(p.cy, p.clusterY, e);
+          p.scale = e * (isJackpot ? 1.15 : 1.05);
+          p.opacity = Math.min(1, t * 1.8);
+        }
+      } else if (elapsed < SPAWN_MS + CLUSTER_MS) {
+        const t = (elapsed - SPAWN_MS) / CLUSTER_MS;
+        const pulse = 1 + Math.sin(t * Math.PI * 2) * 0.06;
+        const pull = 0.55 + t * 0.35;
+        for (const p of particles) {
+          p.x = lerp(p.cx, p.clusterX, pull);
+          p.y = lerp(p.cy, p.clusterY, pull) - Math.sin(t * Math.PI) * 6;
+          p.scale = (isJackpot ? 1.12 : 1.02) * pulse;
+          p.opacity = 1;
+        }
+      } else {
+        const rushElapsed = elapsed - SPAWN_MS - CLUSTER_MS;
+        for (const p of particles) {
+          const localMs = Math.max(0, rushElapsed - p.rushOffset);
+          const lt = Math.min(1, localMs / RUSH_MS);
+          const e = easeInQuad(lt);
+          if (lt < 1) {
+            const arc = Math.sin(lt * Math.PI) * -18;
+            p.x = lerp(p.clusterX, tx, e);
+            p.y = lerp(p.clusterY, ty, e) + arc;
+            p.scale = lerp(isJackpot ? 1.1 : 1, 0.45, e);
+            p.opacity = lt > 0.88 ? 1 - (lt - 0.88) / 0.12 : 1;
+          } else if (!p.landed) {
+            p.landed = true;
+            p.opacity = 0;
+            runningCount += addPerLand[p.landIndex];
+            bumpCountQuick(countEl, runningCount, targetRow);
+            targetRow.classList.toggle('has-stock', runningCount > 0);
+          }
+        }
+      }
+
+      for (const p of particles) {
+        p.el.style.transform = `translate(${p.x - size / 2}px, ${p.y - size / 2}px) scale(${p.scale})`;
+        p.el.style.opacity = String(p.opacity);
+      }
+
+      if (elapsed < SPAWN_MS + CLUSTER_MS + RUSH_MS + visualCount * 28 + 180) {
+        requestAnimationFrame(frame);
+      } else {
+        particles.forEach((p) => p.el.remove());
+        plusFloat.remove();
+        burst.remove();
+        setCropCount(itemId, newTotal, false);
+        countEl.classList.add('count-bump');
+        targetRow.classList.add('crop-stack-pop');
+        resolve();
+      }
+    }
+    requestAnimationFrame(frame);
+  });
 }
 
 function plotIsReady(plot) {
@@ -546,9 +664,10 @@ async function runPlotAction(action, index, seedId) {
       const amt = r.harvested?.amount || 1;
       const tier = r.harvested?.tier || 'normal';
       if (itemId && r.inventory) {
+        const prevTotal = farm.inventory?.[itemId] || 0;
+        const newTotal = r.inventory[itemId] || 0;
         farm.inventory = r.inventory;
-        await playHarvestCollectAnimation(index, itemId, amt, tier);
-        setCropCount(itemId, r.inventory[itemId] || 0, true);
+        await playHarvestCollectAnimation(index, itemId, amt, tier, prevTotal, newTotal);
       }
       const hype =
         tier === 'jackpot' ? '🎉 JACKPOT harvest!' :
