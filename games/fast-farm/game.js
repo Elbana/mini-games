@@ -251,7 +251,7 @@ function getPlotVisualAnchor(plotIndex) {
 
   return {
     cx: rect.left + rect.width * 0.5,
-    cy: rect.top + rect.height * 0.44,
+    cy: rect.top + rect.height * 0.5,
     width: rect.width,
     height: rect.height,
   };

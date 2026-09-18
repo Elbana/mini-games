@@ -401,16 +401,16 @@ html, body {
   pointer-events: auto;
 }
 
-/* Visible tilled mound — tool highlight + FX anchor */
+/* Plot hit area — square highlight + tool FX anchor */
 .plot-mound {
   position: absolute;
-  left: 10%;
-  width: 80%;
-  top: 28%;
-  height: 50%;
+  left: 14%;
+  width: 72%;
+  top: 12%;
+  height: 54%;
   z-index: 4;
   border: 2px dashed transparent;
-  border-radius: 46% 46% 52% 52% / 42% 42% 58% 58%;
+  border-radius: 4px;
   pointer-events: none;
   box-sizing: border-box;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -418,19 +418,22 @@ html, body {
 
 .plot-stack.tool-target .plot-mound {
   border-color: rgba(255, 255, 255, 0.62);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.35),
-    0 0 14px rgba(255, 220, 100, 0.28);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.plot-cell:nth-child(-n+3) .plot-mound {
+  top: 10%;
+  height: 52%;
 }
 
 .plot-cell:nth-child(n+4):nth-child(-n+6) .plot-mound {
-  top: 26%;
-  height: 48%;
+  top: 8%;
+  height: 50%;
 }
 
 .plot-cell:nth-child(n+7) .plot-mound {
-  top: 24%;
-  height: 46%;
+  top: 6%;
+  height: 48%;
 }
 
 .plot-cell:nth-child(n+4):nth-child(-n+6) .plot-stack {
