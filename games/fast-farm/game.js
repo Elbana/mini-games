@@ -7,11 +7,21 @@ let walletBalance = 0;
 let careRules = { stepsToHarvest: 6, careWindowSec: 18 };
 let dailyMood = null;
 let activePlot = null;
+let activeTool = null;
 let tickTimer = null;
 let actionBusy = false;
 let skipPlotRender = false;
 let lastPlotsJson = '';
 const FARM_TICK_MS = 1500;
+
+const TOOL_FX = {
+  water: { emoji: '🪣', class: 'fx-water', particles: 'water' },
+  fertilize: { emoji: '🧴', class: 'fx-fertilize', particles: 'fert' },
+  heal: { emoji: '💊', class: 'fx-heal' },
+  harvest: { emoji: '🧺', class: 'fx-harvest' },
+  plant: { emoji: '🌱', class: 'fx-plant' },
+  clear: { emoji: '🧹', class: 'fx-clear' },
+};
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -74,12 +84,14 @@ function bindUi() {
     el.addEventListener('click', () => closeSheet(el.dataset.close));
   });
 
+  bindToolbar();
+
   const scene = document.getElementById('farm-scene');
   let lastPlotTapAt = 0;
 
   function tapPlotFromEvent(e, clientX, clientY) {
     if (actionBusy) return;
-    if (e.target?.closest?.('.farm-top-bar, .farm-sheet:not(.hidden)')) return;
+    if (e.target?.closest?.('.farm-top-bar, .farm-toolbar, .farm-sheet:not(.hidden)')) return;
 
     const now = Date.now();
     if (now - lastPlotTapAt < 100) return;
@@ -106,6 +118,183 @@ function bindUi() {
     },
     tapOpts
   );
+}
+
+function bindToolbar() {
+  document.querySelectorAll('.farm-tool[data-tool]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tool = btn.dataset.tool;
+      selectTool(activeTool === tool ? null : tool);
+    });
+  });
+}
+
+function selectTool(tool) {
+  activeTool = tool;
+  document.querySelectorAll('.farm-tool[data-tool]').forEach((btn) => {
+    const on = btn.dataset.tool === tool;
+    btn.classList.toggle('selected', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('.plot-cell.tool-target').forEach((el) => el.classList.remove('tool-target'));
+  if (tool) {
+    highlightToolTargets(tool);
+    const labels = {
+      water: 'Tap a thirsty plot to water',
+      fertilize: 'Tap a hungry plot to feed',
+      heal: 'Tap a sick or dead plot to heal',
+      harvest: 'Tap a ready plot to pick',
+      plant: 'Tap an empty plot to plant',
+      clear: 'Tap a dead plot to clear',
+    };
+    Arcade.toast(labels[tool] || 'Tap a plot');
+  }
+}
+
+function highlightToolTargets(tool) {
+  (farm.plots || []).forEach((plot, i) => {
+    if (canUseToolOnPlot(tool, plot).ok) {
+      document.querySelector(`.plot-cell[data-plot="${i}"]`)?.classList.add('tool-target');
+    }
+  });
+}
+
+function countPlotsNeedingTool(tool) {
+  return (farm.plots || []).filter((p) => canUseToolOnPlot(tool, p).ok).length;
+}
+
+function updateToolbarBadges() {
+  const counts = {
+    water: 0,
+    fertilize: 0,
+    heal: 0,
+    harvest: 0,
+  };
+  for (const plot of farm.plots || []) {
+    if (plot.ready || plot.state === 'ready') counts.harvest += 1;
+    else if (plot.state === 'dead') counts.heal += 1;
+    else if (careIsActive(plot)) {
+      const action = careActionForPlot(plot);
+      if (action === 'water') counts.water += 1;
+      else if (action === 'fertilize') counts.fertilize += 1;
+      else if (action === 'heal') counts.heal += 1;
+    }
+  }
+
+  document.querySelectorAll('.farm-tool[data-tool]').forEach((btn) => {
+    const tool = btn.dataset.tool;
+    const badge = btn.querySelector('.farm-tool-badge');
+    const n = counts[tool] || 0;
+    btn.classList.toggle('needs-attention', n > 0 && activeTool !== tool);
+    if (badge) {
+      badge.textContent = String(n);
+      badge.classList.toggle('hidden', n <= 0);
+    }
+  });
+
+  if (activeTool) highlightToolTargets(activeTool);
+}
+
+function canUseToolOnPlot(tool, plot) {
+  if (!plot) return { ok: false, msg: 'No plot' };
+
+  if (tool === 'plant') {
+    return plot.state === 'empty'
+      ? { ok: true }
+      : { ok: false, msg: 'That plot already has a crop — pick Plant only on empty soil' };
+  }
+
+  if (tool === 'clear') {
+    return plot.state === 'dead'
+      ? { ok: true }
+      : { ok: false, msg: 'Clear is only for dead plots' };
+  }
+
+  if (tool === 'harvest') {
+    return plot.ready || plot.state === 'ready'
+      ? { ok: true }
+      : { ok: false, msg: 'Nothing ready to pick here yet' };
+  }
+
+  if (tool === 'heal') {
+    if (plot.state === 'dead') return { ok: true };
+    if (careIsActive(plot) && careActionForPlot(plot) === 'heal') return { ok: true };
+    return { ok: false, msg: 'This crop does not need medicine' };
+  }
+
+  if (tool === 'water') {
+    if (plot.state === 'empty') return { ok: false, msg: 'Plant something first' };
+    if (plot.state === 'dead') return { ok: false, msg: 'Use Heal or Clear on dead plots' };
+    if (plot.ready || plot.state === 'ready') return { ok: false, msg: 'Ready to pick — use the basket' };
+    if (careIsActive(plot) && careActionForPlot(plot) === 'water') return { ok: true };
+    return { ok: false, msg: 'This plot does not need water right now' };
+  }
+
+  if (tool === 'fertilize') {
+    if (plot.state === 'empty') return { ok: false, msg: 'Plant something first' };
+    if (plot.state === 'dead') return { ok: false, msg: 'Use Heal or Clear on dead plots' };
+    if (plot.ready || plot.state === 'ready') return { ok: false, msg: 'Ready to pick — use the basket' };
+    if (careIsActive(plot) && careActionForPlot(plot) === 'fertilize') return { ok: true };
+    return { ok: false, msg: 'This plot does not need feed right now' };
+  }
+
+  return { ok: false, msg: 'Unknown tool' };
+}
+
+function playToolUseAnimation(plotIndex, tool) {
+  const plotCell = document.querySelector(`.plot-cell[data-plot="${plotIndex}"]`);
+  const layer = document.getElementById('fx-layer');
+  const cfg = TOOL_FX[tool];
+  if (!plotCell || !layer || !cfg) return Promise.resolve();
+
+  const rect = plotCell.getBoundingClientRect();
+  const cx = rect.left + rect.width * 0.5;
+  const cy = rect.top + rect.height * 0.32;
+
+  const el = document.createElement('div');
+  el.className = `farm-tool-fx ${cfg.class}`;
+  el.textContent = cfg.emoji;
+  el.style.left = `${cx}px`;
+  el.style.top = `${cy}px`;
+  layer.appendChild(el);
+
+  const particles = [];
+  if (cfg.particles === 'water') {
+    for (let i = 0; i < 7; i++) {
+      const drop = document.createElement('span');
+      drop.className = 'farm-tool-particle water-drop';
+      drop.textContent = '💧';
+      drop.style.left = `${cx + (Math.random() - 0.5) * 36}px`;
+      drop.style.top = `${cy + 8}px`;
+      drop.style.setProperty('--dx', `${(Math.random() - 0.5) * 18}px`);
+      drop.style.animationDelay = `${80 + i * 45}ms`;
+      layer.appendChild(drop);
+      particles.push(drop);
+    }
+  } else if (cfg.particles === 'fert') {
+    for (let i = 0; i < 6; i++) {
+      const spark = document.createElement('span');
+      spark.className = 'farm-tool-particle fert-spark';
+      spark.textContent = '✨';
+      spark.style.left = `${cx + (Math.random() - 0.5) * 40}px`;
+      spark.style.top = `${cy}px`;
+      spark.style.setProperty('--dx', `${(Math.random() - 0.5) * 24}px`);
+      spark.style.setProperty('--dy', `${12 + Math.random() * 22}px`);
+      spark.style.animationDelay = `${60 + i * 40}ms`;
+      layer.appendChild(spark);
+      particles.push(spark);
+    }
+  }
+
+  plotCell.classList.add('tool-target');
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      el.remove();
+      particles.forEach((p) => p.remove());
+      plotCell.classList.remove('tool-target');
+      resolve();
+    }, tool === 'water' || tool === 'harvest' ? 900 : 820);
+  });
 }
 
 function assetSeed(name) {
@@ -153,6 +342,7 @@ async function refreshFarm() {
     lastPlotsJson = plotsJson;
     renderPlots();
   }
+  updateToolbarBadges();
   if (activePlot != null && !document.getElementById('sheet-plot').classList.contains('hidden')) {
     openPlotSheet(activePlot, false);
   }
@@ -513,40 +703,35 @@ async function handlePlotTap(index) {
   const plot = farm.plots[index];
   if (!plot) return;
 
-  if (plot.state === 'empty') {
+  if (!activeTool) {
+    if (plot.state === 'empty') {
+      selectTool('plant');
+      openPlotSheet(index);
+      return;
+    }
+    Arcade.toast('Pick a tool from the bar below');
+    return;
+  }
+
+  const check = canUseToolOnPlot(activeTool, plot);
+  if (!check.ok) {
+    Arcade.toast(check.msg, 'lose');
+    return;
+  }
+
+  if (activeTool === 'plant') {
     openPlotSheet(index);
     return;
   }
 
-  if (plot.ready || plot.state === 'ready') {
-    await runPlotAction('harvest', index);
-    return;
-  }
+  await applyToolToPlot(activeTool, index);
+}
 
-  if (plot.state === 'dead') {
-    openPlotSheet(index);
-    return;
-  }
-
-  if (careIsActive(plot)) {
-    const action = careActionForPlot(plot);
-    if (action === 'water') {
-      await runPlotAction('water', index);
-      return;
-    }
-    if (action === 'fertilize') {
-      await runPlotAction('fertilize', index);
-      return;
-    }
-    if (action === 'heal') {
-      await runPlotAction('heal', index);
-      return;
-    }
-    openPlotSheet(index);
-    return;
-  }
-
-  /* Growing plot with no care needed — progress is visible on the plot; ignore mis-taps */
+async function applyToolToPlot(tool, index, seedId) {
+  if (actionBusy) return;
+  actionBusy = true;
+  await playToolUseAnimation(index, tool);
+  await runPlotAction(tool, index, seedId, true, true);
 }
 
 async function openPlotSheet(index, show = true) {
@@ -573,7 +758,14 @@ async function openPlotSheet(index, show = true) {
 
   body.querySelectorAll('[data-action]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      runPlotAction(btn.dataset.action, index, btn.dataset.seed);
+      const action = btn.dataset.action;
+      if (action === 'plant') {
+        selectTool('plant');
+        applyToolToPlot('plant', index, btn.dataset.seed);
+        return;
+      }
+      selectTool(action);
+      applyToolToPlot(action, index);
     });
   });
 
@@ -645,14 +837,17 @@ function buildPlotSheetContent(plot, seed) {
   return html;
 }
 
-async function runPlotAction(action, index, seedId) {
-  if (actionBusy) return;
-  actionBusy = true;
+async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy = false) {
+  if (!keepBusy) {
+    if (actionBusy) return;
+    actionBusy = true;
+  }
   skipPlotRender = true;
 
   try {
     if (action === 'plant') {
       if (!seedId) return;
+      if (!skipToolFx) await playToolUseAnimation(index, 'plant');
       await Arcade.post('/api/fast-farm/buy-seed', { seed_id: seedId, plot_index: index });
       Arcade.toast('🌱 Planted!', 'win');
       closeSheet('sheet-plot');

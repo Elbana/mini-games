@@ -177,8 +177,9 @@ html[data-arcade-embed='1'] .board {
 /* Fast Farm — absolute layout (not flex column), plots above UI chrome */
 html[data-arcade-embed='1'] .farm-screen {
   display: block !important;
-  --field-top: clamp(46%, 48vh, 52%);
-  --field-bottom: clamp(1%, 1vh, 2%);
+  --toolbar-h: clamp(88px, 13vh, 102px);
+  --field-top: clamp(34%, 38vh, 42%);
+  --field-bottom: calc(var(--toolbar-h) + max(4px, env(safe-area-inset-bottom, 4px)));
   --field-side: clamp(2%, 2vw, 4%);
   touch-action: manipulation;
 }

@@ -26,6 +26,37 @@
         <p class="farm-daily-mood" id="farm-daily-mood">🌤️ Loading farm mood…</p>
       </header>
       <div id="farm-crop-stack" class="farm-crop-stack" aria-label="Harvested crops"></div>
+
+      <nav id="farm-toolbar" class="farm-toolbar" aria-label="Farm tools">
+        <button type="button" class="farm-tool" data-tool="water" aria-pressed="false" aria-label="Watering can">
+          <span class="farm-tool-icon" aria-hidden="true">🪣</span>
+          <span class="farm-tool-label">Water</span>
+          <span class="farm-tool-badge hidden" data-badge="water">0</span>
+        </button>
+        <button type="button" class="farm-tool" data-tool="fertilize" aria-pressed="false" aria-label="Fertilizer">
+          <span class="farm-tool-icon" aria-hidden="true">🧴</span>
+          <span class="farm-tool-label">Feed</span>
+          <span class="farm-tool-badge hidden" data-badge="fertilize">0</span>
+        </button>
+        <button type="button" class="farm-tool" data-tool="heal" aria-pressed="false" aria-label="Medicine">
+          <span class="farm-tool-icon" aria-hidden="true">💊</span>
+          <span class="farm-tool-label">Heal</span>
+          <span class="farm-tool-badge hidden" data-badge="heal">0</span>
+        </button>
+        <button type="button" class="farm-tool" data-tool="harvest" aria-pressed="false" aria-label="Harvest basket">
+          <span class="farm-tool-icon" aria-hidden="true">🧺</span>
+          <span class="farm-tool-label">Pick</span>
+          <span class="farm-tool-badge hidden" data-badge="harvest">0</span>
+        </button>
+        <button type="button" class="farm-tool" data-tool="plant" aria-pressed="false" aria-label="Plant seeds">
+          <span class="farm-tool-icon" aria-hidden="true">🌱</span>
+          <span class="farm-tool-label">Plant</span>
+        </button>
+        <button type="button" class="farm-tool" data-tool="clear" aria-pressed="false" aria-label="Clear plot">
+          <span class="farm-tool-icon" aria-hidden="true">🧹</span>
+          <span class="farm-tool-label">Clear</span>
+        </button>
+      </nav>
     </div>
 
     <div id="toast-zone" class="farm-toast-zone" aria-live="polite"></div>

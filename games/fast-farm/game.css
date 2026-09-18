@@ -9,8 +9,9 @@ html, body {
 }
 
 .farm-screen {
-  --field-top: clamp(38%, 42vh, 46%);
-  --field-bottom: clamp(0.5%, 1vh, 2%);
+  --toolbar-h: clamp(92px, 14vh, 108px);
+  --field-top: clamp(34%, 38vh, 42%);
+  --field-bottom: calc(var(--toolbar-h) + max(6px, env(safe-area-inset-bottom, 6px)));
   --field-side: clamp(0.5%, 1vw, 2%);
   position: relative;
   width: 100%;
@@ -614,70 +615,202 @@ html, body {
   background: linear-gradient(180deg, #5d4037, rgba(93, 64, 55, 0.3));
 }
 
-/* Bottom action bar */
-.farm-bottom-bar {
+/* Bottom tool bar — pick a tool, then tap a plot */
+.farm-toolbar {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 14;
   display: flex;
   justify-content: space-evenly;
-  padding: 0 24px max(16px, env(safe-area-inset-bottom, 16px));
+  align-items: flex-end;
+  gap: 2px;
+  padding: 8px 6px max(8px, env(safe-area-inset-bottom, 8px));
   pointer-events: auto;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(8, 18, 10, 0.42) 28%,
+    rgba(6, 14, 8, 0.72) 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.farm-action-btn {
+.farm-tool {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  max-width: 58px;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.farm-action-emoji {
+.farm-tool-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: clamp(44px, 11vw, 52px);
+  height: clamp(44px, 11vw, 52px);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  font-size: 1.75rem;
-  border: 3px solid var(--action-color, #4caf50);
-  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--action-color) 30%, transparent);
+  background: rgba(0, 0, 0, 0.38);
+  font-size: clamp(1.35rem, 4.2vw, 1.55rem);
+  line-height: 1;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.farm-action-btn[data-color="green"] { --action-color: #4caf50; }
-.farm-action-btn[data-color="orange"] { --action-color: #ff9800; }
-.farm-action-btn[data-color="gold"] { --action-color: #ffd700; }
-
-.farm-action-label {
-  color: #fff;
-  font-size: 0.875rem;
+.farm-tool-label {
+  color: rgba(255, 255, 255, 0.92);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: clamp(0.58rem, 2.2vw, 0.68rem);
   font-weight: 700;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
 }
 
-.farm-action-badge {
+.farm-tool[data-tool="water"] { --tool-color: #42a5f5; }
+.farm-tool[data-tool="fertilize"] { --tool-color: #66bb6a; }
+.farm-tool[data-tool="heal"] { --tool-color: #ef5350; }
+.farm-tool[data-tool="harvest"] { --tool-color: #ffd54f; }
+.farm-tool[data-tool="plant"] { --tool-color: #aed581; }
+.farm-tool[data-tool="clear"] { --tool-color: #bdbdbd; }
+
+.farm-tool.selected .farm-tool-icon {
+  border-color: var(--tool-color, #fff);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.35),
+    0 0 14px color-mix(in srgb, var(--tool-color) 55%, transparent);
+  transform: scale(1.08);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.farm-tool.needs-attention:not(.selected) .farm-tool-icon {
+  border-color: color-mix(in srgb, var(--tool-color) 70%, #fff);
+  animation: tool-attention 1.1s ease-in-out infinite;
+}
+
+@keyframes tool-attention {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.farm-tool-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 22px;
-  padding: 4px 8px;
-  border-radius: 12px;
+  top: -2px;
+  right: 2px;
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 10px;
   background: linear-gradient(135deg, #e53935, #ef5350);
-  border: 2px solid #fff;
+  border: 1.5px solid #fff;
   color: #fff;
-  font-size: 0.875rem;
+  font-size: 0.65rem;
   font-weight: 800;
-  box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
+  line-height: 1.1;
 }
 
-.farm-action-badge.hidden { display: none; }
+.farm-tool-badge.hidden { display: none; }
+
+/* Tool-use FX over plots */
+.farm-tool-fx {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+  font-size: clamp(2.4rem, 9vw, 3.2rem);
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45));
+  will-change: transform, opacity;
+}
+
+.farm-tool-fx.fx-water { animation: fx-water-can 0.9s ease forwards; }
+.farm-tool-fx.fx-fertilize { animation: fx-fertilize 0.85s ease forwards; }
+.farm-tool-fx.fx-heal { animation: fx-heal 0.85s ease forwards; }
+.farm-tool-fx.fx-harvest { animation: fx-harvest 0.9s ease forwards; }
+.farm-tool-fx.fx-plant { animation: fx-plant 0.85s ease forwards; }
+.farm-tool-fx.fx-clear { animation: fx-clear 0.8s ease forwards; }
+
+.farm-tool-particle {
+  position: fixed;
+  z-index: 54;
+  pointer-events: none;
+  font-size: 1rem;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+}
+
+.farm-tool-particle.water-drop {
+  animation: fx-water-drop 0.75s ease forwards;
+}
+
+.farm-tool-particle.fert-spark {
+  animation: fx-fert-spark 0.7s ease forwards;
+}
+
+@keyframes fx-water-can {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.5) rotate(-18deg); }
+  20% { opacity: 1; transform: translate(-50%, -55%) scale(1) rotate(-28deg); }
+  55% { transform: translate(-50%, -52%) scale(1.05) rotate(-32deg); }
+  100% { opacity: 0; transform: translate(-50%, -40%) scale(0.85) rotate(-12deg); }
+}
+
+@keyframes fx-water-drop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + 28px)) scale(0.7); }
+}
+
+@keyframes fx-fertilize {
+  0% { opacity: 0; transform: translate(-50%, -20%) scale(0.5) rotate(8deg); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-12deg); }
+  100% { opacity: 0; transform: translate(-50%, -35%) scale(0.8) rotate(6deg); }
+}
+
+@keyframes fx-fert-spark {
+  0% { opacity: 0; transform: translate(-50%, -50%); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 16px))); }
+}
+
+@keyframes fx-heal {
+  0% { opacity: 0; transform: translate(-50%, -20%) scale(0.4); }
+  30% { opacity: 1; transform: translate(-50%, -55%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -70%) scale(0.6); }
+}
+
+@keyframes fx-harvest {
+  0% { opacity: 0; transform: translate(-50%, -10%) scale(0.5); }
+  25% { opacity: 1; transform: translate(-50%, -48%) scale(1.05); }
+  60% { transform: translate(-50%, -44%) scale(1) rotate(-8deg); }
+  100% { opacity: 0; transform: translate(-50%, -20%) scale(0.7); }
+}
+
+@keyframes fx-plant {
+  0% { opacity: 0; transform: translate(-50%, -80%) scale(0.6); }
+  35% { opacity: 1; transform: translate(-50%, -45%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -30%) scale(0.5); }
+}
+
+@keyframes fx-clear {
+  0% { opacity: 0; transform: translate(-50%, -20%) scale(0.5) rotate(-20deg); }
+  30% { opacity: 1; transform: translate(-50%, -48%) scale(1) rotate(12deg); }
+  100% { opacity: 0; transform: translate(-50%, -35%) scale(0.75) rotate(-8deg); }
+}
+
+.plot-cell.tool-target {
+  outline: 2px dashed rgba(255, 255, 255, 0.45);
+  outline-offset: -2px;
+}
 
 /* Toasts — pinned under top bar, stack downward, never over plots */
 .farm-toast-zone {
@@ -1365,13 +1498,20 @@ html, body {
 }
 
 @media (max-height: 640px) {
-  .farm-screen { --field-top: 36%; }
+  .farm-screen {
+    --field-top: 32%;
+    --toolbar-h: 86px;
+  }
   .plot-cell:nth-child(n+4):nth-child(-n+6) .plot-stack { transform: translateY(-18%); }
   .plot-cell:nth-child(n+7) .plot-stack { transform: translateY(-34%); }
 }
 
 @media (min-height: 820px) {
-  .farm-screen { --field-top: 44%; }
+  .farm-screen { --field-top: 40%; }
+}
+
+@media (max-width: 430px) {
+  .farm-screen { --field-top: clamp(32%, 36vh, 38%); }
 }
 
 @media (max-width: 360px) {
