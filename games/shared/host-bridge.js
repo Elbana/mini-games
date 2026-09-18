@@ -4,7 +4,7 @@
  */
 (function initArcadeHostBridge() {
   function notifyHost(event) {
-    if (window.__arcadePaused || document.visibilityState !== 'visible') return;
+    if (window.__arcadePaused) return;
 
     const payload = JSON.stringify({
       source: 'arcade-games',

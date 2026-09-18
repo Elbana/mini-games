@@ -241,6 +241,11 @@ async function init() {
     if (!qty || qty < 1) return;
     try {
       const r = await Arcade.post('/api/v1/market/sell', { itemId, qty });
+      window.gmNotifyWallet?.('win', {
+        balance: r.balance,
+        amount: r.total,
+        path: '/api/v1/market/sell',
+      });
       Arcade.toast(`+🪙 ${Arcade.formatCoins(r.total)} coins!`, 'win');
       balanceEl.textContent = Arcade.formatCoins(r.balance);
       marketData.inventory = r.inventory;
