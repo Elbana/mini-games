@@ -31,6 +31,9 @@ async function init() {
 
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/fishing/config');
+  if (config.dailyMood?.headline) {
+    document.getElementById('cast-hint').textContent = config.dailyMood.headline;
+  }
   await refreshState();
   renderHelpPanel();
 
@@ -675,8 +678,9 @@ function showFightResult(r, cast) {
     document.getElementById('result-rank').style.color = r.fish.rankColor;
     document.getElementById('result-name').textContent = r.fish.name;
     const stars = '★'.repeat(r.fish.rankStars);
+    const qtyNote = r.catchQty > 1 ? ` ×${r.catchQty} double catch!` : '';
     document.getElementById('result-detail').textContent =
-      `${stars} ${r.fish.rankLabel} · ~🪙${Arcade.formatCoins(r.fish.sellBase)} at market`;
+      `${stars} ${r.fish.rankLabel} · ~🪙${Arcade.formatCoins(r.fish.sellBase)} at market${qtyNote}`;
     const grade =
       r.result.grade === 'perfect' ? 'Perfect reel!' : r.result.grade === 'good' ? 'Solid fight!' : 'You landed it!';
     document.getElementById('result-sub').textContent = grade;
@@ -688,15 +692,17 @@ function showFightResult(r, cast) {
   } else {
     card.className = 'result-card card lose';
     setResultIcon(null);
+    const misMsg = r.misfortune?.message;
+    const reason = misMsg ? (r.misfortune.type === 'line_snap' ? 'snapped' : 'escaped') : r.result.reason;
     document.getElementById('result-icon-fallback').textContent =
-      r.result.reason === 'snapped' ? '🪢' : '💨';
-    sounds?.play(r.result.reason === 'snapped' ? 'snap' : 'escape', { volume: 0.38 });
+      reason === 'snapped' ? '🪢' : '💨';
+    sounds?.play(reason === 'snapped' ? 'snap' : 'escape', { volume: 0.38 });
     document.getElementById('result-rank').textContent = 'Missed';
     document.getElementById('result-rank').style.color = '#ffb3c1';
     document.getElementById('result-name').textContent =
-      r.result.reason === 'snapped' ? 'Line snapped!' : 'Fish got away';
+      misMsg || (reason === 'snapped' ? 'Line snapped!' : 'Fish got away');
     document.getElementById('result-detail').textContent =
-      r.result.reason === 'snapped' ? 'You pulled too hard' : 'Too much slack on the line';
+      reason === 'snapped' ? 'Choppy luck today — reel again' : 'Almost had it — cast again';
     document.getElementById('result-sub').textContent = 'Try again — tap the sea to cast';
     document.getElementById('result-sell').classList.add('hidden');
   }

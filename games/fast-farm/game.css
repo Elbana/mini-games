@@ -76,6 +76,25 @@ html, body {
   pointer-events: auto;
 }
 
+.farm-daily-mood {
+  flex: 1;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+  text-align: center;
+  line-height: 1.25;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.farm-daily-mood.farm-mood-hot {
+  color: #ffe08a;
+}
+
+.farm-daily-mood.farm-mood-storm {
+  color: #ffb4b4;
+}
+
 .farm-back-btn {
   display: flex;
   align-items: center;

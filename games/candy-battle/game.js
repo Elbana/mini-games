@@ -49,6 +49,9 @@ async function init() {
   manifest = await fetch('/candy-battle/assets/manifest.json').then((r) => r.json());
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/candy-battle/config');
+  if (config.dailyMood?.headline) {
+    document.getElementById('lobby-title').textContent = config.dailyMood.headline;
+  }
   await refreshState();
   buildTierPicker();
   buildLevelPicker();

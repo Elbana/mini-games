@@ -14,6 +14,11 @@ import {
 } from '../games/fishing-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
+import { rollFishingMisfortune } from '../economy/unfair-loss.mjs';
+import {
+  getDailyFishingMood,
+  rollFishingDoubleCatch,
+} from '../economy/daily-variance.mjs';
 
 const SLUG = 'fishing';
 
@@ -22,6 +27,7 @@ export function handleGetFishingConfig(_req, res) {
     baits: BAIT_TABLE,
     fish: FISH_TABLE,
     ranks: FISH_RANKS,
+    dailyMood: getDailyFishingMood(),
   });
 }
 
@@ -94,10 +100,11 @@ export async function handleCast(req, res) {
   }
   session.arcade.fishing.baitStock[bait.id] -= 1;
   session.arcade.fishing.selectedBait = bait.id;
-  const cast = createCastSession({ x, y, baitId: bait.id });
+  const dailyMood = getDailyFishingMood();
+  const cast = createCastSession({ x, y, baitId: bait.id, dailyTierBoost: dailyMood.tierBoost });
   session.arcade.pendingCast = cast;
   savePlayerData(ctx, session);
-  res.json({ cast, gear: session.arcade.fishing });
+  res.json({ cast, gear: session.arcade.fishing, dailyMood });
 }
 
 export function handleReel(req, res) {
@@ -112,30 +119,42 @@ export function handleReel(req, res) {
   }
 
   const prog = Number(progress) || 0;
-  const won = prog >= 0.98 || outcome === 'caught';
+  let won = prog >= 0.98 || outcome === 'caught';
   const failReason = outcome === 'snapped' ? 'snapped' : 'escaped';
   const result = evaluateFight(cast, { won, greenRatio, failReason });
+  const dailyMood = getDailyFishingMood();
+  let misfortune = null;
+  let catchQty = 1;
 
   session.arcade.pendingCast = null;
   let fish = null;
 
   if (won) {
-    fish = resolveCatchFish(cast);
-    addInventory(session, fish.id, 1);
-    session.arcade.stats.fishCaught += 1;
-    addScore(SLUG, ctx.playerId, ctx.playerId, result.grade === 'perfect' ? 30 : 15, {
-      win: result.grade === 'perfect',
-    });
+    misfortune = rollFishingMisfortune(result, dailyMood.misfortuneMult);
+    if (misfortune) {
+      won = false;
+    } else {
+      fish = resolveCatchFish(cast, dailyMood);
+      catchQty = rollFishingDoubleCatch(dailyMood) ? 2 : 1;
+      addInventory(session, fish.id, catchQty);
+      session.arcade.stats.fishCaught += catchQty;
+      addScore(SLUG, ctx.playerId, ctx.playerId, result.grade === 'perfect' ? 30 : 15, {
+        win: result.grade === 'perfect',
+      });
+    }
   }
 
   savePlayerData(ctx, session);
   res.json({
     result,
     won,
+    misfortune,
+    catchQty: won ? catchQty : 0,
     fish: fish ? fishMeta(fish) : null,
     tierKey: cast.tierKey,
     tierLabel: cast.tierLabel,
     baitId: cast.baitId,
     inventory: session.arcade.inventory,
+    dailyMood,
   });
 }

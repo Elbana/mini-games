@@ -117,18 +117,19 @@ export function pickFishForTier(tierKey) {
   return pool[pool.length - 1];
 }
 
-export function rollMythicCatch(baitId) {
+export function rollMythicCatch(baitId, mythicMult = 1) {
   const bait = getBaitById(baitId);
   let chance = 0.002;
   if (bait.id === 'bait_lure') chance = 0.006;
   if (bait.id === 'bait_golden') chance = 0.018;
+  chance *= Math.max(0.5, mythicMult);
   if (Math.random() < chance) return FISH_TABLE.find((f) => f.mythic);
   return null;
 }
 
-export function createCastSession({ x = 0.5, y = 0.5, baitId = 'bait_worm' } = {}) {
+export function createCastSession({ x = 0.5, y = 0.5, baitId = 'bait_worm', dailyTierBoost = 0 } = {}) {
   const bait = getBaitById(baitId);
-  const tierKey = rollFightTier(bait.tierBoost);
+  const tierKey = rollFightTier(bait.tierBoost + dailyTierBoost);
   const tier = FIGHT_TIERS[tierKey];
   const fish = pickFishForTier(tierKey);
   const biteDelay = 3500 + Math.floor(Math.random() * 4500);
@@ -161,9 +162,15 @@ export function evaluateFight(_session, { won, greenRatio = 0, failReason = 'esc
   return { grade: 'miss', accuracy: g };
 }
 
-export function resolveCatchFish(cast) {
-  const mythic = rollMythicCatch(cast.baitId);
+export function resolveCatchFish(cast, dailyMood = null) {
+  const mythic = rollMythicCatch(cast.baitId, dailyMood?.mythicMult ?? 1);
   if (mythic) return mythic;
+  if (dailyMood?.tierBoost > 0 && Math.random() < dailyMood.tierBoost * 0.35) {
+    const upgraded = pickFishForTier(
+      cast.tierKey === 'common' ? 'nice' : cast.tierKey === 'nice' ? 'big' : cast.tierKey,
+    );
+    if (upgraded) return upgraded;
+  }
   return getFishById(cast.fishId);
 }
 

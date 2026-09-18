@@ -8,16 +8,16 @@ import {
   damageFromMatch,
   rollMonsterAttack,
   rollBonusCandies,
-  rollRewardQty,
 } from '../games/candy-battle-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
 import { rollCandyMisfortune } from '../economy/unfair-loss.mjs';
+import { getDailyCandyMood, rollCandyRewardQty } from '../economy/daily-variance.mjs';
 
 const SLUG = 'candy-battle';
 
 export function handleGetCandyConfig(_req, res) {
-  res.json({ tiers: CANDY_TIERS, monsters: MONSTERS });
+  res.json({ tiers: CANDY_TIERS, monsters: MONSTERS, dailyMood: getDailyCandyMood() });
 }
 
 export function handleGetCandyState(req, res) {
@@ -157,17 +157,19 @@ export async function handleCandyTurn(req, res) {
   let monsterAttack = 0;
   let rewards = [];
 
+  const candyMood = getDailyCandyMood();
+
   if (fight.monsterHp <= 0) {
     won = true;
     fight.active = false;
     const tier = CANDY_TIERS[tierId];
-    const qty = rollRewardQty(tier);
+    const qty = rollCandyRewardQty(tier, candyMood);
     addInventory(session, tier.rewardItem, qty);
     rewards.push({ itemId: tier.rewardItem, qty });
     session.arcade.stats.candyWins += 1;
     addScore(SLUG, ctx.playerId, ctx.playerId, qty * 20, { win: true });
   } else {
-    const misfortune = rollCandyMisfortune();
+    const misfortune = rollCandyMisfortune(candyMood.misfortuneMult);
     if (misfortune?.instantLoss) {
       fight.playerHp = 0;
       lost = true;
@@ -195,6 +197,9 @@ export async function handleCandyTurn(req, res) {
     }
     fight.playerHp = Math.max(0, fight.playerHp - monsterAttack);
     bonusCandies = rollBonusCandies(monster);
+    if (bonusCandies < 1 && Math.random() < candyMood.bonusBuyInChance) {
+      bonusCandies = 1 + Math.floor(Math.random() * 2);
+    }
     if (bonusCandies > 0) session.arcade.candyBuyIn[tierId] += bonusCandies;
     if (fight.playerHp <= 0) {
       lost = true;
@@ -267,11 +272,13 @@ export async function handleCandyMatch(req, res) {
   let monsterAttack = 0;
   let rewards = [];
 
+  const candyMood = getDailyCandyMood();
+
   if (fight.monsterHp <= 0) {
     won = true;
     fight.active = false;
     const tier = CANDY_TIERS[tierId];
-    const qty = rollRewardQty(tier);
+    const qty = rollCandyRewardQty(tier, candyMood);
     addInventory(session, tier.rewardItem, qty);
     rewards.push({ itemId: tier.rewardItem, qty });
     session.arcade.stats.candyWins += 1;

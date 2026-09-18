@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { MARKET_DIR } from '../config.mjs';
+import { getDailyMarketBrief, getDailyMarketMultiplier } from './daily-variance.mjs';
 
 /** @type {Record<string, { id: string, name: string, basePrice: number, category: string, icon: string }>} */
 export const MARKET_ITEMS = {
@@ -68,9 +69,10 @@ function recalcPrice(itemId, state) {
   const recent = pruneSales(state.salesLog[itemId] || []);
   state.salesLog[itemId] = recent;
   const volume = recent.reduce((sum, s) => sum + s.qty, 0);
-  const supplyPressure = Math.min(0.45, volume * 0.008);
-  const lowActivityBoost = volume < 5 ? 0.12 : volume < 20 ? 0.05 : 0;
-  const multiplier = 1 - supplyPressure + lowActivityBoost;
+  const supplyPressure = Math.min(0.32, volume * 0.006);
+  const lowActivityBoost = volume < 5 ? 0.14 : volume < 20 ? 0.06 : 0;
+  const dailyMult = getDailyMarketMultiplier(item.category, itemId);
+  const multiplier = (1 - supplyPressure + lowActivityBoost) * dailyMult;
   const price = Math.max(1, Math.round(item.basePrice * multiplier));
   state.prices[itemId] = price;
   return price;
@@ -86,7 +88,7 @@ export function getMarketSnapshot() {
     return { ...item, price, basePrice: item.basePrice, volume24h, trend };
   });
   saveState(state);
-  return { items, updatedAt: state.updatedAt };
+  return { items, updatedAt: state.updatedAt, dailyBrief: getDailyMarketBrief() };
 }
 
 export function recordSale(itemId, qty) {

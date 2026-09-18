@@ -1,4 +1,4 @@
-/** Fast Farm v6 — tiered economy (200–100k) + unfair blight losses. */
+/** Fast Farm v7 — chill care loops + daily harvest / market variance. */
 
 import {
   rollFarmBlightAfterCare,
@@ -7,6 +7,7 @@ import {
   cropHealCost,
   cropMarketBase,
 } from '../economy/unfair-loss.mjs';
+import { getDailyFarmMood } from '../economy/daily-variance.mjs';
 
 function tier(price, harvestAmount, id, name, marketItem, desc, assets) {
   return {
@@ -51,15 +52,12 @@ export const SEEDS = {
 };
 
 export const PLOT_COUNT = 9;
-export const CARE_STEPS_TO_HARVEST = 10;
-export const CARE_WINDOW_SEC = 6.5;
-export const WILT_GRACE_SEC = 3.5;
-export const DEAD_AFTER_WILT_SEC = 5;
+export const CARE_STEPS_TO_HARVEST = 6;
+export const CARE_WINDOW_SEC = 18;
+export const WILT_GRACE_SEC = 10;
+export const DEAD_AFTER_WILT_SEC = 14;
 
-export const CARE_SCHEDULE = [
-  'water', 'water', 'water', 'fertilize', 'water',
-  'water', 'sick', 'water', 'fertilize', 'water',
-];
+export const CARE_SCHEDULE = ['water', 'water', 'fertilize', 'water', 'sick', 'water'];
 
 export function careCostsForSeed(seedId) {
   const seed = SEEDS[seedId];
@@ -82,15 +80,15 @@ export function defaultPlots() {
 }
 
 export function createInitialFarm() {
-  return { version: 6, plots: defaultPlots() };
+  return { version: 7, plots: defaultPlots() };
 }
 
 export function normalizeFarm(raw) {
-  if (!raw?.plots?.length || raw.version !== 6) {
+  if (!raw?.plots?.length || (raw.version !== 6 && raw.version !== 7)) {
     return createInitialFarm();
   }
   const farm = {
-    version: 6,
+    version: 7,
     plots: raw.plots.map((p, i) => ({
       plot_index: p.plot_index ?? i,
       state: p.state === 'locked' ? 'empty' : (p.state ?? 'empty'),
@@ -156,7 +154,8 @@ export function applyGrowthState(plot, now = Date.now()) {
     return p;
   }
 
-  const tickBlight = rollFarmBlightTick(p, now);
+  const { blightMult } = getDailyFarmMood(new Date(now));
+  const tickBlight = rollFarmBlightTick(p, now, blightMult);
   if (tickBlight) return applyBlight(p, tickBlight, now);
   p.last_unfair_check = new Date(now).toISOString();
 
@@ -248,6 +247,7 @@ export function newPlantedPlot(plot, seedId, now = Date.now()) {
 }
 
 function advanceCare(plot, now = Date.now()) {
+  const { blightMult } = getDailyFarmMood(new Date(now));
   let next = {
     ...plot,
     care_step: (plot.care_step || 0) + 1,
@@ -257,7 +257,7 @@ function advanceCare(plot, now = Date.now()) {
     return { ...next, state: 'ready', care_due_at: null, care_type: null };
   }
   next = scheduleNextCare(next, now);
-  return applyBlight(next, rollFarmBlightAfterCare(), now);
+  return applyBlight(next, rollFarmBlightAfterCare(blightMult), now);
 }
 
 export function afterWater(plot, now = Date.now()) {

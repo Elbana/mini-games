@@ -25,6 +25,7 @@ import {
 } from '../games/fast-farm-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
+import { getDailyFarmMood, rollFarmHarvestYield } from '../economy/daily-variance.mjs';
 
 const SLUG = 'fast-farm';
 
@@ -58,6 +59,7 @@ function serializePlot(p, now = Date.now()) {
 
 function farmPayload(farm, session) {
   const now = Date.now();
+  const dailyMood = getDailyFarmMood(new Date(now));
   return {
     success: true,
     plots: farm.plots.map((p) => serializePlot(p, now)),
@@ -66,6 +68,7 @@ function farmPayload(farm, session) {
       stepsToHarvest: CARE_STEPS_TO_HARVEST,
       careWindowSec: CARE_WINDOW_SEC,
     },
+    dailyMood,
   };
 }
 
@@ -261,19 +264,34 @@ export function handleHarvest(req, res) {
     return res.status(400).json({ success: false, error: 'Nothing to harvest' });
   }
   if (!isReadyToHarvest(plot)) {
-    return res.status(400).json({ success: false, error: 'Crop is not ready — finish all 10 care rounds' });
+    return res.status(400).json({
+      success: false,
+      error: `Crop is not ready — finish all ${CARE_STEPS_TO_HARVEST} care rounds`,
+    });
   }
 
   const seed = SEEDS[plot.seed_id];
-  addInventory(session, seed.marketItem, seed.harvestAmount);
+  const harvestRoll = rollFarmHarvestYield({
+    plotIndex: plot_index,
+    seedId: plot.seed_id,
+    baseAmount: seed.harvestAmount,
+  });
+  addInventory(session, seed.marketItem, harvestRoll.amount);
   session.arcade.stats.farmHarvests += 1;
-  addScore(SLUG, ctx.playerId, ctx.playerId, Math.min(500, Math.round(seed.price / 50)), { win: true });
+  addScore(SLUG, ctx.playerId, ctx.playerId, Math.min(500, Math.round(seed.price / 50)), {
+    win: harvestRoll.tier !== 'poor',
+  });
 
   farm.plots[plot_index] = emptyPlot(plot_index);
   savePlayerData(ctx, session);
   res.json({
     success: true,
-    harvested: { itemId: seed.marketItem, amount: seed.harvestAmount },
+    harvested: {
+      itemId: seed.marketItem,
+      amount: harvestRoll.amount,
+      tier: harvestRoll.tier,
+      hotCrop: harvestRoll.hotCrop,
+    },
     inventory: session.arcade.inventory,
   });
 }

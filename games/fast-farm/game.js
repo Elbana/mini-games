@@ -1,16 +1,17 @@
-/** Fast Farm v5 — 10 care rounds per crop. No timer. Crops look sick when neglected. */
+/** Fast Farm v7 — chill care, daily harvest swings, sell at Black Market. */
 
 let seeds = {};
 let seedList = [];
 let farm = null;
 let walletBalance = 0;
-let careRules = { stepsToHarvest: 10, careWindowSec: 6.5 };
+let careRules = { stepsToHarvest: 6, careWindowSec: 18 };
+let dailyMood = null;
 let activePlot = null;
 let tickTimer = null;
 let actionBusy = false;
 let skipPlotRender = false;
 let lastPlotsJson = '';
-const FARM_TICK_MS = 4000;
+const FARM_TICK_MS = 1500;
 const MARKET_TO_SEED = {
   crop_carrot: 'carrot',
   crop_potato: 'potato',
@@ -91,7 +92,7 @@ function bindUi() {
     if (e.target?.closest?.('.farm-top-bar, .farm-sheet:not(.hidden)')) return;
 
     const now = Date.now();
-    if (now - lastPlotTapAt < 280) return;
+    if (now - lastPlotTapAt < 100) return;
 
     const target =
       e.target?.closest?.('.plot-cell') ||
@@ -152,6 +153,10 @@ async function refreshFarm() {
 
   farm = { plots: newPlots, inventory: st.inventory || {} };
   if (st.careRules) careRules = st.careRules;
+  if (st.dailyMood) {
+    dailyMood = st.dailyMood;
+    renderDailyMood();
+  }
 
   if (inventoryChanged) renderHud();
   if (!skipPlotRender && plotsChanged) {
@@ -320,6 +325,10 @@ async function handlePlotTap(index) {
       await runPlotAction('fertilize', index);
       return;
     }
+    if (action === 'heal') {
+      await runPlotAction('heal', index);
+      return;
+    }
     openPlotSheet(index);
     return;
   }
@@ -419,7 +428,7 @@ function buildPlotSheetContent(plot, seed) {
     html += `<button type="button" class="action-btn heal pulse" data-action="heal">💊 Heal 🪙${fmtCoins(costs.heal)}</button>`;
   }
 
-  html += `</div><p class="care-tip">~${careRules.careWindowSec}s per round. Stagger planting so plots don't all scream at once.</p>`;
+  html += `</div><p class="care-tip">Take your time — about ${careRules.careWindowSec}s per care step.</p>`;
   return html;
 }
 
@@ -457,7 +466,14 @@ async function runPlotAction(action, index, seedId) {
     }
     if (action === 'harvest') {
       const seed = seeds[farm.plots[index]?.seed_id];
-      Arcade.toast(`🌾 +${r.harvested?.amount || '?'} ${seed?.name || ''}`, 'win');
+      const amt = r.harvested?.amount || 1;
+      const tier = r.harvested?.tier;
+      const hype =
+        tier === 'jackpot' ? '🎉 JACKPOT harvest!' :
+        tier === 'great' ? '✨ Great haul!' :
+        tier === 'good' ? '🌾 Nice crop!' :
+        tier === 'poor' ? '🌾 Small harvest' : '🌾 Harvested!';
+      Arcade.toast(`${hype} +${amt} ${seed?.name || ''}`, tier === 'poor' ? '' : 'win');
       closeSheet('sheet-plot');
     }
   } catch (e) {
@@ -484,7 +500,7 @@ function renderBackpack() {
     invEl.innerHTML = `<div class="empty-backpack">
       <div class="emoji">🌱</div>
       <h3>Bag empty</h3>
-      <p>Survive 10 care rounds, harvest, sell at Black Market.</p>
+      <p>Grow crops, harvest, sell at Black Market — some days pay big!</p>
     </div>`;
     return;
   }
@@ -506,5 +522,13 @@ function renderBackpack() {
 function closeSheet(id) {
   document.getElementById(id)?.classList.add('hidden');
   if (id === 'sheet-plot') activePlot = null;
+}
+
+function renderDailyMood() {
+  const el = document.getElementById('farm-daily-mood');
+  if (!el || !dailyMood?.headline) return;
+  el.textContent = dailyMood.headline;
+  el.classList.toggle('farm-mood-hot', dailyMood.kind === 'bounty');
+  el.classList.toggle('farm-mood-storm', dailyMood.kind === 'stormy');
 }
 

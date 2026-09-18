@@ -112,7 +112,8 @@ async function init() {
   function updateStats() {
     document.getElementById('stat-portfolio').textContent = `🪙 ${Arcade.formatCoins(portfolioValue())}`;
     document.getElementById('stat-owned').textContent = String(totalOwned());
-    document.getElementById('stat-tip').textContent = bestTip();
+    const daily = marketData?.dailyBrief?.headline;
+    document.getElementById('stat-tip').textContent = daily || bestTip();
     const ts = marketData?.updatedAt ? new Date(marketData.updatedAt) : new Date();
     lastUpdated.textContent = `Last updated ${ts.toLocaleTimeString()} · auto-refresh every 30s`;
   }
