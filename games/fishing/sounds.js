@@ -11,6 +11,7 @@ export class FishingSounds {
     this._ready = this._init();
     this._reelLoop = null;
     this._lureLoop = null;
+    this._destroyed = false;
   }
 
   isMuted() {
@@ -80,9 +81,21 @@ export class FishingSounds {
     if (this.ctx?.state === 'suspended') await this.ctx.resume();
   }
 
+  destroy() {
+    this._destroyed = true;
+    this.stopReel();
+    this.stopLureIdle();
+    this.cache.clear();
+    if (this.ctx) {
+      this.ctx.close().catch(() => {});
+      this.ctx = null;
+    }
+  }
+
   play(name, opts = {}) {
-    if (this.muted) return;
+    if (this.muted || this._destroyed) return;
     this._ready.then(async () => {
+      if (this._destroyed) return;
       await this.unlock();
       const buf = this.cache.get(name);
       if (buf && this.ctx) {

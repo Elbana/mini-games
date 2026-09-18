@@ -9,6 +9,26 @@ export class BoardAnimator {
     this.sounds = sounds;
     this.fxLayer = document.getElementById('fx-layer');
     this.comboLayer = document.getElementById('combo-layer');
+    this._destroyed = false;
+    this._pendingTimers = new Set();
+  }
+
+  destroy() {
+    this._destroyed = true;
+    for (const id of this._pendingTimers) clearTimeout(id);
+    this._pendingTimers.clear();
+    this.fxLayer?.replaceChildren();
+    this.comboLayer?.replaceChildren();
+  }
+
+  _later(fn, ms) {
+    if (this._destroyed) return null;
+    const id = setTimeout(() => {
+      this._pendingTimers.delete(id);
+      if (!this._destroyed) fn();
+    }, ms);
+    this._pendingTimers.add(id);
+    return id;
   }
 
   candySrc(piece) {
@@ -27,6 +47,7 @@ export class BoardAnimator {
   }
 
   async swapAnimate(r0, c0, r1, c1) {
+    if (this._destroyed) return;
     const a = this.board.querySelector(`[data-r="${r0}"][data-c="${c0}"] .piece`);
     const b = this.board.querySelector(`[data-r="${r1}"][data-c="${c1}"] .piece`);
     if (!a || !b) return;
@@ -74,10 +95,10 @@ export class BoardAnimator {
       i++;
       if (i < frames.length) {
         img.src = frames[i];
-        setTimeout(tick, 40);
+        this._later(tick, 40);
       } else boom.remove();
     };
-    setTimeout(tick, 40);
+    this._later(tick, 40);
   }
 
   async colorFieldWipe(color) {

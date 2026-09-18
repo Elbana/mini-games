@@ -52,6 +52,23 @@ async function init() {
   });
   bindSoundToggle();
   bindBaitChipRow();
+  registerArcadeGameShutdown(shutdownFishing);
+}
+
+function shutdownFishing() {
+  clearTimeout(activeCast?._waitTimer);
+  clearTimeout(activeCast?._hintTimer);
+  clearTimeout(activeCast?._lureTimer);
+  cancelAnimationFrame(fightAnim);
+  fightAnim = null;
+  sounds?.destroy();
+  sounds = null;
+  unbindFightPull();
+  isPulling = false;
+  activeCast = null;
+  gameState = 'idle';
+  actionBusy = false;
+  fightEnding = false;
 }
 
 function applyManifestVisuals() {
@@ -150,54 +167,100 @@ function isSeaCastPoint(x, y, sceneEl) {
   return !onBoat;
 }
 
+let lastCastAt = 0;
+
+function isInputBlocked(target) {
+  return target?.closest?.(
+    '.fish-hud, .top-bar, .fight-panel, .boat-wrap, .help-overlay, button, a, .result-overlay'
+  );
+}
+
+function tryCastAt(clientX, clientY, target) {
+  if (gameState !== 'idle' || actionBusy) return;
+  if (isInputBlocked(target)) return;
+  const now = Date.now();
+  if (now - lastCastAt < 350) return;
+
+  const scene = document.getElementById('ocean-scene');
+  const rect = scene.getBoundingClientRect();
+  const x = (clientX - rect.left) / rect.width;
+  const y = (clientY - rect.top) / rect.height;
+  if (!isSeaCastPoint(x, y, scene)) {
+    if (getBoatExclusionRect(scene)) Arcade.toast('Cast into the sea', 'lose');
+    return;
+  }
+  lastCastAt = now;
+  castAt(x, y);
+}
+
 function bindCastAndFightInput() {
   const scene = document.getElementById('ocean-scene');
 
   scene.addEventListener('pointerup', (e) => {
-    if (gameState !== 'idle' || actionBusy) return;
-    if (e.target.closest('.fish-hud, .top-bar, .fight-panel, .boat-wrap, .help-overlay, button, a')) return;
-
-    const rect = scene.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    if (!isSeaCastPoint(x, y, scene)) {
-      if (getBoatExclusionRect(scene)) Arcade.toast('Cast into the sea', 'lose');
-      return;
-    }
-    castAt(x, y);
+    tryCastAt(e.clientX, e.clientY, e.target);
   });
 
+  scene.addEventListener(
+    'touchend',
+    (e) => {
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const target = document.elementFromPoint(t.clientX, t.clientY);
+      tryCastAt(t.clientX, t.clientY, target);
+    },
+    { passive: true }
+  );
 }
 
 let fightPullBound = false;
+let activePullId = null;
+const PULL_OPTS = { capture: true, passive: false };
 
 function onFightPullStart(e) {
   if (gameState !== 'fighting') return;
-  if (e.target.closest('button, a, .result-overlay, .help-overlay')) return;
-  if (isPulling) return;
+  if (isInputBlocked(e.target)) return;
+  if (activePullId != null) return;
+
+  activePullId =
+    typeof e.pointerId === 'number'
+      ? e.pointerId
+      : e.changedTouches?.[0]?.identifier ?? 'mouse';
   isPulling = true;
   sounds?.unlock();
+  if (e.cancelable) e.preventDefault();
 }
 
-function onFightPullEnd() {
-  if (!isPulling) return;
+function onFightPullEnd(e) {
+  if (activePullId == null) return;
+  if (e.type === 'pointerup' || e.type === 'pointercancel') {
+    if (typeof e.pointerId === 'number' && e.pointerId !== activePullId) return;
+  }
+  activePullId = null;
   isPulling = false;
 }
 
 function bindFightPull() {
   if (fightPullBound) return;
   fightPullBound = true;
-  document.addEventListener('pointerdown', onFightPullStart, { capture: true });
-  document.addEventListener('pointerup', onFightPullEnd, { capture: true });
-  document.addEventListener('pointercancel', onFightPullEnd, { capture: true });
+  document.addEventListener('pointerdown', onFightPullStart, PULL_OPTS);
+  document.addEventListener('pointerup', onFightPullEnd, PULL_OPTS);
+  document.addEventListener('pointercancel', onFightPullEnd, PULL_OPTS);
+  document.addEventListener('touchstart', onFightPullStart, PULL_OPTS);
+  document.addEventListener('touchend', onFightPullEnd, PULL_OPTS);
+  document.addEventListener('touchcancel', onFightPullEnd, PULL_OPTS);
 }
 
 function unbindFightPull() {
   if (!fightPullBound) return;
   fightPullBound = false;
-  document.removeEventListener('pointerdown', onFightPullStart, { capture: true });
-  document.removeEventListener('pointerup', onFightPullEnd, { capture: true });
-  document.removeEventListener('pointercancel', onFightPullEnd, { capture: true });
+  document.removeEventListener('pointerdown', onFightPullStart, PULL_OPTS);
+  document.removeEventListener('pointerup', onFightPullEnd, PULL_OPTS);
+  document.removeEventListener('pointercancel', onFightPullEnd, PULL_OPTS);
+  document.removeEventListener('touchstart', onFightPullStart, PULL_OPTS);
+  document.removeEventListener('touchend', onFightPullEnd, PULL_OPTS);
+  document.removeEventListener('touchcancel', onFightPullEnd, PULL_OPTS);
+  activePullId = null;
+  isPulling = false;
 }
 
 function showCallout(text, { color = '#fff', glow = '#0284c7', small = false } = {}) {
@@ -473,7 +536,8 @@ async function castAt(x, y) {
 
     placeCastVisuals(x, y);
     sounds?.play('cast', { volume: 0.38, duration: 0.65, offset: 0 });
-    setTimeout(() => {
+    activeCast._lureTimer = setTimeout(() => {
+      if (gameState !== 'waiting') return;
       sounds?.play('lure', { volume: 0.52 });
       sounds?.startLureIdle();
     }, 90);
@@ -495,7 +559,7 @@ async function castAt(x, y) {
       setTimeout(() => startFight(), 900);
     }, biteMs);
 
-    setTimeout(() => {
+    activeCast._hintTimer = setTimeout(() => {
       if (gameState === 'waiting') {
         document.getElementById('cast-hint').textContent = 'Something might be nibbling…';
       }
@@ -643,6 +707,9 @@ async function endFight(outcome) {
   if (fightEnding) return;
   fightEnding = true;
 
+  clearTimeout(activeCast?._waitTimer);
+  clearTimeout(activeCast?._hintTimer);
+  clearTimeout(activeCast?._lureTimer);
   cancelAnimationFrame(fightAnim);
   fightAnim = null;
   sounds?.stopReel();

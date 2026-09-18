@@ -1,0 +1,237 @@
+/**
+ * Riko room WebView — fit games to the panel height, scroll when needed.
+ */
+
+/* Solid frame paints first; hero backgrounds appear after first paint (embed-mode.js). */
+html[data-arcade-embed='1']:not(.arcade-painted) .farm-bg,
+html[data-arcade-embed='1']:not(.arcade-painted) .water-bg {
+  background-image: none !important;
+  opacity: 0;
+}
+
+html[data-arcade-embed='1'] .farm-bg,
+html[data-arcade-embed='1'] .water-bg {
+  transition: opacity 0.15s ease-out;
+}
+
+html[data-arcade-embed='1'],
+html[data-arcade-embed='1'] body {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: var(--arcade-vh, 100%) !important;
+  min-height: var(--arcade-vh, 100%) !important;
+  max-height: var(--arcade-vh, 100%) !important;
+  overflow: hidden !important;
+}
+
+html[data-arcade-embed='1'] body {
+  display: flex;
+  flex-direction: column;
+}
+
+html[data-arcade-embed='1'] .arcade-shell,
+html[data-arcade-embed='1'] .farm-screen,
+html[data-arcade-embed='1'] .fish-shell,
+html[data-arcade-embed='1'] .market-app,
+html[data-arcade-embed='1'] #app.candy-world {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: var(--arcade-vh, 100%) !important;
+  min-height: var(--arcade-vh, 100%) !important;
+  max-height: var(--arcade-vh, 100%) !important;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+html[data-arcade-embed='1'] .top-bar,
+html[data-arcade-embed='1'] .fish-top-bar,
+html[data-arcade-embed='1'] .farm-top-bar,
+html[data-arcade-embed='1'] .mk-header {
+  flex-shrink: 0;
+  padding-top: 8px !important;
+}
+
+html[data-arcade-embed='1'] .top-bar a[href='/'],
+html[data-arcade-embed='1'] .farm-back-btn,
+html[data-arcade-embed='1'] .mk-back,
+html[data-arcade-embed='1'] .fish-top-bar a[href='/'] {
+  display: none !important;
+}
+
+html[data-arcade-embed='1'] .content-scroll,
+html[data-arcade-embed='1'] .mk-scroll {
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+html[data-arcade-embed='1'] .screen {
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+html[data-arcade-embed='1'] #screen-lobby {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+html[data-arcade-embed='1'] #screen-fight {
+  overflow: hidden !important;
+}
+
+html[data-arcade-embed='1'] .screen.hidden {
+  display: none !important;
+}
+
+/* Candy Battle — compact lobby + scrollable fight setup */
+html[data-arcade-embed='1'] .lobby-card {
+  margin-top: 0;
+  padding: 12px;
+}
+
+html[data-arcade-embed='1'] .monster-preview {
+  font-size: 2.4rem;
+}
+
+html[data-arcade-embed='1'] .tier-picker,
+html[data-arcade-embed='1'] .level-picker {
+  margin: 8px 0;
+  gap: 6px;
+}
+
+html[data-arcade-embed='1'] .tier-btn,
+html[data-arcade-embed='1'] .level-btn {
+  padding: 7px 9px;
+  font-size: 0.65rem;
+}
+
+html[data-arcade-embed='1'] #btn-start {
+  margin-top: 8px;
+  margin-bottom: 4px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+}
+
+html[data-arcade-embed='1'] .specials-legend {
+  display: none;
+}
+
+html[data-arcade-embed='1'] .arena-panel {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+}
+
+html[data-arcade-embed='1'] .monster-stage {
+  height: 48px;
+}
+
+html[data-arcade-embed='1'] .monster-sprite {
+  font-size: 2.2rem;
+}
+
+html[data-arcade-embed='1'] .board-wrap {
+  flex: 1 1 auto;
+  min-height: 120px;
+  touch-action: none;
+}
+
+html[data-arcade-embed='1'] .board {
+  width: min(100%, calc(var(--arcade-vh, 100vh) * 0.42));
+  max-height: min(100%, calc(var(--arcade-vh, 100vh) * 0.42));
+}
+
+/* Fast Farm — absolute layout (not flex column), plots above UI chrome */
+html[data-arcade-embed='1'] .farm-screen {
+  display: block !important;
+  --field-top: 34%;
+  --field-bottom: 2%;
+  touch-action: manipulation;
+}
+
+html[data-arcade-embed='1'] .farm-ui {
+  inset: auto;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: auto;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 12;
+}
+
+html[data-arcade-embed='1'] .farm-scene,
+html[data-arcade-embed='1'] .farm-grid {
+  pointer-events: auto;
+  z-index: 10;
+}
+
+html[data-arcade-embed='1'] .farm-top-bar,
+html[data-arcade-embed='1'] .harvest-chip {
+  pointer-events: auto;
+}
+
+html[data-arcade-embed='1'] .plot-cell {
+  min-height: 52px;
+}
+
+html[data-arcade-embed='1'] .plot-stack {
+  touch-action: manipulation;
+}
+
+/* Fishing — touch-friendly in WebView */
+html[data-arcade-embed='1'] .ocean-scene {
+  touch-action: none;
+}
+
+html[data-arcade-embed='1'] .ocean-scene.fighting .fish-hud {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+html[data-arcade-embed='1'] .fight-panel {
+  pointer-events: none;
+}
+
+html[data-arcade-embed='1'] .bait-chip-row {
+  flex-shrink: 0;
+}
+
+html[data-arcade-embed='1'] .fish-hud {
+  max-height: 28%;
+  overflow-y: auto;
+}
+
+/* Black Market — single column in panel */
+html[data-arcade-embed='1'] .mk-layout {
+  grid-template-columns: 1fr !important;
+}
+
+html[data-arcade-embed='1'] .mk-hero-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+html[data-arcade-embed='1'] .mk-stat-tip {
+  grid-column: span 2;
+}
+
+html[data-arcade-embed='1'] .mk-portfolio {
+  position: static;
+}
+
+html[data-arcade-embed='1'] .mk-portfolio-list {
+  max-height: 240px;
+}
+
+html[data-arcade-embed='1'] .mk-table-wrap {
+  max-height: min(280px, calc(var(--arcade-vh, 400px) * 0.35));
+  overflow: auto;
+}

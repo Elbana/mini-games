@@ -20,6 +20,14 @@ async function init() {
   let category = 'all';
   let sortBy = 'name';
   let searchTimer = null;
+  let marketPollTimer = null;
+
+  registerArcadeGameShutdown(() => {
+    if (marketPollTimer) clearInterval(marketPollTimer);
+    if (searchTimer) clearTimeout(searchTimer);
+    marketPollTimer = null;
+    searchTimer = null;
+  });
 
   await Arcade.refreshBalance(balanceEl);
 
@@ -247,7 +255,10 @@ async function init() {
   }
 
   await loadMarket();
-  setInterval(loadMarket, 30000);
+  marketPollTimer = setInterval(() => {
+    if (window.__arcadePaused) return;
+    loadMarket();
+  }, 30000);
 }
 
 function setupHubLink() {

@@ -64,6 +64,16 @@ async function init() {
   board.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
   animator = new BoardAnimator(board, manifest, sounds);
   setupBoardInput(board);
+
+  registerArcadeGameShutdown(() => {
+    busy = true;
+    animator?.destroy?.();
+    sounds?.destroy?.();
+    if (fight) {
+      Arcade.post('/api/candy-battle/abandon', {}).catch(() => {});
+      fight = null;
+    }
+  });
 }
 
 let dragStart = null;
@@ -344,11 +354,13 @@ function estimateDamage(size, combo, bonus = 0) {
 }
 
 async function runFullCascadeTurn() {
+  if (window.__arcadePaused) return;
   const waves = [];
   let combo = 0;
   const monsterEl = document.getElementById('monster-sprite');
 
   while (true) {
+    if (window.__arcadePaused) return;
     const { groups, creates } = findTurnResult(grid);
     if (!groups.length) break;
     combo++;
@@ -414,10 +426,11 @@ async function runFullCascadeTurn() {
     await sleep(80);
   }
 
-  if (!waves.length) return;
+  if (!waves.length || window.__arcadePaused) return;
 
   try {
     const r = await Arcade.post('/api/candy-battle/turn', { waves });
+    if (window.__arcadePaused) return;
     fight = r.fight;
     updateHud(r.buyInCandies);
 

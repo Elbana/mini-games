@@ -110,7 +110,7 @@ function injectPlatform(html, req) {
   const inject = qs.size
     ? `<script>window.__ARCADE__=${JSON.stringify(Object.fromEntries(qs))};</script>`
     : '';
-  const headInject = `<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="/shared/arcade-shell.css">${inject}`;
+  const headInject = `<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="/shared/embed-mode.css"><script defer src="/shared/embed-mode.js"></script><script defer src="/shared/host-bridge.js"></script><script defer src="/shared/embed-nav.js"></script>${inject}`;
   return html.replace('</head>', `${headInject}</head>`);
 }
 

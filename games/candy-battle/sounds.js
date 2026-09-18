@@ -8,6 +8,7 @@ export class CandySounds {
     this.cache = new Map();
     this.muted = localStorage.getItem(STORAGE_KEY) === 'off';
     this._ready = this._init();
+    this._destroyed = false;
   }
 
   isMuted() {
@@ -58,9 +59,19 @@ export class CandySounds {
     if (this.ctx?.state === 'suspended') await this.ctx.resume();
   }
 
+  destroy() {
+    this._destroyed = true;
+    this.cache.clear();
+    if (this.ctx) {
+      this.ctx.close().catch(() => {});
+      this.ctx = null;
+    }
+  }
+
   play(name, opts = {}) {
-    if (this.muted) return;
+    if (this.muted || this._destroyed) return;
     this._ready.then(() => {
+      if (this._destroyed) return;
       const buf = this.cache.get(name);
       if (buf && this.ctx) {
         const src = this.ctx.createBufferSource();

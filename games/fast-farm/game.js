@@ -9,6 +9,8 @@ let activePlot = null;
 let tickTimer = null;
 let actionBusy = false;
 let skipPlotRender = false;
+let lastPlotsJson = '';
+const FARM_TICK_MS = 4000;
 const MARKET_TO_SEED = {
   crop_carrot: 'carrot',
   crop_potato: 'potato',
@@ -33,7 +35,26 @@ async function init() {
   setupFarmToast();
   bindUi();
   await refreshFarm();
-  tickTimer = setInterval(refreshFarm, 800);
+  await refreshWallet();
+  startFarmTick();
+  const syncFarmTick = () => {
+    if (window.__arcadePaused || document.visibilityState !== 'visible') stopFarmTick();
+    else startFarmTick();
+  };
+  document.addEventListener('visibilitychange', syncFarmTick);
+  document.addEventListener('pagehide', stopFarmTick);
+  registerArcadeGameShutdown(stopFarmTick);
+}
+
+function startFarmTick() {
+  if (tickTimer) return;
+  tickTimer = setInterval(refreshFarm, FARM_TICK_MS);
+}
+
+function stopFarmTick() {
+  if (!tickTimer) return;
+  clearInterval(tickTimer);
+  tickTimer = null;
 }
 
 function setupFarmToast() {
@@ -62,14 +83,38 @@ function bindUi() {
     el.addEventListener('click', () => closeSheet(el.dataset.close));
   });
 
-  const grid = document.getElementById('farm-grid');
-  grid.addEventListener('pointerup', (e) => {
+  const scene = document.getElementById('farm-scene');
+  let lastPlotTapAt = 0;
+
+  function tapPlotFromEvent(e, clientX, clientY) {
     if (actionBusy) return;
-    const cell = e.target.closest('.plot-cell');
-    if (!cell) return;
-    e.preventDefault();
-    handlePlotTap(Number(cell.dataset.plot));
-  });
+    if (e.target?.closest?.('.farm-top-bar, .farm-sheet:not(.hidden)')) return;
+
+    const now = Date.now();
+    if (now - lastPlotTapAt < 280) return;
+
+    const target =
+      e.target?.closest?.('.plot-cell') ||
+      document.elementFromPoint(clientX, clientY)?.closest?.('.plot-cell');
+    if (!target) return;
+
+    lastPlotTapAt = now;
+    if (e.cancelable) e.preventDefault();
+    handlePlotTap(Number(target.dataset.plot));
+  }
+
+  const tapOpts = { capture: true, passive: false };
+  scene.addEventListener('pointerup', (e) => tapPlotFromEvent(e, e.clientX, e.clientY), tapOpts);
+  scene.addEventListener('click', (e) => tapPlotFromEvent(e, e.clientX, e.clientY), tapOpts);
+  scene.addEventListener(
+    'touchend',
+    (e) => {
+      const t = e.changedTouches[0];
+      if (!t) return;
+      tapPlotFromEvent(e, t.clientX, t.clientY);
+    },
+    tapOpts
+  );
 }
 
 function assetSeed(name) {
@@ -96,15 +141,23 @@ function plotCareCosts(plot) {
 }
 
 async function refreshFarm() {
+  if (window.__arcadePaused) return;
   const st = await Arcade.get('/api/fast-farm/state');
-  farm = {
-    plots: st.plots?.length ? st.plots : defaultPlots(),
-    inventory: st.inventory || {},
-  };
+  if (window.__arcadePaused) return;
+  const newPlots = st.plots?.length ? st.plots : defaultPlots();
+  const plotsJson = JSON.stringify(newPlots);
+  const inventoryJson = JSON.stringify(st.inventory || {});
+  const plotsChanged = plotsJson !== lastPlotsJson;
+  const inventoryChanged = inventoryJson !== JSON.stringify(farm?.inventory || {});
+
+  farm = { plots: newPlots, inventory: st.inventory || {} };
   if (st.careRules) careRules = st.careRules;
-  await refreshWallet();
-  renderHud();
-  if (!skipPlotRender) renderPlots();
+
+  if (inventoryChanged) renderHud();
+  if (!skipPlotRender && plotsChanged) {
+    lastPlotsJson = plotsJson;
+    renderPlots();
+  }
   if (activePlot != null && !document.getElementById('sheet-plot').classList.contains('hidden')) {
     openPlotSheet(activePlot, false);
   }
@@ -228,7 +281,7 @@ function renderPlots() {
 
       return `<div class="${cls}" data-plot="${i}" role="gridcell">
         <div class="plot-stack">
-          <img class="plot-img" src="${plotBaseAsset(plot, seed)}" alt="">
+          <img class="plot-img" src="${plotBaseAsset(plot, seed)}" alt="" decoding="async">
           ${cropHtml}
           ${badge ? `<span class="plot-badge care">${badge}</span>` : ''}
         </div>
@@ -274,10 +327,14 @@ async function handlePlotTap(index) {
   openPlotSheet(index);
 }
 
-function openPlotSheet(index, show = true) {
+async function openPlotSheet(index, show = true) {
   activePlot = index;
   const plot = farm.plots[index];
   if (!plot) return;
+
+  if (plot.state === 'empty' || show) {
+    await refreshWallet();
+  }
 
   const seed = plot.seed_id ? seeds[plot.seed_id] : null;
   document.getElementById('plot-sheet-title').textContent = seed
@@ -408,6 +465,7 @@ async function runPlotAction(action, index, seedId) {
   } finally {
     skipPlotRender = false;
     actionBusy = false;
+    await refreshWallet();
     await refreshFarm();
   }
 }
