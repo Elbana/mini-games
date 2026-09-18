@@ -181,6 +181,25 @@ function orderedSeeds() {
   return [...seedList].sort((a, b) => a.price - b.price);
 }
 
+function formatCropCount(n) {
+  const num = Math.max(0, Math.floor(Number(n) || 0));
+  if (num < 1000) return String(num);
+  const tiers = [
+    { div: 1e9, suffix: 'b' },
+    { div: 1e6, suffix: 'm' },
+    { div: 1e3, suffix: 'k' },
+  ];
+  for (const { div, suffix } of tiers) {
+    if (num >= div) {
+      const v = num / div;
+      if (v >= 100) return `${Math.floor(v)}${suffix}`;
+      const text = v >= 10 ? v.toFixed(0) : v.toFixed(1);
+      return `${text.replace(/\.0$/, '')}${suffix}`;
+    }
+  }
+  return String(num);
+}
+
 function buildCropStack() {
   const stack = document.getElementById('farm-crop-stack');
   if (!stack) return;
@@ -188,8 +207,8 @@ function buildCropStack() {
     .map((seed) => {
       const itemId = seed.marketItem;
       return `<div class="crop-stack-row" data-item="${itemId}" id="crop-row-${itemId}">
-        <img class="crop-stack-icon" src="${assetIcon(seed.assets.icon)}" alt="${seed.name}">
         <span class="crop-stack-count" id="count-${itemId}" data-value="0">0</span>
+        <img class="crop-stack-icon" src="${assetIcon(seed.assets.icon)}" alt="${seed.name}">
       </div>`;
     })
     .join('');
@@ -213,7 +232,7 @@ function setCropCount(itemId, count, animate = false) {
     void row?.offsetWidth;
     row?.classList.add('crop-stack-pop');
   } else {
-    el.textContent = String(next);
+    el.textContent = formatCropCount(next);
   }
   el.dataset.value = String(next);
 }
@@ -223,16 +242,16 @@ function animateCountRoll(el, from, to, duration = 280) {
   function tick(now) {
     const t = Math.min(1, (now - start) / duration);
     const eased = 1 - (1 - t) ** 3;
-    el.textContent = String(Math.round(from + (to - from) * eased));
+    el.textContent = formatCropCount(Math.round(from + (to - from) * eased));
     if (t < 1) requestAnimationFrame(tick);
-    else el.textContent = String(to);
+    else el.textContent = formatCropCount(to);
   }
   requestAnimationFrame(tick);
 }
 
 function bumpCountQuick(countEl, value, row) {
   if (!countEl) return;
-  countEl.textContent = String(value);
+  countEl.textContent = formatCropCount(value);
   countEl.dataset.value = String(value);
   countEl.classList.remove('count-bump', 'count-tick');
   void countEl.offsetWidth;
@@ -271,7 +290,7 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
   if (!plotCell || !targetRow || !iconEl || !layer || !countEl) return Promise.resolve();
 
   const from = plotCell.getBoundingClientRect();
-  const to = targetRow.getBoundingClientRect();
+  const countBox = countEl.getBoundingClientRect();
   const iconSrc = iconEl.src;
   const harvestAmt = Math.max(1, Math.round(amount));
   const visualCount = Math.min(harvestAmt, tier === 'jackpot' ? 14 : tier === 'great' ? 12 : 10);
@@ -279,8 +298,8 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
 
   const cx = from.left + from.width * 0.5;
   const cy = from.top + from.height * 0.36;
-  const tx = to.left + to.width * 0.12;
-  const ty = to.top + to.height * 0.5;
+  const tx = countBox.left + countBox.width * 0.5;
+  const ty = countBox.top + countBox.height * 0.5;
   const size = isJackpot ? 38 : 34;
 
   const addPerLand = [];
@@ -527,7 +546,7 @@ async function handlePlotTap(index) {
     return;
   }
 
-  openPlotSheet(index);
+  /* Growing plot with no care needed — progress is visible on the plot; ignore mis-taps */
 }
 
 async function openPlotSheet(index, show = true) {
