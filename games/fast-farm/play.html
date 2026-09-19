@@ -25,6 +25,10 @@
       <header class="farm-top-bar">
         <a class="farm-back-btn" id="btn-hub" href="/" aria-label="Back to hub">‹</a>
         <p class="farm-daily-mood" id="farm-daily-mood">🌤️ Loading farm mood…</p>
+        <div class="farm-top-actions">
+          <button type="button" class="farm-icon-btn" id="btn-help" aria-label="How to play">?</button>
+          <button type="button" class="farm-icon-btn sound-toggle" id="btn-sound" aria-pressed="false" aria-label="Sound on">🔊</button>
+        </div>
       </header>
       <div id="farm-crop-stack" class="farm-crop-stack" aria-label="Harvested crops"></div>
     </div>
@@ -36,13 +40,13 @@
         <span class="farm-tool-badge hidden" data-badge="water">0</span>
       </button>
       <button type="button" class="farm-tool" data-tool="fertilize" aria-pressed="false" aria-label="Fertilizer">
-        <span class="farm-tool-icon" aria-hidden="true">🧴</span>
-        <span class="farm-tool-label">Feed</span>
+        <span class="farm-tool-icon" aria-hidden="true">🌿</span>
+        <span class="farm-tool-label">Fertilizer</span>
         <span class="farm-tool-badge hidden" data-badge="fertilize">0</span>
       </button>
-      <button type="button" class="farm-tool" data-tool="heal" aria-pressed="false" aria-label="Medicine">
-        <span class="farm-tool-icon" aria-hidden="true">💊</span>
-        <span class="farm-tool-label">Heal</span>
+      <button type="button" class="farm-tool" data-tool="heal" aria-pressed="false" aria-label="Insecticide">
+        <span class="farm-tool-icon farm-tool-icon-spray" aria-hidden="true"></span>
+        <span class="farm-tool-label">Insecticide</span>
         <span class="farm-tool-badge hidden" data-badge="heal">0</span>
       </button>
       <button type="button" class="farm-tool" data-tool="clear" aria-pressed="false" aria-label="Clear plot">
@@ -54,6 +58,27 @@
 
     <div id="toast-zone" class="farm-toast-zone" aria-live="polite"></div>
     <div id="fx-layer" aria-hidden="true"></div>
+
+    <div id="sheet-help" class="farm-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="sheet-backdrop" data-close="sheet-help"></div>
+      <div class="sheet-panel sheet-help">
+        <div class="sheet-handle"></div>
+        <header class="sheet-header compact">
+          <h2 id="help-title">How to Farm</h2>
+        </header>
+        <div class="help-body">
+          <ol class="help-steps">
+            <li>Tap an <strong>empty plot</strong> and pick a seed to plant.</li>
+            <li>When a badge appears, give the crop what it needs: <strong>💧 water</strong>, <strong>🌿 fertilizer</strong>, or <strong>🐛 insecticide</strong>.</li>
+            <li>Complete all care rounds, then tap a <strong>⭐ ready</strong> plot to harvest.</li>
+            <li>Sell crops at the <strong>Black Market</strong> from the hub.</li>
+            <li>If a crop dies (💀), tap the plot once to <strong>clear</strong> it and plant again.</li>
+          </ol>
+          <p class="help-tip">Badges only show when you can act — water, fertilizer, or insecticide.</p>
+        </div>
+        <button type="button" class="action-btn harvest" id="help-close">Got it</button>
+      </div>
+    </div>
 
     <div id="sheet-plot" class="farm-sheet hidden" role="dialog" aria-modal="true">
       <div class="sheet-backdrop" data-close="sheet-plot"></div>

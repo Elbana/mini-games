@@ -276,7 +276,7 @@ export function afterHeal(plot, now = Date.now()) {
     throw new Error('Crop is dead — clear the plot and replant');
   }
   if (!canPerformCare(plot, 'heal', now)) {
-    throw new Error('This crop is not sick');
+    throw new Error('This crop does not need insecticide');
   }
   return advanceCare({ ...plot, state: 'growing' }, now);
 }

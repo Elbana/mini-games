@@ -21,8 +21,8 @@ function sfx(name, opts) {
 
 const TOOL_FX = {
   water: { emoji: '🪣', class: 'fx-water', particles: 'water' },
-  fertilize: { emoji: '🧴', class: 'fx-fertilize', particles: 'fert' },
-  heal: { emoji: '💊', class: 'fx-heal' },
+  fertilize: { emoji: '🌿', class: 'fx-fertilize', particles: 'fert' },
+  heal: { class: 'fx-spray', particles: 'spray', icon: 'spray' },
   harvest: { emoji: '🧺', class: 'fx-harvest' },
   plant: { emoji: '🌱', class: 'fx-plant' },
   clear: { emoji: '🧹', class: 'fx-clear' },
@@ -96,13 +96,14 @@ function bindUi() {
   });
 
   bindToolbar();
+  bindHelpAndSound();
 
   const scene = document.getElementById('farm-scene');
   let lastPlotTapAt = 0;
 
   function tapPlotFromEvent(e, clientX, clientY) {
     if (actionBusy) return;
-    if (e.target?.closest?.('.farm-top-bar, .farm-toolbar, .farm-sheet:not(.hidden)')) return;
+    if (e.target?.closest?.('.farm-top-bar, .farm-toolbar, .farm-sheet:not(.hidden), .farm-top-actions')) return;
 
     const now = Date.now();
     if (now - lastPlotTapAt < 100) return;
@@ -139,6 +140,41 @@ function bindToolbar() {
   });
 }
 
+function bindHelpAndSound() {
+  const helpBtn = document.getElementById('btn-help');
+  const helpClose = document.getElementById('help-close');
+  const soundBtn = document.getElementById('btn-sound');
+
+  helpBtn?.addEventListener('click', () => {
+    sfx('click', { volume: 0.18 });
+    document.getElementById('sheet-help')?.classList.remove('hidden');
+  });
+
+  helpClose?.addEventListener('click', () => {
+    sfx('click', { volume: 0.15 });
+    closeSheet('sheet-help');
+  });
+
+  function syncSoundBtn() {
+    if (!soundBtn || !farmSounds) return;
+    const muted = farmSounds.isMuted();
+    soundBtn.textContent = muted ? '🔇' : '🔊';
+    soundBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    soundBtn.setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
+  }
+
+  soundBtn?.addEventListener('click', () => {
+    farmSounds?.toggleMuted();
+    syncSoundBtn();
+    if (!farmSounds?.isMuted()) {
+      farmSounds?.unlock();
+      sfx('click', { volume: 0.18 });
+    }
+  });
+
+  syncSoundBtn();
+}
+
 function selectTool(tool) {
   const changed = activeTool !== tool;
   activeTool = tool;
@@ -155,8 +191,8 @@ function selectTool(tool) {
 
   const labels = {
     water: 'Tap a thirsty plot to water',
-    fertilize: 'Tap a hungry plot to feed',
-    heal: 'Tap a sick plot to heal',
+    fertilize: 'Tap a plot that needs fertilizer',
+    heal: 'Tap a plot with pests to spray insecticide',
     clear: 'Tap a dead plot to clear',
   };
   Arcade.toast(labels[tool] || 'Tap a plot');
@@ -219,7 +255,7 @@ function canUseToolOnPlot(tool, plot) {
   if (tool === 'heal') {
     if (plot.state === 'dead') return { ok: false, msg: 'Crop is dead — clear the plot first' };
     if (careIsActive(plot) && careActionForPlot(plot) === 'heal') return { ok: true };
-    return { ok: false, msg: 'This crop does not need medicine' };
+    return { ok: false, msg: 'This crop does not need insecticide' };
   }
 
   if (tool === 'water') {
@@ -235,7 +271,7 @@ function canUseToolOnPlot(tool, plot) {
     if (plot.state === 'dead') return { ok: false, msg: 'Clear the dead plot first' };
     if (plot.ready || plot.state === 'ready') return { ok: false, msg: 'Ready to pick — use the basket' };
     if (careIsActive(plot) && careActionForPlot(plot) === 'fertilize') return { ok: true };
-    return { ok: false, msg: 'This plot does not need feed right now' };
+    return { ok: false, msg: 'This plot does not need fertilizer right now' };
   }
 
   return { ok: false, msg: 'Unknown tool' };
@@ -277,7 +313,11 @@ function playToolUseAnimation(plotIndex, tool) {
 
   const el = document.createElement('div');
   el.className = `farm-tool-fx ${cfg.class}`;
-  el.textContent = cfg.emoji;
+  if (cfg.icon === 'spray') {
+    el.innerHTML = '<span class="fx-spray-can" aria-hidden="true"></span>';
+  } else {
+    el.textContent = cfg.emoji;
+  }
   el.style.left = `${cx}px`;
   el.style.top = `${cy}px`;
   layer.appendChild(el);
@@ -307,6 +347,18 @@ function playToolUseAnimation(plotIndex, tool) {
       spark.style.animationDelay = `${60 + i * 40}ms`;
       layer.appendChild(spark);
       particles.push(spark);
+    }
+  } else if (cfg.particles === 'spray') {
+    for (let i = 0; i < 9; i++) {
+      const mist = document.createElement('span');
+      mist.className = 'farm-tool-particle spray-mist';
+      mist.style.left = `${cx + (Math.random() - 0.5) * 48}px`;
+      mist.style.top = `${cy - 4 + Math.random() * 8}px`;
+      mist.style.setProperty('--dx', `${(Math.random() - 0.5) * 32}px`);
+      mist.style.setProperty('--dy', `${-8 - Math.random() * 28}px`);
+      mist.style.animationDelay = `${40 + i * 35}ms`;
+      layer.appendChild(mist);
+      particles.push(mist);
     }
   }
 
@@ -657,7 +709,7 @@ function cropVisualClass(plot) {
   if (plot.ready || plot.state === 'ready') return 'crop-ready';
   if (plot.state === 'dead') return 'crop-dead';
   if (!plot.needs_care) return 'crop-ok';
-  if (plot.care_type === 'sick') return 'crop-sick';
+  if (plot.care_type === 'sick') return 'crop-pests';
   if (plot.care_type === 'fertilize') return 'crop-hungry';
   if (plot.care_type === 'water') return 'crop-thirsty';
   return 'crop-ok';
@@ -667,7 +719,7 @@ function careLabel(plot) {
   if (plot.ready || plot.state === 'ready') return '⭐';
   if (plot.state === 'dead') return '💀';
   if (!plot.needs_care) return '';
-  if (plot.care_type === 'sick') return '🤒';
+  if (plot.care_type === 'sick') return '🐛';
   if (plot.care_type === 'fertilize') return '🌿';
   if (plot.care_type === 'water') return '💧';
   return '';
@@ -693,8 +745,8 @@ function renderPlots() {
         cropHtml = `
           <div class="plot-crop ${cropCls}">
             <img class="crop-sprite" src="${assetIcon(seed.assets.icon)}" alt="">
-            <span class="sick-veil"></span>
-            ${cropCls === 'crop-sick' ? '<span class="sick-bugs">🦠</span>' : ''}
+            <span class="crop-veil"></span>
+            ${cropCls === 'crop-pests' ? '<span class="pest-dots" aria-hidden="true"><i></i><i></i><i></i></span>' : ''}
           </div>`;
       }
 
@@ -845,7 +897,7 @@ function buildPlotSheetContent(plot, seed) {
   }
 
   const nextName =
-    plot.care_type === 'fertilize' ? 'fertilizer' : plot.care_type === 'sick' ? 'medicine' : 'water';
+    plot.care_type === 'fertilize' ? 'fertilizer' : plot.care_type === 'sick' ? 'insecticide' : 'water';
 
   if (!careIsActive(plot)) {
     return `<p class="sheet-intro">Round <strong>${step + 1}/${steps}</strong> — growing fine. Next: <strong>${nextName}</strong> soon.</p>
@@ -853,7 +905,7 @@ function buildPlotSheetContent(plot, seed) {
   }
 
   const careName =
-    plot.care_type === 'fertilize' ? 'Fertilizer' : plot.care_type === 'sick' ? 'Medicine' : 'Water';
+    plot.care_type === 'fertilize' ? 'Fertilizer' : plot.care_type === 'sick' ? 'Insecticide' : 'Water';
   const costs = plotCareCosts(plot);
 
   let html = `<p class="sheet-intro">Round <strong>${step + 1}/${steps}</strong> — needs <strong>${careName}</strong> now!</p>
@@ -863,9 +915,9 @@ function buildPlotSheetContent(plot, seed) {
   if (action === 'water') {
     html += `<button type="button" class="action-btn water pulse" data-action="water">💧 Water</button>`;
   } else if (action === 'fertilize') {
-    html += `<button type="button" class="action-btn fert pulse" data-action="fertilize">🌿 Fertilize 🪙${fmtCoins(costs.fertilize)}</button>`;
+    html += `<button type="button" class="action-btn fert pulse" data-action="fertilize">🌿 Fertilizer 🪙${fmtCoins(costs.fertilize)}</button>`;
   } else {
-    html += `<button type="button" class="action-btn heal pulse" data-action="heal">💊 Heal 🪙${fmtCoins(costs.heal)}</button>`;
+    html += `<button type="button" class="action-btn spray pulse" data-action="heal">🐛 Insecticide 🪙${fmtCoins(costs.heal)}</button>`;
   }
 
   html += `</div><p class="care-tip">Take your time — about ${careRules.careWindowSec}s per care step.</p>`;
@@ -902,8 +954,8 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
       sfx('blight', { volume: 0.32 });
       Arcade.toast('🌪️ Sudden blight — crop died!', 'lose');
     } else if (action === 'water') Arcade.toast('💧 Watered!', 'win');
-    else if (action === 'fertilize') Arcade.toast('🌿 Fed!', 'win');
-    else if (action === 'heal') Arcade.toast('💊 Healed!', 'win');
+    else if (action === 'fertilize') Arcade.toast('🌿 Fertilized!', 'win');
+    else if (action === 'heal') Arcade.toast('🐛 Pests cleared!', 'win');
     if (action === 'clear') {
       sfx('clear', { volume: 0.36 });
       Arcade.toast('Cleared', 'win');

@@ -208,7 +208,7 @@ export async function handleHeal(req, res) {
       success: false,
       error: plot.state === 'dead'
         ? 'Crop is dead — clear the plot and replant'
-        : 'This crop does not need medicine',
+        : 'This crop does not need insecticide',
     });
   }
 

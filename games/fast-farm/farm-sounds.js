@@ -33,6 +33,11 @@
       localStorage.setItem(STORAGE_KEY, muted ? 'off' : 'on');
     }
 
+    toggleMuted() {
+      this.setMuted(!this.muted);
+      return this.muted;
+    }
+
     _loadBuffer(file) {
       const self = this;
       return fetch(self.base + '/' + file)
