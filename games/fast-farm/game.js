@@ -874,7 +874,7 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
     if (action === 'plant') {
       if (!seedId) return;
       await Arcade.post('/api/fast-farm/buy-seed', { seed_id: seedId, plot_index: index });
-      sfx('plant', { volume: 0.3 });
+      sfx('plant', { volume: 0.16 });
       Arcade.toast('🌱 Planted!', 'win');
       closeSheet('sheet-plot');
       return;

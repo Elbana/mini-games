@@ -104,7 +104,7 @@
     _sampleDefaults(name) {
       const presets = {
         water: { volume: 0.42, rate: 1 },
-        plant: { volume: 0.5, rate: 1.08 },
+        plant: { volume: 0.2, rate: 1.08 },
         harvest: { offset: 0, volume: 0.78, rate: 1 },
         heal: { volume: 0.38, rate: 1 },
         clear: { offset: 0, duration: 1.4, volume: 0.44, rate: 1 },
