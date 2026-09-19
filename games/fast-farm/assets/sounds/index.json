@@ -1,0 +1,10 @@
+{
+  "water": "water.ogg",
+  "plant": "plant.ogg",
+  "harvest": "harvest.ogg",
+  "heal": "heal.ogg",
+  "clear": "clear.ogg",
+  "click": "click.ogg",
+  "toolSelect": "toolSelect.ogg",
+  "harvestTick": "harvestTick.ogg"
+}
