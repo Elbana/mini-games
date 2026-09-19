@@ -875,7 +875,7 @@ function buildPlotSheetContent(plot, seed) {
             <img src="${assetSeed(s.assets.seed)}" alt="">
             <span class="seed-quick-name">${s.name}</span>
             <span class="seed-quick-price">🪙${fmtCoins(s.price)}</span>
-            <span class="seed-quick-sell">→${fmtCoins(s.marketBase)}</span>
+            <span class="seed-quick-sell">→🪙${fmtCoins(s.marketBase)}/crop</span>
           </button>`;
         })
         .join('')}</div>`;
@@ -965,12 +965,13 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
       sfx('harvest', { volume: 0.72 });
       const seed = seeds[farm.plots[index]?.seed_id];
       const itemId = r.harvested?.itemId;
-      const amt = r.harvested?.amount || 1;
-      const tier = r.harvested?.tier || 'normal';
-      if (itemId && r.inventory) {
-        const prevTotal = farm.inventory?.[itemId] || 0;
-        const newTotal = r.inventory[itemId] || 0;
-        farm.inventory = r.inventory;
+      const prevTotal = itemId ? (farm.inventory?.[itemId] || 0) : 0;
+      if (itemId && r.inventory) farm.inventory = r.inventory;
+      const newTotal = itemId ? (r.inventory?.[itemId] || 0) : 0;
+      const delta = Math.max(0, newTotal - prevTotal);
+      const amt = Math.max(4, r.harvested?.amount ?? delta);
+      const tier = r.harvested?.tier || (amt >= 12 ? 'mega' : amt >= 9 ? 'great' : amt >= 7 ? 'good' : 'normal');
+      if (itemId && r.inventory && amt > 0) {
         await playHarvestCollectAnimation(index, itemId, amt, tier, prevTotal, newTotal);
       }
       if (tier === 'mega') sfx('harvestMega', { volume: 0.34 });
@@ -979,9 +980,8 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
       const hype =
         tier === 'mega' ? '🎉 Mega harvest!' :
         tier === 'great' ? '✨ Great haul!' :
-        tier === 'good' ? '🌾 Nice crop!' :
-        tier === 'poor' ? '🌾 Small harvest' : '🌾 Harvested!';
-      Arcade.toast(`${hype} +${amt} ${seed?.name || ''}`, tier === 'poor' ? '' : 'win');
+        tier === 'good' ? '🌾 Nice crop!' : '🌾 Harvested!';
+      Arcade.toast(`${hype} +${amt} ${seed?.name || ''}`, 'win');
       closeSheet('sheet-plot');
     }
   } catch (e) {

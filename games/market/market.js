@@ -174,7 +174,7 @@ async function init() {
           <td class="num mk-price-base">🪙${Arcade.formatCoins(item.basePrice)}</td>
           <td class="num mk-price-live">🪙${Arcade.formatCoins(item.price)}</td>
           <td class="num mk-change ${trendClass}">${changeLabel}</td>
-          <td class="num mk-vol ${volClass}">${item.volume24h}</td>
+          <td class="num mk-vol ${volClass}" title="24h / today">${item.volume24h} / ${item.volumeToday ?? 0}</td>
           <td class="num mk-owned ${owned ? '' : 'zero'}">${owned || '—'}</td>
         </tr>`;
       })
@@ -200,7 +200,13 @@ async function init() {
         const name = item?.name || id;
         const icon = item?.icon || '📦';
         const { pct } = item ? priceChange(item) : { pct: 0 };
-        const trendHint = pct > 0 ? `+${pct.toFixed(0)}% vs base` : pct < 0 ? `${pct.toFixed(0)}% vs base` : 'at base';
+        const volToday = item?.volumeToday ?? 0;
+        const nearFloor = item?.floorPrice && unit <= item.floorPrice + 1;
+        const trendHint = nearFloor
+          ? 'break-even price — wait for tomorrow'
+          : volToday > 40
+            ? 'heavy selling today — price falling'
+            : pct > 0 ? `+${pct.toFixed(0)}% vs opening` : pct < 0 ? `${pct.toFixed(0)}% vs opening` : 'opening price';
         return `<div class="mk-inv-card">
           <span class="mk-inv-icon">${icon}</span>
           <div class="mk-inv-info">
@@ -247,7 +253,7 @@ async function init() {
         amount: r.total,
         path: '/api/v1/market/sell',
       });
-      Arcade.toast(`+🪙 ${Arcade.formatCoins(r.total)} coins!`, 'win');
+      Arcade.toast(`+🪙 ${Arcade.formatCoins(r.total)}`, 'win');
       balanceEl.textContent = Arcade.formatCoins(r.balance);
       marketData.inventory = r.inventory;
       marketData.items = r.market.items;

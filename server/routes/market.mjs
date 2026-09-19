@@ -1,9 +1,15 @@
 import { requireOperator } from '../auth/operator-auth.mjs';
 import { buildContext, extractPlayerId } from '../auth/player-context.mjs';
 import { createWalletForOperator } from '../wallet/wallet-adapter.mjs';
-import { getMarketSnapshot, getItemPrice, recordSale, MARKET_ITEMS } from '../economy/black-market.mjs';
+import { getMarketSnapshot, recordSale, MARKET_ITEMS } from '../economy/black-market.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
 import { getPlayerData, savePlayerData, removeInventory, txId } from '../store/player-store.mjs';
+
+function liveItemPrice(itemId) {
+  const snap = getMarketSnapshot();
+  const item = snap.items.find((i) => i.id === itemId);
+  return item?.price ?? MARKET_ITEMS[itemId]?.basePrice ?? 0;
+}
 
 export function handleGetMarket(req, res) {
   const operator = requireOperator(req, res);
@@ -11,8 +17,9 @@ export function handleGetMarket(req, res) {
   const playerId = extractPlayerId(req);
   const ctx = buildContext(operator, playerId);
   const session = getPlayerData(ctx);
+  const snap = getMarketSnapshot();
   res.json({
-    ...getMarketSnapshot(),
+    ...snap,
     inventory: session.arcade.inventory,
   });
 }
@@ -30,7 +37,7 @@ export async function handleSell(req, res) {
   if (!removeInventory(session, itemId, qty)) {
     return res.status(400).json({ error: 'Not enough items' });
   }
-  const unitPrice = getItemPrice(itemId);
+  const unitPrice = liveItemPrice(itemId);
   const total = unitPrice * qty;
   recordSale(itemId, qty);
   const wallet = createWalletForOperator(operator);

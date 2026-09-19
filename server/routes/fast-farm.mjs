@@ -25,7 +25,7 @@ import {
 } from '../games/fast-farm-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
-import { getDailyFarmMood, rollFarmHarvestYield } from '../economy/daily-variance.mjs';
+import { getDailyFarmMood, rollFarmHarvestYield, MIN_HARVEST_YIELD } from '../economy/daily-variance.mjs';
 
 const SLUG = 'fast-farm';
 
@@ -76,6 +76,7 @@ export function handleGetFarmConfig(_req, res) {
   res.json({
     seeds: Object.values(SEEDS),
     plotCount: PLOT_COUNT,
+    harvestMin: MIN_HARVEST_YIELD,
     careRules: {
       stepsToHarvest: CARE_STEPS_TO_HARVEST,
       careWindowSec: CARE_WINDOW_SEC,
@@ -279,13 +280,13 @@ export function handleHarvest(req, res) {
   const harvestRoll = rollFarmHarvestYield({
     plotIndex: plot_index,
     seedId: plot.seed_id,
-    baseAmount: seed.harvestAmount,
     seedPrice: seed.price,
   });
-  addInventory(session, seed.marketItem, harvestRoll.amount);
+  const amount = Math.max(MIN_HARVEST_YIELD, harvestRoll.amount);
+  addInventory(session, seed.marketItem, amount);
   session.arcade.stats.farmHarvests += 1;
   addScore(SLUG, ctx.playerId, ctx.playerId, Math.min(500, Math.round(seed.price / 50)), {
-    win: harvestRoll.tier !== 'poor',
+    win: true,
   });
 
   farm.plots[plot_index] = emptyPlot(plot_index);
@@ -294,7 +295,7 @@ export function handleHarvest(req, res) {
     success: true,
     harvested: {
       itemId: seed.marketItem,
-      amount: harvestRoll.amount,
+      amount,
       tier: harvestRoll.tier,
       hotCrop: harvestRoll.hotCrop,
     },

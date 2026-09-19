@@ -65,9 +65,24 @@ export function rollCandyMisfortune(misfortuneMult = 1) {
   return null;
 }
 
-/** Market sell target ≈ seed + care + small margin (losses eat the margin). */
+/** Typical harvest size used for per-unit market pricing. */
+export const AVG_CROP_YIELD = 5.5;
+
+/** Break-even coin price per crop unit after seed + care (quota exhausted). */
+export function cropFloorUnitPrice(seedPrice) {
+  const care = cropFertilizeCost(seedPrice) + Math.round(cropHealCost(seedPrice) * 0.35);
+  return Math.max(1, Math.round((seedPrice + care) / AVG_CROP_YIELD));
+}
+
+/** Opening-of-day price per crop unit — rewarding haul at low market volume. */
+export function cropPremiumUnitPrice(seedPrice) {
+  const floor = cropFloorUnitPrice(seedPrice);
+  return Math.max(floor + 1, Math.round(floor * 1.45));
+}
+
+/** Shown in farm UI as expected sell price per crop unit. */
 export function cropMarketBase(seedPrice) {
-  return Math.round(seedPrice * 1.52);
+  return cropPremiumUnitPrice(seedPrice);
 }
 
 export function cropFertilizeCost(seedPrice) {

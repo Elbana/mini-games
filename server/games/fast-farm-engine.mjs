@@ -9,12 +9,12 @@ import {
 } from '../economy/unfair-loss.mjs';
 import { getDailyFarmMood } from '../economy/daily-variance.mjs';
 
-function tier(price, harvestAmount, id, name, marketItem, desc, assets) {
+function tier(price, id, name, marketItem, desc, assets) {
   return {
     id,
     name,
     price,
-    harvestAmount,
+    expectedYield: '5–8',
     marketItem,
     description: desc,
     assets,
@@ -25,28 +25,28 @@ function tier(price, harvestAmount, id, name, marketItem, desc, assets) {
 }
 
 export const SEEDS = {
-  carrot: tier(200, 3, 'carrot', 'Carrot', 'crop_carrot', 'Starter crop — cheap but fragile.', {
+  carrot: tier(200, 'carrot', 'Carrot', 'crop_carrot', 'Starter crop — cheap but fragile.', {
     seed: 'carrot', planted: 'carrot', icon: 'carrot',
   }),
-  potato: tier(600, 2, 'potato', 'Potato', 'crop_potato', 'Low stakes, low mercy.', {
+  potato: tier(600, 'potato', 'Potato', 'crop_potato', 'Low stakes, low mercy.', {
     seed: 'potato', planted: 'potato', icon: 'potato',
   }),
-  beans: tier(1500, 2, 'beans', 'Beans', 'crop_beans', 'Mid grind begins here.', {
+  beans: tier(1500, 'beans', 'Beans', 'crop_beans', 'Mid grind begins here.', {
     seed: 'beans', planted: 'beans', icon: 'beans',
   }),
-  corn: tier(4000, 1, 'corn', 'Corn', 'crop_corn', 'Golden rows, thin margins.', {
+  corn: tier(4000, 'corn', 'Corn', 'crop_corn', 'Golden rows, thin margins.', {
     seed: 'corn', planted: 'corn', icon: 'corn',
   }),
-  cabbage: tier(10000, 1, 'cabbage', 'Cabbage', 'crop_cabbage', 'Heavy seed, heavy risk.', {
+  cabbage: tier(10000, 'cabbage', 'Cabbage', 'crop_cabbage', 'Heavy seed, heavy risk.', {
     seed: 'cabbage', planted: 'cabbage', icon: 'cabbage',
   }),
-  berry: tier(25000, 1, 'berry', 'Berry', 'crop_berry', 'Premium berries — pricey seeds.', {
+  berry: tier(25000, 'berry', 'Berry', 'crop_berry', 'Premium berries — pricey seeds.', {
     seed: 'berry', planted: 'berry', icon: 'berry',
   }),
-  pumpkin: tier(55000, 1, 'pumpkin', 'Pumpkin', 'crop_pumpkin', 'Big investment patch — tough margins.', {
+  pumpkin: tier(55000, 'pumpkin', 'Pumpkin', 'crop_pumpkin', 'Big investment patch — tough margins.', {
     seed: 'pumkin', planted: 'pumkin', icon: 'pumpkin',
   }),
-  mushroom: tier(100000, 1, 'mushroom', 'Mushroom', 'crop_mushroom', '100k seed. Rare big harvest.', {
+  mushroom: tier(100000, 'mushroom', 'Mushroom', 'crop_mushroom', '100k seed. Rare big harvest.', {
     seed: 'Mushrooms', planted: 'Mushrooms', icon: 'Mushrooms',
   }),
 };

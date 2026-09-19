@@ -61,75 +61,26 @@ export function getDailyFarmMood(date = new Date()) {
   };
 }
 
-/** TEMP QA — set false before release. Cycles harvest tiers by plot for testing. */
-export const FORCE_HARVEST_TEST = true;
+/** Every harvest feels big — market prices cap profit, not crop count. */
+export const MIN_HARVEST_YIELD = 4;
+export const MAX_HARVEST_YIELD = 15;
 
-const HARVEST_TEST_SAMPLES = [
-  { amount: 1, tier: 'poor' },
-  { amount: 2, tier: 'normal' },
-  { amount: 4, tier: 'good' },
-  { amount: 7, tier: 'great' },
-  { amount: 14, tier: 'mega' },
-];
-
-/** 0 = whale crops, 1 = starter crops — cheap seeds roll bigger hauls for fun. */
-function harvestGenerosity(seedPrice = 200) {
-  if (seedPrice <= 600) return 1;
-  if (seedPrice <= 4000) return 0.72;
-  if (seedPrice <= 25000) return 0.42;
-  return 0.18;
-}
-
-export function rollFarmHarvestYield({ plotIndex, seedId, baseAmount = 1, seedPrice = 200, date = new Date() }) {
-  if (FORCE_HARVEST_TEST) {
-    const pick = HARVEST_TEST_SAMPLES[plotIndex % HARVEST_TEST_SAMPLES.length];
-    return {
-      amount: Math.max(pick.amount, baseAmount),
-      tier: pick.tier,
-      hotCrop: false,
-    };
-  }
-
+export function rollFarmHarvestYield({ plotIndex, seedId, seedPrice = 200, date = new Date() }) {
   const mood = getDailyFarmMood(date);
-  const rnd = mulberry32(hashSeed(`harvest:${dayKey(date)}:${plotIndex}:${seedId}`));
-  const gen = harvestGenerosity(seedPrice);
-  let mult = 1;
+  const rnd = mulberry32(hashSeed(`harvest:${dayKey(date)}:${plotIndex}:${seedId}:${seedPrice}`));
 
-  if (seedId === mood.hotCrop) mult *= 1.25 + rnd() * 0.55;
+  let amount = 5 + Math.floor(rnd() * 3);
 
-  const r = rnd();
-  const r2 = rnd();
-  const moodLuck =
-    mood.kind === 'bounty' ? 1.4 :
-    mood.kind === 'normal' ? 1 :
-    mood.kind === 'lean' ? 0.88 : 0.78;
+  if (seedId === mood.hotCrop) amount += 1 + Math.floor(rnd() * 3);
+  if (mood.kind === 'bounty' && rnd() < 0.32) amount += 2 + Math.floor(rnd() * 4);
+  else if (mood.kind === 'normal' && rnd() < 0.18) amount += 1 + Math.floor(rnd() * 2);
 
-  const megaAt = (0.035 + gen * 0.07) * moodLuck;
-  const greatAt = megaAt + (0.08 + gen * 0.14);
-  const goodAt = greatAt + (0.12 + gen * 0.2);
-
-  if (r < megaAt) {
-    mult *= 3 + Math.floor(r2 * 5);
-  } else if (r < greatAt) {
-    mult *= 2 + Math.floor(r2 * 2.5);
-  } else if (r < goodAt) {
-    mult *= 1.45 + r2 * 1.1;
-  } else if (gen < 0.45 && r > 0.9 && mood.kind !== 'bounty') {
-    mult *= 0.5;
-  }
-
-  if (gen >= 0.72 && mult < 1.5 && r2 < 0.5) mult = 1.5 + r2 * 0.8;
-  if (gen >= 1 && mult < 1.85 && r2 < 0.62) mult = 1.85 + r2 * 0.9;
-
-  let amount = Math.max(1, Math.round(baseAmount * mult));
-  if (gen >= 1 && amount <= 2 && r2 > 0.35) amount += 1 + Math.floor(r2 * 2);
-  if (gen >= 0.72 && amount === 1 && r2 > 0.25) amount = 2;
+  amount = Math.max(MIN_HARVEST_YIELD, Math.min(MAX_HARVEST_YIELD, amount));
 
   const tier =
-    amount >= 10 || mult >= 4.5 ? 'mega' :
-    amount >= 5 || mult >= 2.4 ? 'great' :
-    amount >= 3 || mult >= 1.45 ? 'good' :
-    mult < 1 ? 'poor' : 'normal';
+    amount >= 12 ? 'mega' :
+    amount >= 9 ? 'great' :
+    amount >= 7 ? 'good' : 'normal';
 
   return { amount, tier, hotCrop: seedId === mood.hotCrop };
 }

@@ -1,7 +1,23 @@
 import fs from 'fs';
 import path from 'path';
 import { MARKET_DIR } from '../config.mjs';
-import { getDailyMarketBrief, getDailyMarketMultiplier } from './daily-variance.mjs';
+import { dayKey, getDailyMarketBrief, getDailyMarketMultiplier } from './daily-variance.mjs';
+import { cropPremiumUnitPrice, cropFloorUnitPrice } from './unfair-loss.mjs';
+import { SEEDS } from '../games/fast-farm-engine.mjs';
+
+function seedPriceForCropItem(itemId) {
+  const seedId = itemId.replace(/^crop_/, '');
+  return SEEDS[seedId]?.price ?? 0;
+}
+
+function syncCropBasePrices() {
+  for (const item of Object.values(MARKET_ITEMS)) {
+    if (item.category !== 'crop') continue;
+    const seedPrice = seedPriceForCropItem(item.id);
+    item.basePrice = cropPremiumUnitPrice(seedPrice);
+    item.floorPrice = cropFloorUnitPrice(seedPrice);
+  }
+}
 
 /** @type {Record<string, { id: string, name: string, basePrice: number, category: string, icon: string }>} */
 export const MARKET_ITEMS = {
@@ -24,6 +40,8 @@ export const MARKET_ITEMS = {
   fish_swordfish: { id: 'fish_swordfish', name: 'Swordfish', basePrice: 140, category: 'fish', icon: '🗡️' },
   fish_phantom: { id: 'fish_phantom', name: 'Phantom Ray', basePrice: 5000, category: 'fish', icon: '👻' },
 };
+
+syncCropBasePrices();
 
 const STATE_FILE = path.join(MARKET_DIR, 'state.json');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -63,17 +81,49 @@ function pruneSales(sales) {
   return sales.filter((s) => s.at > cutoff);
 }
 
-function recalcPrice(itemId, state) {
+function todayVolume(sales, date = new Date()) {
+  const key = dayKey(date);
+  return sales.reduce((sum, s) => {
+    const saleDay = s.dayKey || dayKey(new Date(s.at));
+    return saleDay === key ? sum + s.qty : sum;
+  }, 0);
+}
+
+/** Crops: morning reward price → break-even floor as today's sell volume rises. */
+function recalcCropPrice(item, state, date = new Date()) {
+  const recent = pruneSales(state.salesLog[item.id] || []);
+  state.salesLog[item.id] = recent;
+  const dayVol = todayVolume(recent, date);
+  const opening = item.basePrice;
+  const floor = item.floorPrice ?? Math.max(1, Math.round(opening * 0.72));
+  const softCap = 100;
+  const t = Math.min(1, dayVol / softCap);
+  const dailyMult = getDailyMarketMultiplier('crop', item.id, date);
+  let price = opening * (1 - t) + floor * t;
+  price *= dailyMult;
+  const flood = Math.min(0.2, dayVol * 0.0015);
+  price *= 1 - flood;
+  return Math.max(floor, Math.round(price));
+}
+
+function recalcPrice(itemId, state, date = new Date()) {
   const item = MARKET_ITEMS[itemId];
   if (!item) return 0;
+  if (item.category === 'crop') {
+    const price = recalcCropPrice(item, state, date);
+    state.prices[itemId] = price;
+    return price;
+  }
   const recent = pruneSales(state.salesLog[itemId] || []);
   state.salesLog[itemId] = recent;
   const volume = recent.reduce((sum, s) => sum + s.qty, 0);
+  const dayVol = todayVolume(recent, date);
   const supplyPressure = Math.min(0.32, volume * 0.006);
-  const lowActivityBoost = volume < 5 ? 0.14 : volume < 20 ? 0.06 : 0;
-  const dailyMult = getDailyMarketMultiplier(item.category, itemId);
+  const lowActivityBoost = dayVol < 8 ? 0.12 : dayVol < 25 ? 0.05 : 0;
+  const dailyMult = getDailyMarketMultiplier(item.category, itemId, date);
   const multiplier = (1 - supplyPressure + lowActivityBoost) * dailyMult;
-  const price = Math.max(1, Math.round(item.basePrice * multiplier));
+  const floor = Math.max(1, Math.round(item.basePrice * 0.72));
+  const price = Math.max(floor, Math.round(item.basePrice * multiplier));
   state.prices[itemId] = price;
   return price;
 }
@@ -84,8 +134,18 @@ export function getMarketSnapshot() {
     const price = recalcPrice(item.id, state);
     const recent = state.salesLog[item.id] || [];
     const volume24h = recent.reduce((s, r) => s + r.qty, 0);
-    const trend = price > item.basePrice ? 'up' : price < item.basePrice ? 'down' : 'flat';
-    return { ...item, price, basePrice: item.basePrice, volume24h, trend };
+    const volumeToday = todayVolume(recent);
+    const floorPrice = item.floorPrice ?? (item.category === 'crop' ? null : Math.max(1, Math.round(item.basePrice * 0.72)));
+    const trend = price > item.basePrice ? 'up' : price < (floorPrice ?? item.basePrice) ? 'down' : 'flat';
+    return {
+      ...item,
+      price,
+      basePrice: item.basePrice,
+      floorPrice,
+      volume24h,
+      volumeToday,
+      trend,
+    };
   });
   saveState(state);
   return { items, updatedAt: state.updatedAt, dailyBrief: getDailyMarketBrief() };
@@ -95,7 +155,7 @@ export function recordSale(itemId, qty) {
   const state = loadState();
   if (!MARKET_ITEMS[itemId]) return null;
   state.salesLog[itemId] = pruneSales(state.salesLog[itemId] || []);
-  state.salesLog[itemId].push({ qty, at: Date.now() });
+  state.salesLog[itemId].push({ qty, at: Date.now(), dayKey: dayKey() });
   const price = recalcPrice(itemId, state);
   saveState(state);
   return price;
