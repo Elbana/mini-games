@@ -61,6 +61,17 @@ export function getDailyFarmMood(date = new Date()) {
   };
 }
 
+/** TEMP QA — set false before release. Cycles harvest tiers by plot for testing. */
+export const FORCE_HARVEST_TEST = true;
+
+const HARVEST_TEST_SAMPLES = [
+  { amount: 1, tier: 'poor' },
+  { amount: 2, tier: 'normal' },
+  { amount: 4, tier: 'good' },
+  { amount: 7, tier: 'great' },
+  { amount: 14, tier: 'mega' },
+];
+
 /** 0 = whale crops, 1 = starter crops — cheap seeds roll bigger hauls for fun. */
 function harvestGenerosity(seedPrice = 200) {
   if (seedPrice <= 600) return 1;
@@ -70,6 +81,15 @@ function harvestGenerosity(seedPrice = 200) {
 }
 
 export function rollFarmHarvestYield({ plotIndex, seedId, baseAmount = 1, seedPrice = 200, date = new Date() }) {
+  if (FORCE_HARVEST_TEST) {
+    const pick = HARVEST_TEST_SAMPLES[plotIndex % HARVEST_TEST_SAMPLES.length];
+    return {
+      amount: Math.max(pick.amount, baseAmount),
+      tier: pick.tier,
+      hotCrop: false,
+    };
+  }
+
   const mood = getDailyFarmMood(date);
   const rnd = mulberry32(hashSeed(`harvest:${dayKey(date)}:${plotIndex}:${seedId}`));
   const gen = harvestGenerosity(seedPrice);
@@ -106,7 +126,7 @@ export function rollFarmHarvestYield({ plotIndex, seedId, baseAmount = 1, seedPr
   if (gen >= 0.72 && amount === 1 && r2 > 0.25) amount = 2;
 
   const tier =
-    amount >= 10 || mult >= 4.5 ? 'jackpot' :
+    amount >= 10 || mult >= 4.5 ? 'mega' :
     amount >= 5 || mult >= 2.4 ? 'great' :
     amount >= 3 || mult >= 1.45 ? 'good' :
     mult < 1 ? 'poor' : 'normal';

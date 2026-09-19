@@ -291,7 +291,7 @@ html, body {
   z-index: 56;
 }
 
-.harvest-float-plus.jackpot {
+.harvest-float-plus.mega-haul {
   font-size: 1.65rem;
   color: #fff;
   text-shadow: 0 0 14px rgba(255, 213, 110, 0.9);
@@ -316,7 +316,7 @@ html, body {
   will-change: transform, opacity;
 }
 
-.harvest-fly.jackpot {
+.harvest-fly.mega-haul {
   filter: drop-shadow(0 0 12px rgba(255, 213, 110, 0.85));
 }
 

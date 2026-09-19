@@ -288,11 +288,11 @@
           return;
         }
 
-        if (name === 'harvestJackpot') {
+        if (name === 'harvestMega') {
           if (self.cache.has('harvest')) {
             self._playSampleBurst('harvest', o, 5, 95);
           } else {
-            self._playSynth('harvestJackpot', o);
+            self._playSynth('harvestMega', o);
           }
           return;
         }
@@ -421,7 +421,7 @@
           this._sfxHarvestPop(t, v * 0.75, 0.13, 0.7);
           this._sfxHarvestPop(t, v * 0.75, 0.22, 0.7);
           break;
-        case 'harvestJackpot':
+        case 'harvestMega':
           this._sfxHarvestPop(t, v, 0, 0.85);
           [0.12, 0.2, 0.28, 0.36].forEach(function (d) {
             this._sfxHarvestPop(t, v * 0.7, d, 0.6);

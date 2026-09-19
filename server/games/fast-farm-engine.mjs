@@ -40,13 +40,13 @@ export const SEEDS = {
   cabbage: tier(10000, 1, 'cabbage', 'Cabbage', 'crop_cabbage', 'Heavy seed, heavy risk.', {
     seed: 'cabbage', planted: 'cabbage', icon: 'cabbage',
   }),
-  berry: tier(25000, 1, 'berry', 'Berry', 'crop_berry', 'High roller berries.', {
+  berry: tier(25000, 1, 'berry', 'Berry', 'crop_berry', 'Premium berries — pricey seeds.', {
     seed: 'berry', planted: 'berry', icon: 'berry',
   }),
-  pumpkin: tier(55000, 1, 'pumpkin', 'Pumpkin', 'crop_pumpkin', 'Whale patch — expect losses.', {
+  pumpkin: tier(55000, 1, 'pumpkin', 'Pumpkin', 'crop_pumpkin', 'Big investment patch — tough margins.', {
     seed: 'pumkin', planted: 'pumkin', icon: 'pumpkin',
   }),
-  mushroom: tier(100000, 1, 'mushroom', 'Mushroom', 'crop_mushroom', '100k seed. Rare payday.', {
+  mushroom: tier(100000, 1, 'mushroom', 'Mushroom', 'crop_mushroom', '100k seed. Rare big harvest.', {
     seed: 'Mushrooms', planted: 'Mushrooms', icon: 'Mushrooms',
   }),
 };

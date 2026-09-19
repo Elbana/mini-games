@@ -558,14 +558,14 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
   const countBox = countEl.getBoundingClientRect();
   const iconSrc = iconEl.src;
   const harvestAmt = Math.max(1, Math.round(amount));
-  const visualCount = Math.min(harvestAmt, tier === 'jackpot' ? 14 : tier === 'great' ? 12 : 10);
-  const isJackpot = tier === 'jackpot' || tier === 'great';
+  const visualCount = Math.min(harvestAmt, tier === 'mega' ? 14 : tier === 'great' ? 12 : 10);
+  const isBigHaul = tier === 'mega' || tier === 'great';
   if (!anchor) return Promise.resolve();
 
   const { cx, cy } = anchor;
   const tx = countBox.left + countBox.width * 0.5;
   const ty = countBox.top + countBox.height * 0.5;
-  const size = isJackpot ? 38 : 34;
+  const size = isBigHaul ? 38 : 34;
 
   const addPerLand = [];
   let remaining = harvestAmt;
@@ -579,7 +579,7 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
   setCropCount(itemId, prevTotal, false);
 
   const plusFloat = document.createElement('div');
-  plusFloat.className = `harvest-float-plus${isJackpot ? ' jackpot' : ''}`;
+  plusFloat.className = `harvest-float-plus${isBigHaul ? ' mega-haul' : ''}`;
   plusFloat.textContent = `+${harvestAmt}`;
   plusFloat.style.left = `${cx}px`;
   plusFloat.style.top = `${cy - 28}px`;
@@ -598,7 +598,7 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
     const clusterX = cx + Math.cos(angle) * spreadR;
     const clusterY = cy + Math.sin(angle) * spreadR * 0.72;
     const el = document.createElement('img');
-    el.className = `harvest-fly${isJackpot ? ' jackpot' : ''}`;
+    el.className = `harvest-fly${isBigHaul ? ' mega-haul' : ''}`;
     el.src = iconSrc;
     el.alt = '';
     el.style.width = `${size}px`;
@@ -635,7 +635,7 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
         for (const p of particles) {
           p.x = lerp(p.cx, p.clusterX, e);
           p.y = lerp(p.cy, p.clusterY, e);
-          p.scale = e * (isJackpot ? 1.15 : 1.05);
+          p.scale = e * (isBigHaul ? 1.15 : 1.05);
           p.opacity = Math.min(1, t * 1.8);
         }
       } else if (elapsed < SPAWN_MS + CLUSTER_MS) {
@@ -645,7 +645,7 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
         for (const p of particles) {
           p.x = lerp(p.cx, p.clusterX, pull);
           p.y = lerp(p.cy, p.clusterY, pull) - Math.sin(t * Math.PI) * 6;
-          p.scale = (isJackpot ? 1.12 : 1.02) * pulse;
+          p.scale = (isBigHaul ? 1.12 : 1.02) * pulse;
           p.opacity = 1;
         }
       } else {
@@ -658,7 +658,7 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
             const arc = Math.sin(lt * Math.PI) * -18;
             p.x = lerp(p.clusterX, tx, e);
             p.y = lerp(p.clusterY, ty, e) + arc;
-            p.scale = lerp(isJackpot ? 1.1 : 1, 0.45, e);
+            p.scale = lerp(isBigHaul ? 1.1 : 1, 0.45, e);
             p.opacity = lt > 0.88 ? 1 - (lt - 0.88) / 0.12 : 1;
           } else if (!p.landed) {
             p.landed = true;
@@ -973,11 +973,11 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
         farm.inventory = r.inventory;
         await playHarvestCollectAnimation(index, itemId, amt, tier, prevTotal, newTotal);
       }
-      if (tier === 'jackpot') sfx('harvestJackpot', { volume: 0.34 });
+      if (tier === 'mega') sfx('harvestMega', { volume: 0.34 });
       else if (tier === 'great') sfx('harvestGreat', { volume: 0.3 });
 
       const hype =
-        tier === 'jackpot' ? '🎉 JACKPOT harvest!' :
+        tier === 'mega' ? '🎉 Mega harvest!' :
         tier === 'great' ? '✨ Great haul!' :
         tier === 'good' ? '🌾 Nice crop!' :
         tier === 'poor' ? '🌾 Small harvest' : '🌾 Harvested!';
