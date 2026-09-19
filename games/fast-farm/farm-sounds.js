@@ -1,6 +1,16 @@
 (function () {
   const STORAGE_KEY = 'fast-farm-sound';
 
+  const HARVEST_PRESET = {
+    randomSlice: true,
+    sliceMin: 0.3,
+    sliceMax: 0.48,
+    sliceHop: 0.03,
+    sliceRelativePeak: 0.18,
+    volume: 0.82,
+    rate: 1,
+  };
+
   /** Cozy game samples + synth feed/blight/error. WebView-safe syntax. */
   class FarmSounds {
     constructor(manifest) {
@@ -10,6 +20,7 @@
       this.cache = new Map();
       this.muted = localStorage.getItem(STORAGE_KEY) === 'off';
       this._destroyed = false;
+      this._harvestSliceStarts = null;
       this._ready = this._init();
     }
 
@@ -31,7 +42,10 @@
         })
         .then(function (data) {
           if (data.byteLength < 256) throw new Error('empty ' + file);
-          return self.ctx.decodeAudioData(data.slice(0));
+          const copy = data.slice(0);
+          return new Promise(function (resolve, reject) {
+            self.ctx.decodeAudioData(copy, resolve, reject);
+          });
         });
     }
 
@@ -59,7 +73,14 @@
               })
               .catch(function () {});
           });
-          return Promise.all(jobs);
+          return Promise.all(jobs).then(function () {
+            if (self.cache.has('harvest') && HARVEST_PRESET.randomSlice) {
+              self._harvestSliceStarts = self._buildHarvestSliceStarts(
+                self.cache.get('harvest'),
+                HARVEST_PRESET
+              );
+            }
+          });
         })
         .catch(function () {});
     }
@@ -84,14 +105,89 @@
       const presets = {
         water: { volume: 0.42, rate: 1 },
         plant: { volume: 0.5, rate: 1.08 },
-        harvest: { volume: 0.52, rate: 0.95 },
+        harvest: { offset: 0, volume: 0.78, rate: 1 },
         heal: { volume: 0.38, rate: 1 },
         clear: { offset: 0, duration: 1.4, volume: 0.44, rate: 1 },
         click: { volume: 0.28, rate: 1 },
         toolSelect: { volume: 0.3, rate: 1 },
         harvestTick: { volume: 0.18, rate: 1.1 },
       };
+      if (name === 'harvest') {
+        presets.harvest = {
+          offset: 0,
+          volume: HARVEST_PRESET.volume != null ? HARVEST_PRESET.volume : 0.78,
+          rate: HARVEST_PRESET.rate != null ? HARVEST_PRESET.rate : 1,
+        };
+      }
       return presets[name] || { volume: 0.4, rate: 1 };
+    }
+
+    _buildHarvestSliceStarts(buf, preset) {
+      const hopSec = preset.sliceHop != null ? preset.sliceHop : 0.03;
+      const minPeak = preset.sliceMinPeak != null ? preset.sliceMinPeak : 0.02;
+      const relative = preset.sliceRelativePeak != null ? preset.sliceRelativePeak : 0.18;
+      const data = buf.getChannelData(0);
+      const sr = buf.sampleRate;
+      const hop = Math.max(1, Math.floor(sr * hopSec));
+      let globalPeak = 0;
+      let i;
+      for (i = 0; i < data.length; i += hop) {
+        let peak = 0;
+        const end = Math.min(i + hop, data.length);
+        for (let j = i; j < end; j++) {
+          const a = Math.abs(data[j]);
+          if (a > peak) peak = a;
+        }
+        if (peak > globalPeak) globalPeak = peak;
+      }
+      const threshold = Math.max(minPeak, globalPeak * relative);
+      const starts = [];
+      for (i = 0; i < data.length; i += hop) {
+        let peak = 0;
+        const end = Math.min(i + hop, data.length);
+        for (let j = i; j < end; j++) {
+          const a = Math.abs(data[j]);
+          if (a > peak) peak = a;
+        }
+        if (peak >= threshold) {
+          starts.push({ offset: i / sr, peak: peak });
+        }
+      }
+      return starts.length ? starts : [{ offset: 0, peak: 1 }];
+    }
+
+    _randomHarvestSlice(base) {
+      const buf = this.cache.get('harvest');
+      const h = HARVEST_PRESET;
+      const sliceMin = h.sliceMin != null ? h.sliceMin : 0.3;
+      const sliceMax = h.sliceMax != null ? h.sliceMax : 0.48;
+      const dur = sliceMin + Math.random() * Math.max(0.05, sliceMax - sliceMin);
+      let offset = 0;
+      const starts = this._harvestSliceStarts;
+      if (starts && starts.length) {
+        const pick = starts[Math.floor(Math.random() * starts.length)];
+        offset = Math.max(0, pick.offset - 0.015);
+        if (buf && offset + dur > buf.duration - 0.02) {
+          offset = Math.max(0, buf.duration - dur - 0.02);
+        }
+      } else if (buf && buf.duration > dur + 0.08) {
+        offset = Math.random() * (buf.duration - dur - 0.05);
+      }
+      const rateBase = base.rate != null ? base.rate : (h.rate != null ? h.rate : 1);
+      return {
+        offset: offset,
+        duration: dur,
+        volume: base.volume,
+        rate: rateBase * (0.95 + Math.random() * 0.12),
+      };
+    }
+
+    _playHarvestSample(opts) {
+      const base = this._mergeOpts(this._sampleDefaults('harvest'), opts || {});
+      if (HARVEST_PRESET.randomSlice) {
+        return this._playSample('harvest', this._randomHarvestSlice(base));
+      }
+      return this._playSample('harvest', base);
     }
 
     _mergeOpts(defaults, opts) {
@@ -115,8 +211,11 @@
       const g = this.ctx.createGain();
       g.gain.value = o.volume != null ? o.volume : 0.45;
       src.connect(g).connect(this.ctx.destination);
-      const offset = Math.max(0, o.offset || 0);
-      const dur = o.duration && o.duration > 0 ? o.duration : undefined;
+      const offset = Math.max(0, Math.min(o.offset || 0, Math.max(0, buf.duration - 0.05)));
+      let dur;
+      if (o.duration && o.duration > 0) {
+        dur = Math.min(o.duration, Math.max(0.05, buf.duration - offset));
+      }
       src.start(0, offset, dur);
       return true;
     }
@@ -124,15 +223,26 @@
     _playSampleBurst(sampleName, opts, count, gapMs) {
       const self = this;
       const base = self._mergeOpts(self._sampleDefaults(sampleName), opts);
+      const useRandom = sampleName === 'harvest' && HARVEST_PRESET.randomSlice;
+      const snipDur = base.duration && base.duration > 0 ? base.duration : 0.45;
+      const snipOffsets = [base.offset || 0, 1.0, 2.0, 0.5, 1.5];
       for (let i = 0; i < count; i++) {
         (function (idx) {
           setTimeout(function () {
             if (self._destroyed || self.muted) return;
+            if (useRandom) {
+              const slice = self._randomHarvestSlice({
+                volume: base.volume * (1 - idx * 0.05),
+                rate: base.rate,
+              });
+              self._playSample(sampleName, slice);
+              return;
+            }
             self._playSample(sampleName, {
-              volume: base.volume * (1 - idx * 0.07),
-              rate: base.rate + idx * 0.03,
-              offset: base.offset,
-              duration: base.duration,
+              volume: base.volume * (1 - idx * 0.05),
+              rate: base.rate,
+              offset: snipOffsets[idx % snipOffsets.length],
+              duration: snipDur,
             });
           }, idx * gapMs);
         })(i);
@@ -155,9 +265,18 @@
           return;
         }
 
+        if (name === 'harvest') {
+          if (self.cache.has('harvest')) {
+            self._playHarvestSample(o);
+          } else {
+            self._playSynth('harvest', o);
+          }
+          return;
+        }
+
         if (name === 'harvestGreat') {
           if (self.cache.has('harvest')) {
-            self._playSampleBurst('harvest', o, 3, 95);
+            self._playSampleBurst('harvest', o, 3, 110);
           } else {
             self._playSynth('harvestGreat', o);
           }
@@ -166,7 +285,7 @@
 
         if (name === 'harvestJackpot') {
           if (self.cache.has('harvest')) {
-            self._playSampleBurst('harvest', o, 5, 80);
+            self._playSampleBurst('harvest', o, 5, 95);
           } else {
             self._playSynth('harvestJackpot', o);
           }
@@ -265,10 +384,10 @@
 
     _sfxHarvestPop(t, v, delay, volScale) {
       const scale = volScale != null ? volScale : 1;
-      this._noise(t, { dur: 0.018, volume: v * 0.35 * scale, freq: 2400, q: 2, delay: delay });
-      this._tone(t, { f: 1180, f2: 720, dur: 0.018, type: 'square', volume: v * 0.12 * scale, delay: delay });
-      this._tone(t, { f: 920, f2: 580, dur: 0.02, type: 'square', volume: v * 0.1 * scale, delay: delay + 0.014 });
-      this._tone(t, { f: 310, f2: 145, dur: 0.1, type: 'sine', volume: v * 0.52 * scale, delay: delay + 0.035 });
+      const d = delay || 0;
+      this._noise(t, { dur: 0.06, volume: v * 0.55 * scale, freq: 680, freqEnd: 320, type: 'bandpass', delay: d });
+      this._noise(t, { dur: 0.04, volume: v * 0.35 * scale, freq: 1800, q: 1.5, delay: d + 0.02, falloff: true });
+      this._tone(t, { f: 420, f2: 180, dur: 0.08, type: 'triangle', volume: v * 0.45 * scale, delay: d + 0.03 });
     }
 
     _sfxBlight(t, v) {
@@ -288,6 +407,9 @@
       switch (name) {
         case 'fertilize':
           this._sfxFertilize(t, v);
+          break;
+        case 'harvest':
+          this._sfxHarvestPop(t, v * 1.4, 0, 1);
           break;
         case 'harvestGreat':
           this._sfxHarvestPop(t, v, 0, 0.9);

@@ -510,7 +510,6 @@ function playHarvestCollectAnimation(plotIndex, itemId, amount, tier = 'normal',
   if (!anchor) return Promise.resolve();
 
   const { cx, cy } = anchor;
-  sfx('harvest', { volume: 0.26 });
   const tx = countBox.left + countBox.width * 0.5;
   const ty = countBox.top + countBox.height * 0.5;
   const size = isJackpot ? 38 : 34;
@@ -901,6 +900,7 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
       closeSheet('sheet-plot');
     }
     if (action === 'harvest') {
+      sfx('harvest', { volume: 0.72 });
       const seed = seeds[farm.plots[index]?.seed_id];
       const itemId = r.harvested?.itemId;
       const amt = r.harvested?.amount || 1;
