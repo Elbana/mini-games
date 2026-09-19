@@ -203,8 +203,13 @@ export async function handleHeal(req, res) {
   const farm = ensureFarm(session);
   const plot = applyGrowthState({ ...farm.plots[plot_index] });
 
-  if (plot.state !== 'dead' && !needsHeal(plot)) {
-    return res.status(400).json({ success: false, error: 'This crop is not sick' });
+  if (plot.state === 'dead' || !needsHeal(plot)) {
+    return res.status(400).json({
+      success: false,
+      error: plot.state === 'dead'
+        ? 'Crop is dead — clear the plot and replant'
+        : 'This crop does not need medicine',
+    });
   }
 
   const seed = SEEDS[plot.seed_id];

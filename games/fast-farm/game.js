@@ -156,7 +156,7 @@ function selectTool(tool) {
   const labels = {
     water: 'Tap a thirsty plot to water',
     fertilize: 'Tap a hungry plot to feed',
-    heal: 'Tap a sick or dead plot to heal',
+    heal: 'Tap a sick plot to heal',
     clear: 'Tap a dead plot to clear',
   };
   Arcade.toast(labels[tool] || 'Tap a plot');
@@ -171,9 +171,10 @@ function updateToolbarBadges() {
     water: 0,
     fertilize: 0,
     heal: 0,
+    clear: 0,
   };
   for (const plot of farm.plots || []) {
-    if (plot.state === 'dead') counts.heal += 1;
+    if (plot.state === 'dead') counts.clear += 1;
     else if (careIsActive(plot)) {
       const action = careActionForPlot(plot);
       if (action === 'water') counts.water += 1;
@@ -216,14 +217,14 @@ function canUseToolOnPlot(tool, plot) {
   }
 
   if (tool === 'heal') {
-    if (plot.state === 'dead') return { ok: true };
+    if (plot.state === 'dead') return { ok: false, msg: 'Crop is dead — clear the plot first' };
     if (careIsActive(plot) && careActionForPlot(plot) === 'heal') return { ok: true };
     return { ok: false, msg: 'This crop does not need medicine' };
   }
 
   if (tool === 'water') {
     if (plot.state === 'empty') return { ok: false, msg: 'Plant something first' };
-    if (plot.state === 'dead') return { ok: false, msg: 'Use Heal or Clear on dead plots' };
+    if (plot.state === 'dead') return { ok: false, msg: 'Clear the dead plot first' };
     if (plot.ready || plot.state === 'ready') return { ok: false, msg: 'Ready to pick — use the basket' };
     if (careIsActive(plot) && careActionForPlot(plot) === 'water') return { ok: true };
     return { ok: false, msg: 'This plot does not need water right now' };
@@ -231,7 +232,7 @@ function canUseToolOnPlot(tool, plot) {
 
   if (tool === 'fertilize') {
     if (plot.state === 'empty') return { ok: false, msg: 'Plant something first' };
-    if (plot.state === 'dead') return { ok: false, msg: 'Use Heal or Clear on dead plots' };
+    if (plot.state === 'dead') return { ok: false, msg: 'Clear the dead plot first' };
     if (plot.ready || plot.state === 'ready') return { ok: false, msg: 'Ready to pick — use the basket' };
     if (careIsActive(plot) && careActionForPlot(plot) === 'fertilize') return { ok: true };
     return { ok: false, msg: 'This plot does not need feed right now' };
@@ -649,14 +650,13 @@ function plotBaseAsset(plot, seed) {
 }
 
 function careIsActive(plot) {
-  return plot.needs_care || plot.state === 'wilting';
+  return plot.needs_care;
 }
 
 function cropVisualClass(plot) {
   if (plot.ready || plot.state === 'ready') return 'crop-ready';
   if (plot.state === 'dead') return 'crop-dead';
-  if (!careIsActive(plot)) return 'crop-ok';
-  if (plot.state === 'wilting') return 'crop-wilting';
+  if (!plot.needs_care) return 'crop-ok';
   if (plot.care_type === 'sick') return 'crop-sick';
   if (plot.care_type === 'fertilize') return 'crop-hungry';
   if (plot.care_type === 'water') return 'crop-thirsty';
@@ -666,8 +666,7 @@ function cropVisualClass(plot) {
 function careLabel(plot) {
   if (plot.ready || plot.state === 'ready') return '⭐';
   if (plot.state === 'dead') return '💀';
-  if (!careIsActive(plot)) return '';
-  if (plot.state === 'wilting') return '⚠️';
+  if (!plot.needs_care) return '';
   if (plot.care_type === 'sick') return '🤒';
   if (plot.care_type === 'fertilize') return '🌿';
   if (plot.care_type === 'water') return '💧';
@@ -695,7 +694,7 @@ function renderPlots() {
           <div class="plot-crop ${cropCls}">
             <img class="crop-sprite" src="${assetIcon(seed.assets.icon)}" alt="">
             <span class="sick-veil"></span>
-            ${cropCls === 'crop-sick' || cropCls === 'crop-wilting' ? '<span class="sick-bugs">🦠</span>' : ''}
+            ${cropCls === 'crop-sick' ? '<span class="sick-bugs">🦠</span>' : ''}
           </div>`;
       }
 
@@ -737,9 +736,21 @@ async function handlePlotTap(index) {
     return;
   }
 
+  if (plot.state === 'dead') {
+    if (activeTool && activeTool !== 'clear') {
+      sfx('error', { volume: 0.2 });
+      Arcade.toast('Clear the dead plot first', 'lose');
+      return;
+    }
+    await applyToolToPlot('clear', index);
+    return;
+  }
+
   if (!activeTool) {
-    if (careIsActive(plot) || plot.state === 'dead') {
-      Arcade.toast('Pick a tool from the bar below');
+    if (careIsActive(plot)) {
+      sfx('click', { volume: 0.2 });
+      openPlotSheet(index);
+      return;
     }
     return;
   }
@@ -820,11 +831,9 @@ function buildPlotSheetContent(plot, seed) {
 
   if (plot.state === 'dead') {
     const blight = plot.death_reason === 'blight';
-    const costs = plotCareCosts(plot);
-    return `<p class="sheet-intro warn">${blight ? '🌪️ Sudden blight — nothing you could do!' : 'Crop died from neglect.'} Heal to retry or clear.</p>
+    return `<p class="sheet-intro warn">${blight ? '🌪️ Sudden blight — crop is gone.' : 'Crop died from neglect.'} Clear the plot and plant again.</p>
       <div class="action-row">
-        <button type="button" class="action-btn heal" data-action="heal">💊 Revive 🪙${fmtCoins(costs.heal)}</button>
-        <button type="button" class="action-btn clear" data-action="clear">🗑️ Clear plot</button>
+        <button type="button" class="action-btn clear pulse" data-action="clear">🧹 Clear plot</button>
       </div>`;
   }
 
@@ -874,7 +883,7 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
     if (action === 'plant') {
       if (!seedId) return;
       await Arcade.post('/api/fast-farm/buy-seed', { seed_id: seedId, plot_index: index });
-      sfx('plant', { volume: 0.16 });
+      sfx('plant', { volume: 0.08 });
       Arcade.toast('🌱 Planted!', 'win');
       closeSheet('sheet-plot');
       return;
@@ -896,6 +905,7 @@ async function runPlotAction(action, index, seedId, skipToolFx = false, keepBusy
     else if (action === 'fertilize') Arcade.toast('🌿 Fed!', 'win');
     else if (action === 'heal') Arcade.toast('💊 Healed!', 'win');
     if (action === 'clear') {
+      sfx('clear', { volume: 0.36 });
       Arcade.toast('Cleared', 'win');
       closeSheet('sheet-plot');
     }

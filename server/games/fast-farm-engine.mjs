@@ -91,7 +91,7 @@ export function normalizeFarm(raw) {
     version: 7,
     plots: raw.plots.map((p, i) => ({
       plot_index: p.plot_index ?? i,
-      state: p.state === 'locked' ? 'empty' : (p.state ?? 'empty'),
+      state: p.state === 'locked' ? 'empty' : p.state === 'wilting' ? 'growing' : (p.state ?? 'empty'),
       seed_id: p.seed_id ?? null,
       planted_at: p.planted_at ?? null,
       care_step: p.care_step ?? 0,
@@ -166,9 +166,7 @@ export function applyGrowthState(plot, now = Date.now()) {
   if (overdue > (WILT_GRACE_SEC + DEAD_AFTER_WILT_SEC) * 1000) {
     p.state = 'dead';
     p.death_reason = p.death_reason || 'neglect';
-  } else if (overdue > WILT_GRACE_SEC * 1000) {
-    p.state = 'wilting';
-  } else if (p.state !== 'wilting') {
+  } else {
     p.state = 'growing';
   }
 
@@ -193,10 +191,7 @@ export function needsFertilize(plot, now = Date.now()) {
 
 export function needsHeal(plot, now = Date.now()) {
   const type = currentCareType(plot);
-  return (
-    (type === 'sick' && (needsCare(plot, now) || plot.state === 'wilting')) ||
-    plot.state === 'dead'
-  );
+  return type === 'sick' && needsCare(plot, now);
 }
 
 export function careActionForPlot(plot) {
@@ -211,7 +206,7 @@ export function canPerformCare(plot, action, now = Date.now()) {
     return false;
   }
   if (action !== careActionForPlot(plot)) return false;
-  return needsCare(plot, now) || plot.state === 'wilting';
+  return needsCare(plot, now);
 }
 
 export function canFertilize(plot, now = Date.now()) {
@@ -278,10 +273,7 @@ export function afterFertilize(plot, now = Date.now()) {
 
 export function afterHeal(plot, now = Date.now()) {
   if (plot.state === 'dead') {
-    return scheduleNextCare(
-      { ...plot, state: 'growing', care_step: plot.care_step || 0, death_reason: null },
-      now,
-    );
+    throw new Error('Crop is dead — clear the plot and replant');
   }
   if (!canPerformCare(plot, 'heal', now)) {
     throw new Error('This crop is not sick');
