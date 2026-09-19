@@ -280,6 +280,7 @@ export function handleHarvest(req, res) {
     plotIndex: plot_index,
     seedId: plot.seed_id,
     baseAmount: seed.harvestAmount,
+    seedPrice: seed.price,
   });
   addInventory(session, seed.marketItem, harvestRoll.amount);
   session.arcade.stats.farmHarvests += 1;

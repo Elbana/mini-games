@@ -25,13 +25,13 @@ function tier(price, harvestAmount, id, name, marketItem, desc, assets) {
 }
 
 export const SEEDS = {
-  carrot: tier(200, 1, 'carrot', 'Carrot', 'crop_carrot', 'Starter crop — cheap but fragile.', {
+  carrot: tier(200, 3, 'carrot', 'Carrot', 'crop_carrot', 'Starter crop — cheap but fragile.', {
     seed: 'carrot', planted: 'carrot', icon: 'carrot',
   }),
-  potato: tier(600, 1, 'potato', 'Potato', 'crop_potato', 'Low stakes, low mercy.', {
+  potato: tier(600, 2, 'potato', 'Potato', 'crop_potato', 'Low stakes, low mercy.', {
     seed: 'potato', planted: 'potato', icon: 'potato',
   }),
-  beans: tier(1500, 1, 'beans', 'Beans', 'crop_beans', 'Mid grind begins here.', {
+  beans: tier(1500, 2, 'beans', 'Beans', 'crop_beans', 'Mid grind begins here.', {
     seed: 'beans', planted: 'beans', icon: 'beans',
   }),
   corn: tier(4000, 1, 'corn', 'Corn', 'crop_corn', 'Golden rows, thin margins.', {

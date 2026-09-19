@@ -61,33 +61,56 @@ export function getDailyFarmMood(date = new Date()) {
   };
 }
 
-export function rollFarmHarvestYield({ plotIndex, seedId, baseAmount = 1, date = new Date() }) {
+/** 0 = whale crops, 1 = starter crops — cheap seeds roll bigger hauls for fun. */
+function harvestGenerosity(seedPrice = 200) {
+  if (seedPrice <= 600) return 1;
+  if (seedPrice <= 4000) return 0.72;
+  if (seedPrice <= 25000) return 0.42;
+  return 0.18;
+}
+
+export function rollFarmHarvestYield({ plotIndex, seedId, baseAmount = 1, seedPrice = 200, date = new Date() }) {
   const mood = getDailyFarmMood(date);
   const rnd = mulberry32(hashSeed(`harvest:${dayKey(date)}:${plotIndex}:${seedId}`));
+  const gen = harvestGenerosity(seedPrice);
   let mult = 1;
 
-  if (seedId === mood.hotCrop) mult *= 1.35 + rnd() * 0.45;
+  if (seedId === mood.hotCrop) mult *= 1.25 + rnd() * 0.55;
 
   const r = rnd();
-  if (mood.kind === 'bounty') {
-    if (r < 0.06) mult *= 6;
-    else if (r < 0.18) mult *= 3;
-    else if (r < 0.42) mult *= 2;
-  } else if (mood.kind === 'normal') {
-    if (r < 0.03) mult *= 5;
-    else if (r < 0.14) mult *= 2;
-  } else if (mood.kind === 'lean') {
-    if (r < 0.08) mult *= 3;
-    else if (r < 0.2) mult *= 2;
-    else if (r > 0.88) mult *= 0.5;
-  } else {
-    if (r < 0.12) mult *= 2;
-    else if (r > 0.9) mult *= 0.5;
+  const r2 = rnd();
+  const moodLuck =
+    mood.kind === 'bounty' ? 1.4 :
+    mood.kind === 'normal' ? 1 :
+    mood.kind === 'lean' ? 0.88 : 0.78;
+
+  const megaAt = (0.035 + gen * 0.07) * moodLuck;
+  const greatAt = megaAt + (0.08 + gen * 0.14);
+  const goodAt = greatAt + (0.12 + gen * 0.2);
+
+  if (r < megaAt) {
+    mult *= 3 + Math.floor(r2 * 5);
+  } else if (r < greatAt) {
+    mult *= 2 + Math.floor(r2 * 2.5);
+  } else if (r < goodAt) {
+    mult *= 1.45 + r2 * 1.1;
+  } else if (gen < 0.45 && r > 0.9 && mood.kind !== 'bounty') {
+    mult *= 0.5;
   }
 
-  const amount = Math.max(1, Math.round(baseAmount * mult));
+  if (gen >= 0.72 && mult < 1.5 && r2 < 0.5) mult = 1.5 + r2 * 0.8;
+  if (gen >= 1 && mult < 1.85 && r2 < 0.62) mult = 1.85 + r2 * 0.9;
+
+  let amount = Math.max(1, Math.round(baseAmount * mult));
+  if (gen >= 1 && amount <= 2 && r2 > 0.35) amount += 1 + Math.floor(r2 * 2);
+  if (gen >= 0.72 && amount === 1 && r2 > 0.25) amount = 2;
+
   const tier =
-    mult >= 5 ? 'jackpot' : mult >= 2.5 ? 'great' : mult >= 1.5 ? 'good' : mult < 1 ? 'poor' : 'normal';
+    amount >= 10 || mult >= 4.5 ? 'jackpot' :
+    amount >= 5 || mult >= 2.4 ? 'great' :
+    amount >= 3 || mult >= 1.45 ? 'good' :
+    mult < 1 ? 'poor' : 'normal';
+
   return { amount, tier, hotCrop: seedId === mood.hotCrop };
 }
 
