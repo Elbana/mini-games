@@ -23,9 +23,8 @@
 
     <div class="farm-ui">
       <header class="farm-top-bar">
-        <a class="farm-back-btn" id="btn-hub" href="/" aria-label="Back to hub">‹</a>
-        <p class="farm-daily-mood" id="farm-daily-mood">🌤️ Loading farm mood…</p>
-        <div class="farm-top-actions">
+        <div class="farm-top-left">
+          <a class="farm-back-btn" id="btn-hub" href="/" aria-label="Back to hub">‹</a>
           <button type="button" class="farm-icon-btn" id="btn-help" aria-label="How to play">?</button>
           <button type="button" class="farm-icon-btn sound-toggle" id="btn-sound" aria-pressed="false" aria-label="Sound on">🔊</button>
         </div>
@@ -40,12 +39,12 @@
         <span class="farm-tool-badge hidden" data-badge="water">0</span>
       </button>
       <button type="button" class="farm-tool" data-tool="fertilize" aria-pressed="false" aria-label="Fertilizer">
-        <span class="farm-tool-icon" aria-hidden="true">🌿</span>
+        <span class="farm-tool-icon" aria-hidden="true">🧴</span>
         <span class="farm-tool-label">Fertilizer</span>
         <span class="farm-tool-badge hidden" data-badge="fertilize">0</span>
       </button>
       <button type="button" class="farm-tool" data-tool="heal" aria-pressed="false" aria-label="Insecticide">
-        <span class="farm-tool-icon farm-tool-icon-spray" aria-hidden="true"></span>
+        <span class="farm-tool-icon" aria-hidden="true"><span class="farm-tool-icon-spray"></span></span>
         <span class="farm-tool-label">Insecticide</span>
         <span class="farm-tool-badge hidden" data-badge="heal">0</span>
       </button>

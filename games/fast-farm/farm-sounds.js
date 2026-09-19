@@ -111,7 +111,7 @@
         water: { volume: 0.42, rate: 1 },
         plant: { volume: 0.1, rate: 1.08 },
         harvest: { offset: 0, volume: 0.78, rate: 1 },
-        heal: { volume: 0.38, rate: 1 },
+        heal: { volume: 0.12, rate: 1 },
         clear: { offset: 0, duration: 1.4, volume: 0.44, rate: 1 },
         click: { volume: 0.28, rate: 1 },
         toolSelect: { volume: 0.3, rate: 1 },

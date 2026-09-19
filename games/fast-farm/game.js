@@ -21,7 +21,7 @@ function sfx(name, opts) {
 
 const TOOL_FX = {
   water: { emoji: '🪣', class: 'fx-water', particles: 'water' },
-  fertilize: { emoji: '🌿', class: 'fx-fertilize', particles: 'fert' },
+  fertilize: { emoji: '🧴', class: 'fx-fertilize', particles: 'fert' },
   heal: { class: 'fx-spray', particles: 'spray', icon: 'spray' },
   harvest: { emoji: '🧺', class: 'fx-harvest' },
   plant: { emoji: '🌱', class: 'fx-plant' },
@@ -103,7 +103,7 @@ function bindUi() {
 
   function tapPlotFromEvent(e, clientX, clientY) {
     if (actionBusy) return;
-    if (e.target?.closest?.('.farm-top-bar, .farm-toolbar, .farm-sheet:not(.hidden), .farm-top-actions')) return;
+    if (e.target?.closest?.('.farm-top-bar, .farm-toolbar, .farm-sheet:not(.hidden), .farm-crop-stack')) return;
 
     const now = Date.now();
     if (now - lastPlotTapAt < 100) return;
@@ -309,7 +309,7 @@ function playToolUseAnimation(plotIndex, tool) {
   const cx = anchor.cx;
   const cy = anchor.cy - anchor.height * 0.06;
 
-  sfx(tool, { volume: 0.28 });
+  sfx(tool, { volume: tool === 'heal' ? 0.1 : 0.28 });
 
   const el = document.createElement('div');
   el.className = `farm-tool-fx ${cfg.class}`;
@@ -915,7 +915,7 @@ function buildPlotSheetContent(plot, seed) {
   if (action === 'water') {
     html += `<button type="button" class="action-btn water pulse" data-action="water">💧 Water</button>`;
   } else if (action === 'fertilize') {
-    html += `<button type="button" class="action-btn fert pulse" data-action="fertilize">🌿 Fertilizer 🪙${fmtCoins(costs.fertilize)}</button>`;
+    html += `<button type="button" class="action-btn fert pulse" data-action="fertilize">🧴 Fertilizer 🪙${fmtCoins(costs.fertilize)}</button>`;
   } else {
     html += `<button type="button" class="action-btn spray pulse" data-action="heal">🐛 Insecticide 🪙${fmtCoins(costs.heal)}</button>`;
   }

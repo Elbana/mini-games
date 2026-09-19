@@ -68,32 +68,16 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
+  z-index: 15;
+  padding: max(10px, env(safe-area-inset-top, 10px)) max(10px, env(safe-area-inset-left, 10px)) 0;
+  pointer-events: none;
+}
+
+.farm-top-left {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  padding-top: max(12px, env(safe-area-inset-top, 12px));
+  gap: clamp(6px, 2vw, 10px);
   pointer-events: auto;
-}
-
-.farm-daily-mood {
-  flex: 1;
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.88);
-  text-align: center;
-  line-height: 1.25;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-}
-
-.farm-daily-mood.farm-mood-hot {
-  color: #ffe08a;
-}
-
-.farm-daily-mood.farm-mood-storm {
-  color: #ffb4b4;
 }
 
 .farm-back-btn,
@@ -101,20 +85,22 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(36px, 10vw, 42px);
-  height: clamp(36px, 10vw, 42px);
+  flex-shrink: 0;
+  width: clamp(38px, 11vw, 44px);
+  height: clamp(38px, 11vw, 44px);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   color: #fff;
-  font-size: 1.4rem;
   line-height: 1;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .farm-back-btn {
   text-decoration: none;
+  font-size: 1.55rem;
+  font-weight: 700;
 }
 
 .farm-icon-btn {
@@ -130,15 +116,8 @@ html, body {
 }
 
 .farm-icon-btn[aria-pressed='true'] {
-  background: rgba(255, 255, 255, 0.12);
-  opacity: 0.85;
-}
-
-.farm-top-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 0.88;
 }
 
 .farm-hint {
@@ -156,18 +135,20 @@ html, body {
   letter-spacing: 0.02em;
 }
 
-/* Stacked harvest totals — top right */
+/* Stacked harvest totals — top right, clear of left controls */
 .farm-crop-stack {
   position: absolute;
   top: max(10px, env(safe-area-inset-top, 10px));
   right: max(8px, env(safe-area-inset-right, 8px));
+  left: auto;
   z-index: 12;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 3px;
   pointer-events: none;
-  max-height: min(72vh, 520px);
+  max-width: min(42vw, 168px);
+  max-height: min(68vh, 480px);
   overflow: hidden;
 }
 
@@ -834,12 +815,19 @@ html, body {
   100% { opacity: 0; transform: translate(-50%, -48%) scale(0.75) rotate(-6deg); }
 }
 
-.fx-spray-can,
-.farm-tool-icon-spray {
+.fx-spray-can {
   display: block;
   width: 1.15em;
   height: 1.35em;
   position: relative;
+}
+
+.farm-tool-icon-spray {
+  display: block;
+  width: 68%;
+  height: 68%;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .fx-spray-can::before,
@@ -867,12 +855,6 @@ html, body {
   background: linear-gradient(135deg, #cfd8dc, #90a4ae);
   transform: rotate(-24deg);
   box-shadow: -3px 2px 0 rgba(0, 0, 0, 0.12);
-}
-
-.farm-tool-icon-spray {
-  width: 28px;
-  height: 32px;
-  margin: 0 auto;
 }
 
 .farm-tool-particle.spray-mist {
@@ -1648,13 +1630,23 @@ html, body {
 
 @media (max-width: 390px) {
   .farm-screen { --field-top: clamp(38%, 41vh, 44%); }
-  .farm-toolbar { gap: 10px; padding-left: 10px; padding-right: 10px; }
+  .farm-toolbar { gap: 8px; padding-left: 8px; padding-right: 8px; }
   .farm-tool-icon {
     width: 40px;
     height: 40px;
     font-size: 1.3rem;
   }
-  .farm-tool-label { font-size: 0.55rem; }
+  .farm-tool-label {
+    font-size: 0.5rem;
+    max-width: 3.6rem;
+  }
+  .farm-back-btn,
+  .farm-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .farm-back-btn { font-size: 1.4rem; }
+  .farm-crop-stack { max-width: min(40vw, 148px); }
 }
 
 @media (max-width: 360px) {
