@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="ballShine" cx="32%" cy="28%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="ballGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="64" cy="64" r="58" fill="#0a0618" opacity="0.5"/>
+  <g filter="url(#ballGlow)">
+    <path d="M64 8 L74 28 L96 22 L86 44 L112 64 L86 84 L96 106 L74 100 L64 120 L54 100 L32 106 L42 84 L16 64 L42 44 L32 22 L54 28 Z" fill="#e11d48"/>
+    <path d="M64 16 L72 32 L90 28 L82 46 L104 64 L82 82 L90 100 L72 96 L64 112 L56 96 L38 100 L46 82 L24 64 L46 46 L38 28 L56 32 Z" fill="#2563eb"/>
+    <path d="M64 24 L68 36 L82 34 L76 48 L92 64 L76 80 L82 94 L68 92 L64 104 L60 92 L46 94 L52 80 L36 64 L52 48 L46 34 L60 36 Z" fill="#eab308"/>
+    <path d="M64 32 L66 40 L76 39 L72 50 L84 64 L72 78 L76 89 L66 88 L64 96 L62 88 L52 89 L56 78 L44 64 L56 50 L52 39 L62 40 Z" fill="#16a34a"/>
+    <path d="M64 40 L64 46 L70 45 L67 54 L74 64 L67 74 L70 83 L64 82 L64 88 L64 82 L58 83 L61 74 L54 64 L61 54 L58 45 L64 46 Z" fill="#9333ea"/>
+    <circle cx="64" cy="64" r="22" fill="#f97316"/>
+    <circle cx="64" cy="64" r="22" fill="url(#ballShine)"/>
+  </g>
+  <ellipse cx="48" cy="46" rx="10" ry="6" fill="rgba(255,255,255,0.55)" transform="rotate(-25 48 46)"/>
+</svg>

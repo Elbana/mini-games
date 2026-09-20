@@ -3,8 +3,11 @@
   "candies": ["red", "blue", "yellow", "green", "purple", "orange"],
   "candyPath": "/candy-battle/assets/candies/{color}.png",
   "special": {
-    "energy": "/candy-battle/assets/special/energy.svg",
-    "buyin": "/candy-battle/assets/special/buyin.svg"
+    "energy": "/candy-battle/assets/special/color-bomb.svg",
+    "colorBomb": "/candy-battle/assets/special/color-bomb.svg",
+    "rocketH": "/candy-battle/assets/special/rocket-h.svg",
+    "rocketV": "/candy-battle/assets/special/rocket-v.svg",
+    "dynamite": "/candy-battle/assets/special/dynamite.svg"
   },
   "background": "/candy-battle/assets/bg-board.png",
   "explosion": [

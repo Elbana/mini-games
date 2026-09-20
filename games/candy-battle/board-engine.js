@@ -1,11 +1,12 @@
 /** Candy Crush–style board with specials, cascades, color wipes. */
-export const COLS = 8;
-export const ROWS = 8;
+export const COLS = 7;
+export const ROWS = 7;
 export const COLORS = 6;
 
 export const ENERGY = 10;
 export const BUYIN = 11;
-export const STRIPE_H = 100; // + color 0-5
+export const WRAPPED = 12;
+export const STRIPE_H = 100;
 export const STRIPE_V = 200;
 
 export function isNormal(v) {
@@ -23,11 +24,20 @@ export function isEnergy(v) {
 export function isBuyin(v) {
   return v === BUYIN;
 }
+export function isWrapped(v) {
+  return v === WRAPPED;
+}
 export function isStripe(v) {
   return v >= STRIPE_H && v < STRIPE_V + COLORS;
 }
+export function isSpecial(v) {
+  return isEnergy(v) || isBuyin(v) || isWrapped(v) || isStripe(v);
+}
 
-export function createBoard(spawnBuyin = false) {
+/** Chance for new refill candies to spawn as a special (testing / juice). */
+export const TEST_SPECIAL_RATE = 0.35;
+
+export function createBoard() {
   const grid = emptyGrid();
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -37,17 +47,51 @@ export function createBoard(spawnBuyin = false) {
   while (findTurnResult(grid).groups.length) {
     fixBoard(grid);
   }
-  if (spawnBuyin) maybeSpawnBuyin(grid);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (isBuyin(grid[r][c])) grid[r][c] = randomCandy(grid, r, c);
+    }
+  }
   return grid;
+}
+
+function rollForcedSpecial() {
+  const roll = Math.random();
+  if (roll < 0.35) return ENERGY;
+  if (roll < 0.65) return WRAPPED;
+  const color = Math.floor(Math.random() * COLORS);
+  return Math.random() < 0.5 ? STRIPE_H + color : STRIPE_V + color;
+}
+
+function rollTestSpecial() {
+  if (Math.random() > TEST_SPECIAL_RATE) return null;
+  return rollForcedSpecial();
+}
+
+/** Place a few specials on the board so FX can be tested quickly. */
+export function seedTestSpecials(grid, count = 4) {
+  let placed = 0;
+  let guard = 0;
+  while (placed < count && guard++ < 300) {
+    const r = Math.floor(Math.random() * ROWS);
+    const c = Math.floor(Math.random() * COLS);
+    const prev = grid[r][c];
+    grid[r][c] = rollForcedSpecial();
+    if (!findTurnResult(grid).groups.length) {
+      placed++;
+    } else {
+      grid[r][c] = prev;
+    }
+  }
 }
 
 function emptyGrid() {
   return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 }
 
-export function randomCandy(grid, r, c, buyinChance = 0) {
-  if (buyinChance > 0 && Math.random() < buyinChance) return BUYIN;
-  if (Math.random() < 0.025) return ENERGY;
+export function randomCandy(grid, r, c) {
+  const testSpecial = rollTestSpecial();
+  if (testSpecial != null) return testSpecial;
   let t;
   let guard = 0;
   do {
@@ -64,7 +108,7 @@ export function randomCandy(grid, r, c, buyinChance = 0) {
 function sameMatchColor(cell, color) {
   if (cell == null) return false;
   if (isNormal(cell)) return cell === color;
-  if (isEnergy(cell) || isBuyin(cell)) return true;
+  if (isEnergy(cell) || isBuyin(cell) || isWrapped(cell)) return false;
   return colorOf(cell) === color;
 }
 
@@ -80,19 +124,196 @@ function cellInMatch(grid, r, c) {
   return findTurnResult(grid).groups.some((g) => g.cells.some((p) => p.r === r && p.c === c));
 }
 
-export function maybeSpawnBuyin(grid) {
-  const r = Math.floor(Math.random() * ROWS);
-  const c = Math.floor(Math.random() * COLS);
-  grid[r][c] = BUYIN;
+/** Valid swap: creates a match OR activates a special piece. */
+export function isValidSwap(grid, r0, c0, r1, c1) {
+  swapCells(grid, r0, c0, r1, c1);
+  const hasMatch = findTurnResult(grid, { includeSpecialLines: true }).groups.length > 0;
+  swapCells(grid, r0, c0, r1, c1);
+  if (hasMatch) return true;
+  return canActivateBySwap(grid[r0][c0], grid[r1][c1]);
 }
 
-/** One cascade step: matches, specials to create, board effects. */
-export function findTurnResult(grid) {
-  const groups = [];
+function canActivateBySwap(v0, v1) {
+  if (isEnergy(v0) || isEnergy(v1)) return true;
+  if (isWrapped(v0) || isWrapped(v1)) return true;
+  if (isStripe(v0) || isStripe(v1)) return true;
+  return false;
+}
+
+function colorFromPiece(v) {
+  if (isNormal(v)) return v;
+  if (isStripe(v)) return colorOf(v);
+  return null;
+}
+
+function addRow(toClear, row) {
+  for (let c = 0; c < COLS; c++) toClear.add(`${row},${c}`);
+}
+
+function addCol(toClear, col) {
+  for (let r = 0; r < ROWS; r++) toClear.add(`${r},${col}`);
+}
+
+function addArea(toClear, centerR, centerC, radius) {
+  for (let r = centerR - radius; r <= centerR + radius; r++) {
+    for (let c = centerC - radius; c <= centerC + radius; c++) {
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) toClear.add(`${r},${c}`);
+    }
+  }
+}
+
+/** Color wiped = the candy type matched/swapped with the color ball (not random match color). */
+function energyWipeColor(g, grid) {
+  const counts = {};
+  for (const { r, c } of g.cells) {
+    const v = grid[r][c];
+    if (isEnergy(v) || isBuyin(v) || isWrapped(v)) continue;
+    if (isNormal(v)) counts[v] = (counts[v] || 0) + 1;
+    else if (isStripe(v)) {
+      const col = colorOf(v);
+      counts[col] = (counts[col] || 0) + 1;
+    }
+  }
+  let best = null;
+  let max = 0;
+  for (const [col, n] of Object.entries(counts)) {
+    if (n > max) {
+      max = n;
+      best = Number(col);
+    }
+  }
+  return best ?? g.color;
+}
+
+function addColorWipe(grid, toClear, color) {
+  const wiped = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const v = grid[r][c];
+      if (v == null) continue;
+      if (isNormal(v) && v === color) {
+        toClear.add(`${r},${c}`);
+        wiped.push({ r, c });
+      } else if (isStripe(v) && colorOf(v) === color) {
+        toClear.add(`${r},${c}`);
+        wiped.push({ r, c });
+      }
+    }
+  }
+  return wiped;
+}
+
+function addFullBoardWipe(grid, toClear) {
+  const wiped = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const v = grid[r][c];
+      if (v == null) continue;
+      if (isNormal(v) || isStripe(v) || isWrapped(v) || isEnergy(v)) {
+        toClear.add(`${r},${c}`);
+        wiped.push({ r, c });
+      }
+    }
+  }
+  return wiped;
+}
+
+/** Activate specials when swapped without forming a match (Candy Crush style). */
+export function resolveSwapActivation(grid, r0, c0, r1, c1) {
+  const a = { r: r0, c: c0, v: grid[r0][c0] };
+  const b = { r: r1, c: c1, v: grid[r1][c1] };
+  if (!canActivateBySwap(a.v, b.v)) return null;
+
+  const toClear = new Set();
+  const effects = [];
+
+  toClear.add(`${a.r},${a.c}`);
+  toClear.add(`${b.r},${b.c}`);
+
+  if (isEnergy(a.v) && isEnergy(b.v)) {
+    const wiped = addFullBoardWipe(grid, toClear);
+    effects.push({ kind: 'colorBombDouble', count: wiped.length, origin: a });
+    return buildActivation(toClear, effects, grid);
+  }
+
+  if (isEnergy(a.v) || isEnergy(b.v)) {
+    const bomb = isEnergy(a.v) ? a : b;
+    const other = bomb === a ? b : a;
+    const color = colorFromPiece(other.v);
+    if (color != null) {
+      const wiped = addColorWipe(grid, toClear, color);
+      effects.push({
+        kind: 'colorWipe',
+        color,
+        count: wiped.length,
+        wiped,
+        origin: bomb,
+        bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
+      });
+    }
+  }
+
+  if (isWrapped(a.v) && isWrapped(b.v)) {
+    addArea(toClear, a.r, a.c, 2);
+    addArea(toClear, b.r, b.c, 2);
+    effects.push({ kind: 'dynamite', row: a.r, col: a.c, big: true });
+    effects.push({ kind: 'dynamite', row: b.r, col: b.c, big: true });
+  } else if (isWrapped(a.v) || isWrapped(b.v)) {
+    const pos = isWrapped(a.v) ? a : b;
+    addArea(toClear, pos.r, pos.c, 1);
+    effects.push({ kind: 'dynamite', row: pos.r, col: pos.c, big: false });
+  }
+
+  if (isStripe(a.v) && isStripe(b.v)) {
+    addRow(toClear, a.r);
+    addCol(toClear, a.c);
+    addRow(toClear, b.r);
+    addCol(toClear, b.c);
+    effects.push({ kind: 'rowBlast', row: a.r, color: colorOf(a.v) ?? 0, cross: true });
+    effects.push({ kind: 'colBlast', col: b.c, color: colorOf(b.v) ?? 0, cross: true });
+  } else if (isStripe(a.v) || isStripe(b.v)) {
+    const pos = isStripe(a.v) ? a : b;
+    const v = pos.v;
+    const col = colorOf(v) ?? 0;
+    if (v >= STRIPE_H && v < STRIPE_H + COLORS) {
+      addRow(toClear, pos.r);
+      effects.push({ kind: 'rowBlast', row: pos.r, color: col });
+    } else {
+      addCol(toClear, pos.c);
+      effects.push({ kind: 'colBlast', col: pos.c, color: col });
+    }
+  }
+
+  if (!effects.length) return null;
+  return buildActivation(toClear, effects, grid);
+}
+
+function buildActivation(toClear, effects, grid) {
+  const cells = [...toClear].map((s) => {
+    const [r, c] = s.split(',').map(Number);
+    return { r, c, type: grid[r][c] };
+  });
+  return { cells, effects, waveMeta: [{ kind: 'swapSpecial', size: cells.length }] };
+}
+
+function swapTouchesCells(cells, swap) {
+  if (!swap || cells == null) return false;
+  const keys = new Set([`${swap.r0},${swap.c0}`, `${swap.r1},${swap.c1}`]);
+  return cells.some((p) => keys.has(`${p.r},${p.c}`));
+}
+
+export function findTurnResult(grid, opts = {}) {
   const horizontal = scanLines(grid, true);
   const vertical = scanLines(grid, false);
-  const merged = mergeRuns([...horizontal, ...vertical]);
+  const squares = scanSquares(grid);
+  let specialLines = opts.includeSpecialLines ? scanSpecialLineMatches(grid) : [];
+  if (specialLines.length && opts.swap) {
+    specialLines = specialLines.filter((run) => swapTouchesCells(run.cells, opts.swap));
+  }
+  specialLines = specialLines.map((run) => ({ ...run, isSpecialLine: true }));
+  const merged = mergeRuns([...horizontal, ...vertical, ...squares, ...specialLines]);
 
+  const groups = [];
   for (const run of merged) {
     if (run.cells.length < 3) continue;
     const dominant = dominantColor(run.cells, grid);
@@ -101,12 +322,33 @@ export function findTurnResult(grid) {
       color: dominant,
       size: run.cells.length,
       hasEnergy: run.cells.some(({ r, c }) => isEnergy(grid[r][c])),
-      hasBuyin: run.cells.some(({ r, c }) => isBuyin(grid[r][c])),
       hasStripe: run.cells.some(({ r, c }) => isStripe(grid[r][c])),
+      hasWrapped: run.cells.some(({ r, c }) => isWrapped(grid[r][c])),
     });
   }
 
   return { groups, creates: proposeCreates(groups), effects: [] };
+}
+
+function scanSquares(grid) {
+  const runs = [];
+  for (let r = 0; r < ROWS - 1; r++) {
+    for (let c = 0; c < COLS - 1; c++) {
+      const v = grid[r][c];
+      if (!isNormal(v)) continue;
+      if (grid[r][c + 1] === v && grid[r + 1][c] === v && grid[r + 1][c + 1] === v) {
+        runs.push({
+          cells: [
+            { r, c },
+            { r, c: c + 1 },
+            { r: r + 1, c },
+            { r: r + 1, c: c + 1 },
+          ],
+        });
+      }
+    }
+  }
+  return runs;
 }
 
 function scanLines(grid, horizontal) {
@@ -136,9 +378,77 @@ function canExtendRun(run, v, grid) {
   const dom = dominantColor(run, grid);
   if (dom == null) return false;
   if (isNormal(v)) return v === dom;
-  if (isEnergy(v) || isBuyin(v)) return true;
+  if (isEnergy(v) || isBuyin(v) || isWrapped(v)) return false;
   if (isStripe(v)) return colorOf(v) === dom;
   return false;
+}
+
+/** Color ball only match in a tight line: ball + 2+ same-color candies. */
+function scanSpecialLineMatches(grid) {
+  const runs = [];
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!isEnergy(grid[r][c])) continue;
+
+      let best = null;
+      for (const [dr, dc] of [
+        [0, 1],
+        [1, 0],
+      ]) {
+        const cells = matchLineThroughSpecial(grid, r, c, dr, dc);
+        if (!cells || cells.length < 3) continue;
+        const candyCount = cells.filter(({ r: cr, c: cc }) => isNormal(grid[cr][cc]) || isStripe(grid[cr][cc])).length;
+        const score = candyCount * 10 + cells.length;
+        if (!best || score > best.score) best = { cells, score };
+      }
+      if (best) runs.push({ cells: best.cells });
+    }
+  }
+  return runs;
+}
+
+function matchLineThroughSpecial(grid, r, c, dr, dc) {
+  if (!isEnergy(grid[r][c])) return null;
+
+  let best = null;
+  for (let color = 0; color < COLORS; color++) {
+    const cells = extendLineForColor(grid, r, c, dr, dc, color, isEnergy);
+    if (cells.length >= 3 && (!best || cells.length > best.length)) best = cells;
+  }
+  return best;
+}
+
+function extendLineForColor(grid, r, c, dr, dc, color, testSpecial) {
+  const inLine = (v) => {
+    if (v == null || isWrapped(v)) return false;
+    if (testSpecial(v)) return true;
+    if (isNormal(v)) return v === color;
+    if (isStripe(v)) return colorOf(v) === color;
+    return false;
+  };
+
+  const cells = [{ r, c }];
+  const maxReach = 1;
+  for (let step = 1; step <= maxReach; step++) {
+    const nr = r - dr * step;
+    const nc = c - dc * step;
+    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || !inLine(grid[nr][nc])) break;
+    cells.unshift({ r: nr, c: nc });
+  }
+  for (let step = 1; step <= maxReach; step++) {
+    const nr = r + dr * step;
+    const nc = c + dc * step;
+    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || !inLine(grid[nr][nc])) break;
+    cells.push({ r: nr, c: nc });
+  }
+
+  if (cells.length < 3) return [];
+  const colorCount = cells.filter(({ r: cr, c: cc }) => {
+    const v = grid[cr][cc];
+    return (isNormal(v) && v === color) || (isStripe(v) && colorOf(v) === color);
+  }).length;
+  return colorCount >= 2 ? cells : [];
 }
 
 function dominantColor(cells, grid) {
@@ -169,6 +479,7 @@ function mergeRuns(runs) {
   for (const run of runs) {
     let merged = false;
     for (const existing of out) {
+      if (Boolean(existing.isSpecialLine) !== Boolean(run.isSpecialLine)) continue;
       if (runsOverlap(existing.cells, run.cells)) {
         const map = new Map();
         [...existing.cells, ...run.cells].forEach((p) => map.set(`${p.r},${p.c}`, p));
@@ -177,7 +488,7 @@ function mergeRuns(runs) {
         break;
       }
     }
-    if (!merged) out.push(run);
+    if (!merged) out.push({ ...run, cells: [...run.cells] });
   }
   return out;
 }
@@ -190,71 +501,86 @@ function runsOverlap(a, b) {
 function proposeCreates(groups) {
   const creates = [];
   for (const g of groups) {
-    if (g.hasEnergy || g.hasStripe || g.hasBuyin) continue;
+    if (g.hasEnergy || g.hasStripe || g.hasWrapped) continue;
     const center = g.cells[Math.floor(g.cells.length / 2)];
-    if (g.size >= 5) creates.push({ r: center.r, c: center.c, piece: ENERGY });
-    else if (g.size === 4) {
-      const horizontal =
-        g.cells.every((p) => p.r === g.cells[0].r) ||
-        g.cells.filter((p) => p.r === g.cells[0].r).length >= 3;
-      creates.push({
-        r: center.r,
-        c: center.c,
-        piece: horizontal ? STRIPE_H + g.color : STRIPE_V + g.color,
-      });
+    if (g.size >= 5) {
+      creates.push({ r: center.r, c: center.c, piece: ENERGY });
+    } else if (g.size === 4) {
+      const sameRow = g.cells.every((p) => p.r === g.cells[0].r);
+      const sameCol = g.cells.every((p) => p.c === g.cells[0].c);
+      if (sameRow || sameCol) {
+        creates.push({
+          r: center.r,
+          c: center.c,
+          piece: sameRow ? STRIPE_H + g.color : STRIPE_V + g.color,
+        });
+      } else {
+        creates.push({ r: center.r, c: center.c, piece: WRAPPED });
+      }
     }
   }
   return creates;
 }
 
-/** Expand groups with stripe / energy / buyin effects. Returns cells to clear + meta effects. */
-export function expandEffects(grid, groups) {
+export function expandEffects(grid, groups, opts = {}) {
   const toClear = new Set();
   const effects = [];
-  const waveMeta = [];
+  const forceBomb = opts.forceBombActivation === true;
+
+  function allowSpecialActivation(g) {
+    if (forceBomb) return true;
+    if (!opts.allowBombActivation) return false;
+    return swapTouchesCells(g.cells, opts.swap);
+  }
 
   for (const g of groups) {
     for (const { r, c } of g.cells) toClear.add(`${r},${c}`);
 
-    if (g.hasBuyin) {
-      effects.push({ kind: 'buyin', bonus: 2 + Math.min(3, g.size - 3) });
-      waveMeta.push({ kind: 'buyin', size: g.size });
-    }
-
-    if (g.hasEnergy && g.color != null) {
-      const wiped = [];
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          const v = grid[r][c];
-          if (v == null) continue;
-          if (isNormal(v) && v === g.color) {
-            toClear.add(`${r},${c}`);
-            wiped.push({ r, c });
-          } else if (isStripe(v) && colorOf(v) === g.color) {
-            toClear.add(`${r},${c}`);
-            wiped.push({ r, c });
-          }
-        }
+    if (g.hasEnergy && allowSpecialActivation(g)) {
+      const bombCell = g.cells.find(({ r, c }) => isEnergy(grid[r][c]));
+      const wipeColor = energyWipeColor(g, grid);
+      if (wipeColor != null) {
+        const wiped = addColorWipe(grid, toClear, wipeColor);
+        effects.push({
+          kind: 'colorWipe',
+          color: wipeColor,
+          count: wiped.length,
+          wiped,
+          origin: bombCell ? { r: bombCell.r, c: bombCell.c } : g.cells[0],
+          bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
+        });
       }
-      effects.push({ kind: 'colorWipe', color: g.color, count: wiped.length });
-      waveMeta.push({ kind: 'colorWipe', color: g.color, size: wiped.length, bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)) });
     }
 
     for (const { r, c } of g.cells) {
       const v = grid[r][c];
+      if (isWrapped(v)) {
+        addArea(toClear, r, c, 1);
+        effects.push({ kind: 'dynamite', row: r, col: c, big: false });
+      }
       if (isStripe(v)) {
         const col = colorOf(v);
         if (v >= STRIPE_H && v < STRIPE_H + COLORS) {
-          for (let cc = 0; cc < COLS; cc++) toClear.add(`${r},${cc}`);
+          addRow(toClear, r);
           effects.push({ kind: 'rowBlast', row: r, color: col });
         } else {
-          for (let rr = 0; rr < ROWS; rr++) toClear.add(`${rr},${c}`);
+          addCol(toClear, c);
           effects.push({ kind: 'colBlast', col: c, color: col });
         }
       }
     }
+  }
 
-    waveMeta.push({ kind: 'match', size: g.size, color: g.color, combo: 0 });
+  const dynamiteSeen = new Set(
+    effects.filter((e) => e.kind === 'dynamite').map((e) => `${e.row},${e.col}`),
+  );
+  for (const s of toClear) {
+    const [r, c] = s.split(',').map(Number);
+    const key = `${r},${c}`;
+    if (isWrapped(grid[r][c]) && !dynamiteSeen.has(key)) {
+      dynamiteSeen.add(key);
+      effects.push({ kind: 'dynamite', row: r, col: c, big: false });
+    }
   }
 
   const cells = [...toClear].map((s) => {
@@ -262,7 +588,7 @@ export function expandEffects(grid, groups) {
     return { r, c, type: grid[r][c] };
   });
 
-  return { cells, effects, waveMeta };
+  return { cells, effects };
 }
 
 export function findMatchGroups(grid) {
@@ -273,7 +599,7 @@ export function swapCells(grid, r0, c0, r1, c1) {
   [grid[r0][c0], grid[r1][c1]] = [grid[r1][c1], grid[r0][c0]];
 }
 
-export function applyGravity(grid, buyinChance = 0.06) {
+export function applyGravity(grid) {
   const moves = [];
   for (let c = 0; c < COLS; c++) {
     let write = ROWS - 1;
@@ -288,7 +614,7 @@ export function applyGravity(grid, buyinChance = 0.06) {
       }
     }
     for (let r = write; r >= 0; r--) {
-      const piece = randomCandy(grid, r, c, buyinChance);
+      const piece = randomCandy(grid, r, c);
       grid[r][c] = piece;
       moves.push({ fromR: -1, fromC: c, toR: r, toC: c, piece, spawn: true });
     }
@@ -311,16 +637,4 @@ export function clusterCenter(cells) {
   const c = cells.reduce((s, p) => s + p.c, 0) / cells.length;
   const type = cells[0]?.type ?? 0;
   return { r, c, type };
-}
-
-export function pieceLabel(v) {
-  if (isBuyin(v)) return 'buyin';
-  if (isEnergy(v)) return 'energy';
-  if (isStripe(v)) return v >= STRIPE_V ? 'stripe-v' : 'stripe-h';
-  if (isNormal(v)) return manifestColorName(v);
-  return 'candy';
-}
-
-function manifestColorName(i) {
-  return ['red', 'blue', 'yellow', 'green', 'purple', 'orange'][i] || 'red';
 }

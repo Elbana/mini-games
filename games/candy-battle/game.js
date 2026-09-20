@@ -3,23 +3,23 @@ import {
   ROWS,
   COLORS,
   ENERGY,
-  BUYIN,
+  WRAPPED,
   STRIPE_H,
   STRIPE_V,
-  isNormal,
   isEnergy,
-  isBuyin,
+  isWrapped,
   isStripe,
   colorOf,
   createBoard,
+  seedTestSpecials,
   findTurnResult,
   expandEffects,
+  isValidSwap,
+  resolveSwapActivation,
   swapCells,
   clearCells,
   applyGravity,
   applyCreates,
-  findMatchGroups,
-  maybeSpawnBuyin,
 } from './board-engine.js';
 import { BoardAnimator } from './animator.js';
 import { CandySounds } from './sounds.js';
@@ -52,7 +52,6 @@ async function init() {
   if (config.dailyMood?.headline) {
     document.getElementById('lobby-title').textContent = config.dailyMood.headline;
   }
-  await refreshState();
   buildTierPicker();
   buildLevelPicker();
 
@@ -67,6 +66,8 @@ async function init() {
   board.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
   animator = new BoardAnimator(board, manifest, sounds);
   setupBoardInput(board);
+
+  await refreshState();
 
   registerArcadeGameShutdown(() => {
     busy = true;
@@ -157,6 +158,25 @@ async function refreshState() {
   buyIn = st.buyInCandies || {};
   document.getElementById('ammo-count').textContent = Object.values(buyIn).reduce((a, b) => a + b, 0);
   document.getElementById('btn-start').disabled = (buyIn[selectedTier] || 0) < 3;
+
+  if (st.fight?.active) {
+    resumeFight(st.fight, buyIn);
+  }
+}
+
+function resumeFight(activeFight, bi) {
+  fight = activeFight;
+  selectedLevel = fight.level;
+  selectedTier = fight.tierId;
+  document.getElementById('screen-lobby').classList.add('hidden');
+  document.getElementById('screen-fight').classList.remove('hidden');
+  document.getElementById('monster-name').textContent = fight.monsterName;
+  const emoji = MONSTER_EMOJI[selectedLevel - 1] || '👾';
+  document.getElementById('monster-sprite').textContent = emoji;
+  grid = createBoard();
+  seedTestSpecials(grid, 6);
+  renderBoard();
+  updateHud(bi);
 }
 
 function buildTierPicker() {
@@ -229,7 +249,8 @@ async function startFight() {
     document.getElementById('monster-preview').textContent = emoji;
     document.getElementById('monster-sprite').textContent = emoji;
     updateHud(r.buyInCandies || buyIn);
-    grid = createBoard(true);
+    grid = createBoard();
+    seedTestSpecials(grid, 6);
     renderBoard();
   } catch (e) {
     Arcade.toast(e.message, 'lose');
@@ -251,18 +272,23 @@ function updateHud(bi) {
 }
 
 function pieceClass(v) {
-  if (isBuyin(v)) return 'piece piece-buyin';
-  if (isEnergy(v)) return 'piece piece-energy';
-  if (isStripe(v)) return `piece piece-stripe ${v >= STRIPE_V ? 'stripe-v' : 'stripe-h'}`;
-  return 'piece';
+  if (isEnergy(v)) return 'piece piece-color-bomb';
+  if (isWrapped(v)) return 'piece piece-dynamite';
+  if (isStripe(v)) return `piece piece-rocket ${v >= STRIPE_V ? 'rocket-v' : 'rocket-h'}`;
+  return 'piece piece-candy';
 }
 
-function pieceSrc(v) {
-  if (isEnergy(v)) return manifest.special.energy;
-  if (isBuyin(v)) return manifest.special.buyin;
+function candySrc(v) {
   const col = colorOf(v);
   if (col != null) return manifest.candyPath.replace('{color}', manifest.candies[col]);
   return manifest.candyPath.replace('{color}', 'red');
+}
+
+function specialOverlaySrc(v) {
+  if (isEnergy(v)) return manifest.special.colorBomb || manifest.special.energy;
+  if (isWrapped(v)) return manifest.special.dynamite;
+  if (isStripe(v)) return v >= STRIPE_V ? manifest.special.rocketV : manifest.special.rocketH;
+  return null;
 }
 
 function renderBoard() {
@@ -278,17 +304,21 @@ function renderBoard() {
       if (v != null) {
         const wrap = document.createElement('div');
         wrap.className = pieceClass(v);
+        if (isStripe(v) || isWrapped(v)) {
+          const base = document.createElement('img');
+          base.className = 'piece-base';
+          base.draggable = false;
+          base.src = candySrc(v);
+          base.alt = '';
+          wrap.appendChild(base);
+        }
+        const overlay = specialOverlaySrc(v);
         const img = document.createElement('img');
+        img.className = isStripe(v) || isWrapped(v) ? 'piece-overlay' : 'piece-candy';
         img.draggable = false;
-        img.src = pieceSrc(v);
+        img.src = overlay || candySrc(v);
         img.alt = '';
         wrap.appendChild(img);
-        if (isStripe(v)) {
-          const stripe = document.createElement('span');
-          stripe.className = 'stripe-mark';
-          stripe.textContent = v >= STRIPE_V ? '|' : '—';
-          wrap.appendChild(stripe);
-        }
         cell.appendChild(wrap);
       }
       board.appendChild(cell);
@@ -323,29 +353,23 @@ function highlightSelected() {
     document.querySelector(`[data-r="${selectedCell.r}"][data-c="${selectedCell.c}"]`)?.classList.add('selected');
 }
 
-function hasAnyMatch() {
-  return findMatchGroups(grid).length > 0;
-}
-
 async function attemptSwap(r0, c0, r1, c1) {
   busy = true;
   selectedCell = null;
   highlightSelected();
 
-  await animator.swapAnimate(r0, c0, r1, c1);
-  swapCells(grid, r0, c0, r1, c1);
-  renderBoard();
-
-  if (!hasAnyMatch()) {
-    swapCells(grid, r0, c0, r1, c1);
-    renderBoard();
+  if (!isValidSwap(grid, r0, c0, r1, c1)) {
+    await animator.swapAnimate(r0, c0, r1, c1);
     await animator.invalidSwap(r0, c0, r1, c1);
     busy = false;
     return;
   }
 
-  await runFullCascadeTurn();
-  if (fight?.active && Math.random() < 0.35) maybeSpawnBuyin(grid);
+  await animator.swapAnimate(r0, c0, r1, c1);
+  swapCells(grid, r0, c0, r1, c1);
+  renderBoard();
+
+  await runFullCascadeTurn(r0, c0, r1, c1);
   renderBoard();
   busy = false;
 }
@@ -356,37 +380,30 @@ function estimateDamage(size, combo, bonus = 0) {
   return Math.round(base * (1 + (combo - 1) * 0.12) + bonus);
 }
 
-async function runFullCascadeTurn() {
-  if (window.__arcadePaused) return;
-  const waves = [];
-  let combo = 0;
-  const monsterEl = document.getElementById('monster-sprite');
+async function runCascadeWave({
+  cells,
+  effects,
+  groups,
+  creates,
+  combo,
+  waves,
+  monsterEl,
+  allowBombActivation = false,
+  forceBombActivation = false,
+}) {
+  if (combo >= 2 && groups?.length) {
+    animator.showComboWord(combo, Math.max(...groups.map((g) => g.size)));
+  }
 
-  while (true) {
-    if (window.__arcadePaused) return;
-    const { groups, creates } = findTurnResult(grid);
-    if (!groups.length) break;
-    combo++;
+  await animator.playEffects(effects, cells);
 
-    if (combo >= 2) {
-      const maxSize = Math.max(...groups.map((g) => g.size));
-      animator.showComboWord(combo, maxSize);
-    }
+  const colorWipeFx = effects.find((e) => e.kind === 'colorWipe' || e.kind === 'colorBombDouble');
+  const wipeBonus = colorWipeFx?.bonusDmg ?? (colorWipeFx ? Math.min(22, Math.round((colorWipeFx.count || 0) * 1.2)) : 0);
+  let waveDamage = 0;
+  let strikeBig = false;
+  let wipeBonusApplied = false;
 
-    const { cells, effects } = expandEffects(grid, groups);
-
-    for (const fx of effects) {
-      if (fx.kind === 'colorWipe') await animator.colorFieldWipe(fx.color);
-      if (fx.kind === 'rowBlast') await animator.rowColBlast(fx.row, 0, true, fx.color);
-      if (fx.kind === 'colBlast') await animator.rowColBlast(0, fx.col, false, fx.color);
-    }
-
-    const colorWipeFx = effects.find((e) => e.kind === 'colorWipe');
-    const wipeBonus = colorWipeFx ? Math.min(22, Math.round((colorWipeFx.count || 0) * 1.2)) : 0;
-    let waveDamage = 0;
-    let strikeBig = false;
-    let wipeBonusApplied = false;
-
+  if (groups?.length) {
     for (const g of groups) {
       const center = g.cells[Math.floor(g.cells.length / 2)];
       let bonus = 0;
@@ -396,37 +413,99 @@ async function runFullCascadeTurn() {
       }
       const dmg = estimateDamage(g.size, combo, bonus);
       waveDamage += dmg;
-      if (g.hasEnergy || g.size >= 5) strikeBig = true;
+      if (g.hasEnergy || g.hasWrapped || g.size >= 5) strikeBig = true;
 
       waves.push({
         size: g.size,
         combo,
         type: g.color ?? 0,
-        effect: g.hasEnergy ? 'colorWipe' : g.hasBuyin ? 'buyin' : 'match',
+        effect: g.hasEnergy ? 'colorWipe' : g.hasWrapped ? 'areaBlast' : 'match',
         wipeCount: colorWipeFx?.count || 0,
         bonusDmg: bonus,
       });
 
-      if (g.hasBuyin) {
-        const pt = animator.cellCenter(center.r, center.c);
-        animator.showBuyinBonus(pt.x, pt.y, 2 + Math.min(3, g.size - 3));
-      }
     }
+  } else {
+    const size = cells.length;
+    const bonus = wipeBonus;
+    waveDamage = estimateDamage(Math.min(6, Math.max(3, size)), combo, bonus);
+    strikeBig = effects.some((e) => e.kind === 'colorBombDouble' || e.kind === 'dynamite');
+    waves.push({
+      size,
+      combo,
+      type: 0,
+      effect: colorWipeFx ? 'colorWipe' : effects.some((e) => e.kind === 'dynamite') ? 'areaBlast' : 'match',
+      wipeCount: colorWipeFx?.count || 0,
+      bonusDmg: bonus,
+    });
+  }
 
-    const strikeFx =
-      waveDamage > 0 ? animator.energyStrike(cells, waveDamage, monsterEl, strikeBig) : Promise.resolve();
-    await Promise.all([animator.popCells(cells, combo), strikeFx]);
+  const strikeFx =
+    waveDamage > 0 ? animator.energyStrike(cells, waveDamage, monsterEl, strikeBig) : Promise.resolve();
+  await Promise.all([animator.popCells(cells, combo), strikeFx]);
 
-    const createKeys = new Set(creates.map((c) => `${c.r},${c.c}`));
-    const toClear = cells.filter(({ r, c }) => !createKeys.has(`${r},${c}`));
-    clearCells(grid, toClear);
-    applyCreates(grid, creates);
+  const createKeys = new Set((creates || []).map((c) => `${c.r},${c.c}`));
+  const toClear = cells.filter(({ r, c }) => !createKeys.has(`${r},${c}`));
+  clearCells(grid, toClear);
+  applyCreates(grid, creates || []);
 
-    const moves = applyGravity(grid, 0.08);
-    renderBoard();
-    await animator.fallMoves(moves);
+  const moves = applyGravity(grid);
+  renderBoard();
+  await animator.fallMoves(moves);
+  await sleep(80);
+}
 
-    await sleep(80);
+async function runFullCascadeTurn(r0, c0, r1, c1) {
+  if (window.__arcadePaused) return;
+  const waves = [];
+  let combo = 0;
+  const monsterEl = document.getElementById('monster-sprite');
+
+  if (r0 != null) {
+    const activation = resolveSwapActivation(grid, r0, c0, r1, c1);
+    if (activation) {
+      combo++;
+      await runCascadeWave({
+        cells: activation.cells,
+        effects: activation.effects,
+        groups: null,
+        creates: [],
+        combo,
+        waves,
+        monsterEl,
+        forceBombActivation: true,
+      });
+    }
+  }
+
+  let cascadeStep = 0;
+  while (true) {
+    if (window.__arcadePaused) return;
+    cascadeStep++;
+    const playerStep = cascadeStep === 1;
+    const swap = playerStep ? { r0, c0, r1, c1 } : null;
+    const { groups, creates } = findTurnResult(grid, {
+      includeSpecialLines: playerStep,
+      swap,
+    });
+    if (!groups.length) break;
+    combo++;
+
+    const { cells, effects } = expandEffects(grid, groups, {
+      allowBombActivation: playerStep,
+      swap,
+    });
+    await runCascadeWave({
+      cells,
+      effects,
+      groups,
+      creates,
+      combo,
+      waves,
+      monsterEl,
+      allowBombActivation: playerStep,
+      forceBombActivation: false,
+    });
   }
 
   if (!waves.length || window.__arcadePaused) return;
@@ -436,10 +515,6 @@ async function runFullCascadeTurn() {
     if (window.__arcadePaused) return;
     fight = r.fight;
     updateHud(r.buyInCandies);
-
-    if (r.buyinGained) {
-      Arcade.toast(`+${r.buyinGained} buy-in candies!`, 'win');
-    }
 
     if (r.misfortune?.message) {
       Arcade.toast(r.misfortune.message, 'lose');

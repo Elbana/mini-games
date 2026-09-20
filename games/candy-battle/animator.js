@@ -1,6 +1,5 @@
 import { comboWord } from './combo-words.js';
-
-const COLOR_BEAM = ['#ff4d8d', '#4db8ff', '#ffd54d', '#5dffb0', '#b884ff', '#ff9f43'];
+import { ElectricField, spawnChargeBurst, electrifyCell, sleep as fxSleep } from './electric-fx.js';
 
 export class BoardAnimator {
   constructor(boardEl, manifest, sounds) {
@@ -15,6 +14,8 @@ export class BoardAnimator {
 
   destroy() {
     this._destroyed = true;
+    this._electricField?.destroy();
+    this._electricField = null;
     for (const id of this._pendingTimers) clearTimeout(id);
     this._pendingTimers.clear();
     this.fxLayer?.replaceChildren();
@@ -31,19 +32,25 @@ export class BoardAnimator {
     return id;
   }
 
-  candySrc(piece) {
-    if (piece === 10) return this.manifest.special?.energy || '/candy-battle/assets/special/energy.png';
-    if (piece === 11) return this.manifest.special?.buyin || '/candy-battle/assets/special/buyin.png';
-    const col = piece >= 100 ? piece % 100 : piece >= 200 ? piece % 200 : piece;
-    const color = this.manifest.candies[col] || 'red';
-    return this.manifest.candyPath.replace('{color}', color);
-  }
-
   cellCenter(r, c) {
     const el = this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`);
     if (!el) return { x: 0, y: 0 };
     const rect = el.getBoundingClientRect();
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
+
+  /** Fixed overlay aligned to the board — same coordinate space as electric FX. */
+  _boardFxAnchor() {
+    if (!this.fxLayer) return null;
+    const boardRect = this.board.getBoundingClientRect();
+    const anchor = document.createElement('div');
+    anchor.className = 'board-fx-anchor';
+    anchor.style.left = `${boardRect.left}px`;
+    anchor.style.top = `${boardRect.top}px`;
+    anchor.style.width = `${boardRect.width}px`;
+    anchor.style.height = `${boardRect.height}px`;
+    this.fxLayer.appendChild(anchor);
+    return { anchor, boardRect };
   }
 
   async swapAnimate(r0, c0, r1, c1) {
@@ -101,31 +108,218 @@ export class BoardAnimator {
     this._later(tick, 40);
   }
 
-  async colorFieldWipe(color) {
-    const overlay = document.createElement('div');
-    overlay.className = 'color-field-wipe';
-    overlay.style.setProperty('--wipe-color', COLOR_BEAM[color] || '#fff');
-    this.fxLayer?.appendChild(overlay);
-    this.sounds?.play('cascade', { volume: 0.55 });
-    await sleep(520);
-    overlay.remove();
+  /** Color ball — lightning connects ONLY to same-color targets from fx.wiped. */
+  async colorBombLightning(wipedCells, _color, origin) {
+    if (!this.fxLayer || !wipedCells?.length) return;
+
+    const from = origin
+      ? this.cellCenter(origin.r, origin.c)
+      : this.cellCenter(wipedCells[0].r, wipedCells[0].c);
+
+    const originKey = origin ? `${origin.r},${origin.c}` : null;
+    const targets = wipedCells.filter(({ r, c }) => {
+      if (originKey && `${r},${c}` === originKey) return false;
+      return this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+    });
+
+    if (!targets.length) return;
+
+    const targetPoints = targets.map(({ r, c }) => ({
+      r,
+      c,
+      ...this.cellCenter(r, c),
+    }));
+    targetPoints.sort(
+      (a, b) =>
+        Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y),
+    );
+
+    this._electricField?.destroy();
+    const field = new ElectricField(this.fxLayer, from);
+    this._electricField = field;
+    field.spawnTargetArcs(
+      from,
+      targetPoints.map((p) => ({ x: p.x, y: p.y })),
+    );
+    field.startLoop();
+
+    const flash = document.createElement('div');
+    flash.className = 'electric-screen-flash';
+    flash.style.setProperty('--flash-x', `${(from.x / window.innerWidth) * 100}%`);
+    flash.style.setProperty('--flash-y', `${(from.y / window.innerHeight) * 100}%`);
+    this.fxLayer.appendChild(flash);
+
+    spawnChargeBurst(this.fxLayer, from.x, from.y);
+    const bombEl = origin
+      ? this.board
+          .querySelector(`[data-r="${origin.r}"][data-c="${origin.c}"]`)
+          ?.querySelector('.piece-color-bomb')
+      : null;
+    bombEl?.classList.add('color-bomb-charging');
+
+    this.sounds?.play('cascade', { volume: 0.5 });
+    await fxSleep(180);
+
+    const batchSize = targetPoints.length > 14 ? 2 : 1;
+    for (let i = 0; i < targetPoints.length; i += batchSize) {
+      const batch = targetPoints.slice(i, i + batchSize);
+      for (const { r, c, x, y } of batch) {
+        field.fireBolt(from, { x, y }, 0.95);
+        electrifyCell(this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`));
+      }
+      if (i > 0) {
+        const prev = targetPoints[i - 1];
+        const cur = batch[0];
+        field.fireBolt({ x: prev.x, y: prev.y }, { x: cur.x, y: cur.y }, 0.4);
+      }
+      await fxSleep(targetPoints.length > 10 ? 28 : 36);
+    }
+
+    await fxSleep(220);
+    field.stopLoop();
+    field.destroy();
+    if (this._electricField === field) this._electricField = null;
+    flash.remove();
+    bombEl?.classList.remove('color-bomb-charging');
   }
 
-  async rowColBlast(row, col, isRow, color) {
+  async colorBombMega(cells, origin) {
+    if (!this.fxLayer) return;
     const boardRect = this.board.getBoundingClientRect();
-    const beam = document.createElement('div');
-    beam.className = isRow ? 'blast-row' : 'blast-col';
-    beam.style.background = `linear-gradient(90deg, transparent, ${COLOR_BEAM[color]}aa, transparent)`;
-    if (isRow) {
-      const y = this.cellCenter(row, 0).y;
-      beam.style.top = `${y - boardRect.top}px`;
-    } else {
-      const x = this.cellCenter(0, col).x;
-      beam.style.left = `${x - boardRect.left}px`;
+    const cx = boardRect.left + boardRect.width / 2;
+    const cy = boardRect.top + boardRect.height / 2;
+
+    this._electricField?.destroy();
+    const field = new ElectricField(this.fxLayer);
+    this._electricField = field;
+    field.spawnFieldArcs(boardRect, 48);
+    field.startLoop();
+
+    const flash = document.createElement('div');
+    flash.className = 'electric-screen-flash mega';
+    this.fxLayer.appendChild(flash);
+
+    spawnChargeBurst(this.fxLayer, cx, cy);
+    this.sounds?.play('cascade', { volume: 0.65 });
+
+    for (let wave = 0; wave < 4; wave++) {
+      for (let i = 0; i < 12; i++) {
+        const tx = boardRect.left + Math.random() * boardRect.width;
+        const ty = boardRect.top + Math.random() * boardRect.height;
+        field.fireBolt({ x: cx, y: cy }, { x: tx, y: ty }, 1);
+      }
+      await fxSleep(90);
     }
-    this.board.appendChild(beam);
-    await sleep(380);
-    beam.remove();
+
+    for (const { r, c } of cells) {
+      electrifyCell(this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`));
+    }
+
+    await fxSleep(550);
+    field.stopLoop();
+    field.destroy();
+    if (this._electricField === field) this._electricField = null;
+    flash.remove();
+  }
+
+  /** Rocket — white-hot laser sweep + machine sprite. */
+  async rowColBlast(row, col, isRow) {
+    const ctx = this._boardFxAnchor();
+    if (!ctx) return;
+    const { anchor, boardRect } = ctx;
+
+    const track = document.createElement('div');
+    track.className = isRow ? 'rocket-track-h' : 'rocket-track-v';
+    anchor.appendChild(track);
+
+    const rocket = document.createElement('img');
+    rocket.className = 'rocket-sweep';
+    rocket.src = isRow ? this.manifest.special?.rocketH : this.manifest.special?.rocketV;
+    rocket.alt = '';
+    track.appendChild(rocket);
+
+    const beam = document.createElement('div');
+    beam.className = isRow ? 'laser-row' : 'laser-col';
+    const trail = document.createElement('div');
+    trail.className = isRow ? 'laser-trail-h' : 'laser-trail-v';
+
+    if (isRow) {
+      const y = this.cellCenter(row, 0).y - boardRect.top;
+      track.style.top = `${y - 22}px`;
+      beam.style.top = `${y - 2}px`;
+      trail.style.top = `${y - 6}px`;
+    } else {
+      const x = this.cellCenter(0, col).x - boardRect.left;
+      track.style.left = `${x - 22}px`;
+      beam.style.left = `${x - 2}px`;
+      trail.style.left = `${x - 6}px`;
+    }
+
+    anchor.appendChild(trail);
+    anchor.appendChild(beam);
+    this.sounds?.play('projectile', { volume: 0.48 });
+    await fxSleep(520);
+    anchor.remove();
+  }
+
+  /** Dynamite — fire flash, shockwave, debris. */
+  async dynamiteBlast(row, col, big = false) {
+    const ctx = this._boardFxAnchor();
+    if (!ctx) return;
+    const { anchor, boardRect } = ctx;
+    const pt = this.cellCenter(row, col);
+    const x = pt.x - boardRect.left;
+    const y = pt.y - boardRect.top;
+
+    const flash = document.createElement('div');
+    flash.className = `dynamite-flash${big ? ' big' : ''}`;
+    flash.style.left = `${x}px`;
+    flash.style.top = `${y}px`;
+    anchor.appendChild(flash);
+
+    const ring = document.createElement('div');
+    ring.className = `dynamite-shockwave${big ? ' big' : ''}`;
+    ring.style.left = `${x}px`;
+    ring.style.top = `${y}px`;
+    anchor.appendChild(ring);
+
+    const smoke = document.createElement('div');
+    smoke.className = 'dynamite-smoke';
+    smoke.style.left = `${x}px`;
+    smoke.style.top = `${y}px`;
+    anchor.appendChild(smoke);
+
+    const count = big ? 22 : 14;
+    for (let i = 0; i < count; i++) {
+      const debris = document.createElement('div');
+      debris.className = 'dynamite-debris';
+      debris.style.left = `${x}px`;
+      debris.style.top = `${y}px`;
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+      const dist = (big ? 55 : 38) + Math.random() * 30;
+      debris.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+      debris.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+      debris.style.setProperty('--rot', `${Math.random() * 720 - 360}deg`);
+      anchor.appendChild(debris);
+    }
+
+    this.sounds?.play('match', { volume: big ? 0.58 : 0.48 });
+    await fxSleep(big ? 580 : 480);
+    anchor.remove();
+  }
+
+  async playEffects(effects, cells) {
+    for (const fx of effects) {
+      if (fx.kind === 'colorWipe' && fx.wiped?.length) {
+        await this.colorBombLightning(fx.wiped, fx.color, fx.origin);
+      }
+      if (fx.kind === 'colorBombDouble') {
+        await this.colorBombMega(cells, fx.origin);
+      }
+      if (fx.kind === 'rowBlast') await this.rowColBlast(fx.row, 0, true);
+      if (fx.kind === 'colBlast') await this.rowColBlast(0, fx.col, false);
+      if (fx.kind === 'dynamite') await this.dynamiteBlast(fx.row, fx.col, fx.big);
+    }
   }
 
   showComboWord(combo, matchSize) {
@@ -138,7 +332,6 @@ export class BoardAnimator {
     setTimeout(() => el.remove(), 900);
   }
 
-  /** Silver energy gathers at matched cells, then streaks rush to the monster. */
   async energyStrike(sourceCells, damage, monsterEl, big = false) {
     if (!this.fxLayer || !monsterEl || !sourceCells?.length) return;
 
@@ -300,17 +493,6 @@ export class BoardAnimator {
     }, 420);
   }
 
-  showBuyinBonus(x, y, amount) {
-    const el = document.createElement('div');
-    el.className = 'buyin-bonus';
-    el.textContent = `+${amount} FREE!`;
-    el.style.left = `${x}px`;
-    el.style.top = `${y}px`;
-    this.fxLayer?.appendChild(el);
-    this.sounds?.play('win', { volume: 0.35 });
-    setTimeout(() => el.remove(), 1100);
-  }
-
   async fallMoves(moves) {
     if (!moves.length) return;
     const maxDelay = moves.reduce((m, mv) => Math.max(m, mv.toR), 0);
@@ -335,5 +517,5 @@ export class BoardAnimator {
 }
 
 function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+  return fxSleep(ms);
 }
