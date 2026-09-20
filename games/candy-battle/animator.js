@@ -39,18 +39,68 @@ export class BoardAnimator {
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   }
 
-  /** Fixed overlay aligned to the board — same coordinate space as electric FX. */
-  _boardFxAnchor() {
+  _cellSize() {
+    const cell = this.board.querySelector('.cell');
+    if (!cell) return { w: 48, h: 48, size: 48, gap: 3 };
+    const rect = cell.getBoundingClientRect();
+    const boardStyle = getComputedStyle(this.board);
+    const gap = parseFloat(boardStyle.gap) || 3;
+    return { w: rect.width, h: rect.height, size: Math.max(rect.width, rect.height), gap };
+  }
+
+  _cellLocal(r, c, boardRect) {
+    const pt = this.cellCenter(r, c);
+    return { x: pt.x - boardRect.left, y: pt.y - boardRect.top };
+  }
+
+  /** One fixed overlay per FX wave — matches electric field coordinate space. */
+  _beginBoardFxWave() {
     if (!this.fxLayer) return null;
     const boardRect = this.board.getBoundingClientRect();
+    const cell = this._cellSize();
     const anchor = document.createElement('div');
     anchor.className = 'board-fx-anchor';
     anchor.style.left = `${boardRect.left}px`;
     anchor.style.top = `${boardRect.top}px`;
     anchor.style.width = `${boardRect.width}px`;
     anchor.style.height = `${boardRect.height}px`;
+    anchor.style.setProperty('--cell-size', `${cell.size}px`);
+    anchor.style.setProperty('--ring-scale', `${(cell.size * 3.2) / 24}`);
     this.fxLayer.appendChild(anchor);
-    return { anchor, boardRect };
+    return { anchor, boardRect, cell };
+  }
+
+  _pulseCells(cells, className, ms = 480) {
+    const els = cells
+      .map(({ r, c }) => this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`))
+      .filter(Boolean);
+    els.forEach((el) => el.classList.add(className));
+    this._later(() => els.forEach((el) => el.classList.remove(className)), ms);
+    return els;
+  }
+
+  _cellsInRow(row) {
+    return [...this.board.querySelectorAll(`[data-r="${row}"]`)].map((el) => ({
+      r: Number(el.dataset.r),
+      c: Number(el.dataset.c),
+    }));
+  }
+
+  _cellsInCol(col) {
+    return [...this.board.querySelectorAll(`[data-c="${col}"]`)].map((el) => ({
+      r: Number(el.dataset.r),
+      c: Number(el.dataset.c),
+    }));
+  }
+
+  _cellsInArea(row, col, radius = 1) {
+    const out = [];
+    for (let r = row - radius; r <= row + radius; r++) {
+      for (let c = col - radius; c <= col + radius; c++) {
+        if (this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`)) out.push({ r, c });
+      }
+    }
+    return out;
   }
 
   async swapAnimate(r0, c0, r1, c1) {
@@ -222,18 +272,29 @@ export class BoardAnimator {
     flash.remove();
   }
 
-  /** Rocket — white-hot laser sweep + machine sprite. */
-  async rowColBlast(row, col, isRow) {
-    const ctx = this._boardFxAnchor();
-    if (!ctx) return;
-    const { anchor, boardRect } = ctx;
+  /** Rocket — laser sweep locked to the exact board row/column. */
+  _spawnRowColBlast(row, col, isRow, ctx) {
+    const { anchor, boardRect, cell } = ctx;
+    const cs = cell.size;
+    const hitCells = isRow ? this._cellsInRow(row) : this._cellsInCol(col);
+    this._pulseCells(hitCells, isRow ? 'cell-row-blast' : 'cell-col-blast');
 
     const track = document.createElement('div');
     track.className = isRow ? 'rocket-track-h' : 'rocket-track-v';
+    if (isRow) {
+      const mid = this._cellLocal(row, Math.floor(hitCells.length / 2), boardRect);
+      track.style.top = `${mid.y - cs * 0.45}px`;
+      track.style.height = `${cs * 0.9}px`;
+    } else {
+      const mid = this._cellLocal(Math.floor(hitCells.length / 2), col, boardRect);
+      track.style.left = `${mid.x - cs * 0.45}px`;
+      track.style.width = `${cs * 0.9}px`;
+    }
     anchor.appendChild(track);
 
     const rocket = document.createElement('img');
     rocket.className = 'rocket-sweep';
+    rocket.style.width = rocket.style.height = `${cs * 1.15}px`;
     rocket.src = isRow ? this.manifest.special?.rocketH : this.manifest.special?.rocketV;
     rocket.alt = '';
     track.appendChild(rocket);
@@ -244,32 +305,33 @@ export class BoardAnimator {
     trail.className = isRow ? 'laser-trail-h' : 'laser-trail-v';
 
     if (isRow) {
-      const y = this.cellCenter(row, 0).y - boardRect.top;
-      track.style.top = `${y - 22}px`;
-      beam.style.top = `${y - 2}px`;
-      trail.style.top = `${y - 6}px`;
+      const y = this._cellLocal(row, 0, boardRect).y;
+      beam.style.top = `${y - 3}px`;
+      beam.style.height = `${Math.max(4, cs * 0.12)}px`;
+      trail.style.top = `${y - cs * 0.22}px`;
+      trail.style.height = `${cs * 0.45}px`;
     } else {
-      const x = this.cellCenter(0, col).x - boardRect.left;
-      track.style.left = `${x - 22}px`;
-      beam.style.left = `${x - 2}px`;
-      trail.style.left = `${x - 6}px`;
+      const x = this._cellLocal(0, col, boardRect).x;
+      beam.style.left = `${x - 3}px`;
+      beam.style.width = `${Math.max(4, cs * 0.12)}px`;
+      trail.style.left = `${x - cs * 0.22}px`;
+      trail.style.width = `${cs * 0.45}px`;
     }
 
     anchor.appendChild(trail);
     anchor.appendChild(beam);
-    this.sounds?.play('projectile', { volume: 0.48 });
-    await fxSleep(520);
-    anchor.remove();
   }
 
-  /** Dynamite — fire flash, shockwave, debris. */
-  async dynamiteBlast(row, col, big = false) {
-    const ctx = this._boardFxAnchor();
-    if (!ctx) return;
-    const { anchor, boardRect } = ctx;
-    const pt = this.cellCenter(row, col);
-    const x = pt.x - boardRect.left;
-    const y = pt.y - boardRect.top;
+  /** Dynamite — flash + shockwave sized to the 3×3 blast area. */
+  _spawnDynamiteBlast(row, col, big, ctx) {
+    const { anchor, boardRect, cell } = ctx;
+    const cs = cell.size;
+    const radius = big ? 2 : 1;
+    const { x, y } = this._cellLocal(row, col, boardRect);
+    const hitCells = this._cellsInArea(row, col, radius);
+    this._pulseCells(hitCells, 'cell-area-blast', big ? 620 : 500);
+
+    anchor.style.setProperty('--ring-scale', `${(cs * (radius * 2 + 1.1)) / 24}`);
 
     const flash = document.createElement('div');
     flash.className = `dynamite-flash${big ? ' big' : ''}`;
@@ -290,36 +352,59 @@ export class BoardAnimator {
     anchor.appendChild(smoke);
 
     const count = big ? 22 : 14;
+    const distBase = cs * (big ? 1.35 : 0.95);
     for (let i = 0; i < count; i++) {
       const debris = document.createElement('div');
       debris.className = 'dynamite-debris';
       debris.style.left = `${x}px`;
       debris.style.top = `${y}px`;
       const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-      const dist = (big ? 55 : 38) + Math.random() * 30;
+      const dist = distBase + Math.random() * cs * 0.55;
       debris.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
       debris.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
       debris.style.setProperty('--rot', `${Math.random() * 720 - 360}deg`);
       anchor.appendChild(debris);
     }
-
-    this.sounds?.play('match', { volume: big ? 0.58 : 0.48 });
-    await fxSleep(big ? 580 : 480);
-    anchor.remove();
   }
 
   async playEffects(effects, cells) {
     for (const fx of effects) {
       if (fx.kind === 'colorWipe' && fx.wiped?.length) {
         await this.colorBombLightning(fx.wiped, fx.color, fx.origin);
-      }
-      if (fx.kind === 'colorBombDouble') {
+      } else if (fx.kind === 'colorBombDouble') {
         await this.colorBombMega(cells, fx.origin);
       }
-      if (fx.kind === 'rowBlast') await this.rowColBlast(fx.row, 0, true);
-      if (fx.kind === 'colBlast') await this.rowColBlast(0, fx.col, false);
-      if (fx.kind === 'dynamite') await this.dynamiteBlast(fx.row, fx.col, fx.big);
     }
+
+    const blasts = effects.filter((e) =>
+      e.kind === 'dynamite' || e.kind === 'rowBlast' || e.kind === 'colBlast',
+    );
+    if (!blasts.length) return;
+
+    const ctx = this._beginBoardFxWave();
+    if (!ctx) return;
+
+    let playedSound = false;
+    for (const fx of blasts) {
+      if (fx.kind === 'dynamite') {
+        this._spawnDynamiteBlast(fx.row, fx.col, fx.big, ctx);
+        if (!playedSound) {
+          this.sounds?.play('match', { volume: fx.big ? 0.58 : 0.48 });
+          playedSound = true;
+        }
+      } else if (fx.kind === 'rowBlast') {
+        this._spawnRowColBlast(fx.row, 0, true, ctx);
+      } else if (fx.kind === 'colBlast') {
+        this._spawnRowColBlast(0, fx.col, false, ctx);
+      }
+    }
+    if (blasts.some((e) => e.kind === 'rowBlast' || e.kind === 'colBlast')) {
+      this.sounds?.play('projectile', { volume: 0.48 });
+    }
+
+    const maxMs = blasts.some((e) => e.kind === 'dynamite' && e.big) ? 620 : 540;
+    await fxSleep(maxMs);
+    ctx.anchor.remove();
   }
 
   showComboWord(combo, matchSize) {
