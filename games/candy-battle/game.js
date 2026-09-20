@@ -461,9 +461,11 @@ async function runFullCascadeTurn(r0, c0, r1, c1) {
   let combo = 0;
   const monsterEl = document.getElementById('monster-sprite');
 
+  let swapSpecialFired = false;
   if (r0 != null) {
     const activation = resolveSwapActivation(grid, r0, c0, r1, c1);
     if (activation) {
+      swapSpecialFired = true;
       combo++;
       await runCascadeWave({
         cells: activation.cells,
@@ -483,16 +485,16 @@ async function runFullCascadeTurn(r0, c0, r1, c1) {
     if (window.__arcadePaused) return;
     cascadeStep++;
     const playerStep = cascadeStep === 1;
-    const swap = playerStep ? { r0, c0, r1, c1 } : null;
+    const swap = playerStep && !swapSpecialFired ? { r0, c0, r1, c1 } : null;
     const { groups, creates } = findTurnResult(grid, {
-      includeSpecialLines: playerStep,
+      includeSpecialLines: playerStep && !swapSpecialFired,
       swap,
     });
     if (!groups.length) break;
     combo++;
 
     const { cells, effects } = expandEffects(grid, groups, {
-      allowBombActivation: playerStep,
+      allowBombActivation: playerStep && !swapSpecialFired,
       swap,
     });
     await runCascadeWave({

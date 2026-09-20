@@ -258,62 +258,26 @@ function addFullBoardWipe(grid, toClear) {
   return wiped;
 }
 
-/** When a color ball is chain-triggered, wipe the dominant candy color in the blast zone. */
-function pickChainWipeColor(grid, toClear, bombPos) {
-  const counts = {};
-  for (const s of toClear) {
-    const [r, c] = s.split(',').map(Number);
-    if (bombPos && r === bombPos.r && c === bombPos.c) continue;
-    const v = grid[r][c];
-    if (isNormal(v)) counts[v] = (counts[v] || 0) + 1;
-    else if (isStripe(v)) {
-      const col = colorOf(v);
-      counts[col] = (counts[col] || 0) + 1;
-    }
-  }
-  let best = null;
-  let max = 0;
-  for (const [col, n] of Object.entries(counts)) {
-    if (n > max) {
-      max = n;
-      best = Number(col);
-    }
-  }
-  if (best != null) return best;
-
-  const boardCounts = {};
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const v = grid[r][c];
-      if (isNormal(v)) boardCounts[v] = (boardCounts[v] || 0) + 1;
-      else if (isStripe(v)) {
-        const col = colorOf(v);
-        boardCounts[col] = (boardCounts[col] || 0) + 1;
-      }
-    }
-  }
-  max = 0;
-  for (const [col, n] of Object.entries(boardCounts)) {
-    if (n > max) {
-      max = n;
-      best = Number(col);
-    }
-  }
-  return best ?? Math.floor(Math.random() * COLORS);
-}
-
 function hasEffect(effects, kind, match) {
   return effects.some((e) => e.kind === kind && match(e));
 }
 
-/** Queue a special only when a dynamite/rocket blast physically reaches its cell. */
+/** Queue bomb/rocket only when a blast wave physically reaches that cell. */
 function enqueueBlastHit(grid, r, c, queue, triggered) {
   const key = `${r},${c}`;
   if (triggered.has(key)) return;
   const v = grid[r][c];
-  if (!isWrapped(v) && !isStripe(v) && !isEnergy(v)) return;
+  if (!isWrapped(v) && !isStripe(v)) return;
   if (queue.some((p) => p.r === r && p.c === c)) return;
   queue.push({ r, c });
+}
+
+function forEachInBlastArea(centerR, centerC, radius, fn) {
+  for (let r = centerR - radius; r <= centerR + radius; r++) {
+    for (let c = centerC - radius; c <= centerC + radius; c++) {
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) fn(r, c);
+    }
+  }
 }
 
 function detonateWrapped(grid, r, c, toClear, effects, triggered, queue, big = false) {
@@ -321,11 +285,12 @@ function detonateWrapped(grid, r, c, toClear, effects, triggered, queue, big = f
   if (triggered.has(key)) return;
   triggered.add(key);
   toClear.add(key);
-  const added = expandAreaNew(toClear, r, c, big ? 2 : 1);
+  const radius = big ? 2 : 1;
+  expandAreaNew(toClear, r, c, radius);
   if (!hasEffect(effects, 'dynamite', (e) => e.row === r && e.col === c)) {
     effects.push({ kind: 'dynamite', row: r, col: c, big });
   }
-  for (const p of added) enqueueBlastHit(grid, p.r, p.c, queue, triggered);
+  forEachInBlastArea(r, c, radius, (br, bc) => enqueueBlastHit(grid, br, bc, queue, triggered));
 }
 
 function detonateStripe(grid, r, c, v, toClear, effects, triggered, queue) {
@@ -334,38 +299,19 @@ function detonateStripe(grid, r, c, v, toClear, effects, triggered, queue) {
   triggered.add(key);
   toClear.add(key);
   const col = colorOf(v) ?? 0;
-  const added =
-    v >= STRIPE_H && v < STRIPE_H + COLORS
-      ? expandRowNew(toClear, r)
-      : expandColNew(toClear, c);
-  if (v >= STRIPE_H && v < STRIPE_H + COLORS) {
+  const isRow = v >= STRIPE_H && v < STRIPE_H + COLORS;
+  if (isRow) {
+    expandRowNew(toClear, r);
     if (!hasEffect(effects, 'rowBlast', (e) => e.row === r)) {
       effects.push({ kind: 'rowBlast', row: r, color: col });
     }
-  } else if (!hasEffect(effects, 'colBlast', (e) => e.col === c)) {
-    effects.push({ kind: 'colBlast', col: c, color: col });
-  }
-  for (const p of added) enqueueBlastHit(grid, p.r, p.c, queue, triggered);
-}
-
-/** Color ball hit by a blast — clears a color only, never fires other specials. */
-function detonateEnergyChain(grid, r, c, toClear, effects, triggered) {
-  const key = `${r},${c}`;
-  if (triggered.has(key)) return;
-  triggered.add(key);
-  toClear.add(key);
-  const wipeColor = pickChainWipeColor(grid, toClear, { r, c });
-  const wiped = addColorWipe(grid, toClear, wipeColor);
-  if (!hasEffect(effects, 'colorWipe', (e) => e.origin?.r === r && e.origin?.c === c)) {
-    effects.push({
-      kind: 'colorWipe',
-      color: wipeColor,
-      count: wiped.length,
-      wiped,
-      origin: { r, c },
-      bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
-      chained: true,
-    });
+    for (let bc = 0; bc < COLS; bc++) enqueueBlastHit(grid, r, bc, queue, triggered);
+  } else {
+    expandColNew(toClear, c);
+    if (!hasEffect(effects, 'colBlast', (e) => e.col === c)) {
+      effects.push({ kind: 'colBlast', col: c, color: col });
+    }
+    for (let br = 0; br < ROWS; br++) enqueueBlastHit(grid, br, c, queue, triggered);
   }
 }
 
@@ -375,7 +321,6 @@ function processBlastChainQueue(grid, toClear, effects, triggered, queue) {
     const v = grid[r][c];
     if (isWrapped(v)) detonateWrapped(grid, r, c, toClear, effects, triggered, queue, false);
     else if (isStripe(v)) detonateStripe(grid, r, c, v, toClear, effects, triggered, queue);
-    else if (isEnergy(v)) detonateEnergyChain(grid, r, c, toClear, effects, triggered);
   }
 }
 
@@ -414,11 +359,7 @@ export function resolveSwapActivation(grid, r0, c0, r1, c1) {
     }
   } else if (isWrapped(a.v) && isWrapped(b.v)) {
     for (const pos of [a, b]) {
-      triggered.add(`${pos.r},${pos.c}`);
-      toClear.add(`${pos.r},${pos.c}`);
-      const added = expandAreaNew(toClear, pos.r, pos.c, 2);
-      effects.push({ kind: 'dynamite', row: pos.r, col: pos.c, big: true });
-      for (const p of added) enqueueBlastHit(grid, p.r, p.c, queue, triggered);
+      detonateWrapped(grid, pos.r, pos.c, toClear, effects, triggered, queue, true);
     }
   } else if (isWrapped(a.v) || isWrapped(b.v)) {
     const pos = isWrapped(a.v) ? a : b;
@@ -428,16 +369,20 @@ export function resolveSwapActivation(grid, r0, c0, r1, c1) {
     triggered.add(`${b.r},${b.c}`);
     toClear.add(`${a.r},${a.c}`);
     toClear.add(`${b.r},${b.c}`);
-    for (const added of [
-      expandRowNew(toClear, a.r),
-      expandColNew(toClear, a.c),
-      expandRowNew(toClear, b.r),
-      expandColNew(toClear, b.c),
-    ]) {
-      for (const p of added) enqueueBlastHit(grid, p.r, p.c, queue, triggered);
-    }
+    expandRowNew(toClear, a.r);
+    expandColNew(toClear, a.c);
+    expandRowNew(toClear, b.r);
+    expandColNew(toClear, b.c);
     effects.push({ kind: 'rowBlast', row: a.r, color: colorOf(a.v) ?? 0, cross: true });
     effects.push({ kind: 'colBlast', col: b.c, color: colorOf(b.v) ?? 0, cross: true });
+    for (let bc = 0; bc < COLS; bc++) {
+      enqueueBlastHit(grid, a.r, bc, queue, triggered);
+      enqueueBlastHit(grid, b.r, bc, queue, triggered);
+    }
+    for (let br = 0; br < ROWS; br++) {
+      enqueueBlastHit(grid, br, a.c, queue, triggered);
+      enqueueBlastHit(grid, br, b.c, queue, triggered);
+    }
   } else if (isStripe(a.v) || isStripe(b.v)) {
     const pos = isStripe(a.v) ? a : b;
     detonateStripe(grid, pos.r, pos.c, pos.v, toClear, effects, triggered, queue);
@@ -717,11 +662,9 @@ export function expandEffects(grid, groups, opts = {}) {
           origin: { r, c },
           bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
         });
-      } else if (isWrapped(v)) {
-        detonateWrapped(grid, r, c, toClear, effects, triggered, queue, false);
-      } else if (isStripe(v)) {
-        detonateStripe(grid, r, c, v, toClear, effects, triggered, queue);
       }
+      // Wrapped/stripe in a normal match are cleared only — they do not fire
+      // unless a bomb/rocket blast (from a swap) reaches them via processBlastChainQueue.
     }
   }
 
