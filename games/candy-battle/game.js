@@ -369,7 +369,6 @@ async function attemptSwap(r0, c0, r1, c1) {
   highlightSelected();
 
   if (!isValidSwap(grid, r0, c0, r1, c1)) {
-    await animator.swapAnimate(r0, c0, r1, c1);
     await animator.invalidSwap(r0, c0, r1, c1);
     busy = false;
     return;
@@ -378,6 +377,7 @@ async function attemptSwap(r0, c0, r1, c1) {
   await animator.swapAnimate(r0, c0, r1, c1);
   swapCells(grid, r0, c0, r1, c1);
   renderBoard();
+  animator.releaseSwapHold();
 
   await runFullCascadeTurn(r0, c0, r1, c1);
   renderBoard();

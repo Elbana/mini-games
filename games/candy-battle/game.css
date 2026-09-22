@@ -48,6 +48,11 @@
   filter: drop-shadow(0 4px 3px rgba(40, 0, 30, 0.45));
 }
 
+.piece-swap-ghost {
+  animation: none !important;
+  will-change: left, top, transform;
+}
+
 @keyframes candy-idle {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-1.5px) scale(1.035); }

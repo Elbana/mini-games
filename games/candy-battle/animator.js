@@ -14,6 +14,7 @@ export class BoardAnimator {
 
   destroy() {
     this._destroyed = true;
+    this.releaseSwapHold();
     this._electricField?.destroy();
     this._electricField = null;
     for (const id of this._pendingTimers) clearTimeout(id);
@@ -103,28 +104,98 @@ export class BoardAnimator {
     return out;
   }
 
+  _liftPiece(r, c, z) {
+    const piece = this.board.querySelector(`[data-r="${r}"][data-c="${c}"] .piece`);
+    const cell = piece?.closest('.cell');
+    if (!piece || !cell || !this.fxLayer) return null;
+    const cellRect = cell.getBoundingClientRect();
+    const width = cellRect.width * 0.92;
+    const height = cellRect.height * 0.92;
+    const rect = {
+      left: cellRect.left + (cellRect.width - width) / 2,
+      top: cellRect.top + (cellRect.height - height) / 2,
+      width,
+      height,
+    };
+    const ghost = piece.cloneNode(true);
+    ghost.classList.add('piece-swap-ghost');
+    ghost.style.animation = 'none';
+    ghost.style.position = 'fixed';
+    ghost.style.left = `${rect.left}px`;
+    ghost.style.top = `${rect.top}px`;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.margin = '0';
+    ghost.style.zIndex = String(z);
+    ghost.style.pointerEvents = 'none';
+    ghost.style.transform = 'scale(1)';
+    ghost.style.transition = 'none';
+    this.fxLayer.appendChild(ghost);
+    piece.style.visibility = 'hidden';
+    return { piece, ghost, rect };
+  }
+
+  async _glide(ghost, left, top, scale, ms) {
+    ghost.style.transition = `left ${ms}ms cubic-bezier(0.22, 0.8, 0.24, 1), top ${ms}ms cubic-bezier(0.22, 0.8, 0.24, 1), transform ${ms}ms cubic-bezier(0.22, 0.8, 0.24, 1)`;
+    void ghost.offsetWidth;
+    ghost.style.left = `${left}px`;
+    ghost.style.top = `${top}px`;
+    ghost.style.transform = `scale(${scale})`;
+    await sleep(ms);
+  }
+
+  _dropLifted(items) {
+    for (const item of items) {
+      if (!item) continue;
+      item.ghost.remove();
+      if (item.piece.isConnected) item.piece.style.visibility = '';
+    }
+  }
+
+  /** Slide both candies into each other's cells and hold them there until releaseSwapHold. */
   async swapAnimate(r0, c0, r1, c1) {
     if (this._destroyed) return;
-    const a = this.board.querySelector(`[data-r="${r0}"][data-c="${c0}"] .piece`);
-    const b = this.board.querySelector(`[data-r="${r1}"][data-c="${c1}"] .piece`);
-    if (!a || !b) return;
-    const ar = a.getBoundingClientRect();
-    const br = b.getBoundingClientRect();
-    const dx = br.left - ar.left;
-    const dy = br.top - ar.top;
-    a.style.transition = b.style.transition = 'transform 0.28s cubic-bezier(0.22, 1.4, 0.36, 1)';
-    a.style.transform = `translate(${dx}px, ${dy}px) scale(1.12)`;
-    b.style.transform = `translate(${-dx}px, ${-dy}px) scale(0.92)`;
+    this.releaseSwapHold();
+    const a = this._liftPiece(r0, c0, 8);
+    const b = this._liftPiece(r1, c1, 7);
+    if (!a || !b) {
+      this._dropLifted([a, b]);
+      return;
+    }
     this.sounds?.play('swap');
-    await sleep(270);
-    a.style.transition = b.style.transition = '';
-    a.style.transform = b.style.transform = '';
+    await Promise.all([
+      this._glide(a.ghost, b.rect.left, b.rect.top, 1.04, 230),
+      this._glide(b.ghost, a.rect.left, a.rect.top, 1, 230),
+    ]);
+    this._swapHold = [a, b];
+  }
+
+  releaseSwapHold() {
+    if (!this._swapHold) return;
+    this._dropLifted(this._swapHold);
+    this._swapHold = null;
   }
 
   async invalidSwap(r0, c0, r1, c1) {
-    await this.swapAnimate(r0, c0, r1, c1);
-    await this.swapAnimate(r1, c1, r0, c0);
+    if (this._destroyed) return;
+    this.releaseSwapHold();
+    const a = this._liftPiece(r0, c0, 8);
+    const b = this._liftPiece(r1, c1, 7);
+    if (!a || !b) {
+      this._dropLifted([a, b]);
+      return;
+    }
+    this.sounds?.play('swap');
+    await Promise.all([
+      this._glide(a.ghost, b.rect.left, b.rect.top, 1.03, 170),
+      this._glide(b.ghost, a.rect.left, a.rect.top, 1, 170),
+    ]);
     this.sounds?.play('invalid');
+    await Promise.all([
+      this._glide(a.ghost, a.rect.left, a.rect.top, 1, 200),
+      this._glide(b.ghost, b.rect.left, b.rect.top, 1, 200),
+    ]);
+    this._dropLifted([a, b]);
   }
 
   async popCells(cells, comboIndex) {
@@ -620,26 +691,42 @@ export class BoardAnimator {
 
   async fallMoves(moves) {
     if (!moves.length) return;
-    const maxDelay = moves.reduce((m, mv) => Math.max(m, mv.toR), 0);
+    const top = this.board.querySelector('[data-r="0"][data-c="0"]');
+    const below = this.board.querySelector('[data-r="1"][data-c="0"]');
+    const stride = top && below
+      ? below.getBoundingClientRect().top - top.getBoundingClientRect().top
+      : 48;
+    let maxDur = 0;
+    const falling = [];
     for (const mv of moves) {
       const cell = this.board.querySelector(`[data-r="${mv.toR}"][data-c="${mv.toC}"]`);
       const img = cell?.querySelector('.piece');
-      if (!img) continue;
-      const dist = mv.spawn ? (mv.toR + 1) * 100 : (mv.fromR - mv.toR) * 100;
+      if (!img || !cell) continue;
+      const cells = Math.max(1, mv.spawn ? mv.toR + 1 : mv.toR - mv.fromR);
+      const dur = 0.2 + cells * 0.04;
+      maxDur = Math.max(maxDur, dur);
+      cell.style.overflow = 'visible';
+      cell.style.zIndex = '4';
+      img.style.animation = 'none';
       img.style.transition = 'none';
-      img.style.transform = `translateY(${mv.spawn ? -dist : dist}%)`;
-      void img.offsetWidth;
-      const dur = 0.22 + (mv.spawn ? mv.toR * 0.03 : (mv.fromR - mv.toR) * 0.04);
-      img.style.transition = `transform ${dur}s cubic-bezier(0.34,1.45,0.64,1)`;
-      img.style.transform = 'translateY(0)';
+      img.style.transform = `translateY(${-cells * stride}px)`;
+      falling.push({ cell, img, dur });
     }
-    await sleep(260 + maxDelay * 25);
-    this.board.querySelectorAll('.piece').forEach((img) => {
-      img.style.transition = '';
-      img.style.transform = '';
-      img.classList.add('piece-land');
-    });
-    await sleep(220);
+    void this.board.offsetWidth;
+    for (const item of falling) {
+      item.img.style.transition = `transform ${item.dur}s cubic-bezier(0.2, 0.75, 0.2, 1)`;
+      item.img.style.transform = 'translateY(0px)';
+    }
+    await sleep(maxDur * 1000 + 40);
+    for (const item of falling) {
+      item.cell.style.overflow = '';
+      item.cell.style.zIndex = '';
+      item.img.style.transition = '';
+      item.img.style.transform = '';
+      item.img.style.animation = '';
+      item.img.classList.add('piece-land');
+    }
+    await sleep(180);
     this.board.querySelectorAll('.piece-land').forEach((img) => img.classList.remove('piece-land'));
   }
 }
