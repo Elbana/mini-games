@@ -365,7 +365,7 @@ export class BoardAnimator {
       if (this._popCell(r, c, frames, 'any')) popped++;
     }
     if (!popped) return;
-    this.sounds?.play(comboIndex > 1 ? 'cascade' : 'match', { volume: 0.4 + comboIndex * 0.06 });
+    this.sounds?.play(comboIndex > 1 ? 'cascade' : 'match', { combo: comboIndex });
     await sleep(280);
   }
 
@@ -480,7 +480,7 @@ export class BoardAnimator {
       : null;
     bombEl?.classList.add('color-bomb-charging');
 
-    this.sounds?.play('cascade', { volume: 0.5 });
+    this.sounds?.play('lightning');
     await fxSleep(180);
 
     const batchSize = targetPoints.length > 14 ? 2 : 1;
@@ -518,7 +518,7 @@ export class BoardAnimator {
     this.fxLayer.appendChild(flash);
 
     spawnChargeBurst(this.fxLayer, cx, cy);
-    this.sounds?.play('cascade', { volume: 0.65 });
+    this.sounds?.play('lightning', { mega: true });
 
     for (let wave = 0; wave < 4; wave++) {
       for (let i = 0; i < 12; i++) {
@@ -662,13 +662,13 @@ export class BoardAnimator {
     if (!ctx) return;
     if (fx.kind === 'dynamite') {
       this._spawnDynamiteBlast(fx.row, fx.col, fx.big, ctx);
-      this.sounds?.play('match', { volume: fx.big ? 0.5 : 0.42 });
+      this.sounds?.play('dynamite', { big: fx.big });
     } else if (fx.kind === 'rowBlast') {
       this._spawnRowColBlast(fx.row, 0, true, ctx);
-      this.sounds?.play('projectile', { volume: 0.42 });
+      this.sounds?.play('rocket');
     } else if (fx.kind === 'colBlast') {
       this._spawnRowColBlast(0, fx.col, false, ctx);
-      this.sounds?.play('projectile', { volume: 0.42 });
+      this.sounds?.play('rocket');
     } else {
       ctx.anchor.remove();
       return;
@@ -702,10 +702,10 @@ export class BoardAnimator {
     for (const pt of points) {
       this._spawnSilverGather(pt, big);
     }
-    this.sounds?.play('match', { volume: big ? 0.35 : 0.25 });
+    this.sounds?.play('gather');
     await sleep(big ? 110 : 85);
 
-    this.sounds?.play('projectile', { volume: big ? 0.38 : 0.28 });
+    this.sounds?.play('beam');
     const duration = big ? 240 : 190;
     await Promise.all(
       points.map((from, i) =>

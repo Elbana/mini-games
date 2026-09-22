@@ -101,7 +101,7 @@ function setupSoundToggle() {
     sync();
     if (!sounds.isMuted()) {
       sounds.unlock();
-      sounds.play('swap', { volume: 0.25 });
+      sounds.play('ui');
     }
   });
 }
@@ -562,6 +562,7 @@ async function runFullCascadeTurn(r0, c0, r1, c1) {
       (r.bonusCandies ? ` +${r.bonusCandies} bonus` : '');
 
     if (r.monsterAttack) {
+      sounds.play('hurt');
       ArcadeFX.shake(document.getElementById('app'));
       ArcadeFX.floatText(window.innerWidth / 2, 100, `-${r.monsterAttack}`, '#ff5a7a');
     }
