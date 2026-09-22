@@ -96,19 +96,11 @@ export class CandySounds {
           this._tone(120, 78, 0.4, 0.05 * m, 0.02, 'sawtooth', 0.04);
         },
         lightning: () => {
-          const dur = opts.mega ? 0.85 : 0.58;
-          const cracks = opts.mega ? 16 : 10;
-          this._tone(2100, 140, 0.1, 0.05 * m, 0, 'square', 0.001);
-          this._tone(95, 70, dur, 0.035 * m, 0, 'sawtooth', 0.01);
-          for (let i = 0; i < cracks; i++) {
-            const when = (i / cracks) * (dur - 0.03);
-            this._noise(0.02 + (i % 3) * 0.012, (0.07 + (i % 2) * 0.05) * m, when, {
-              type: 'highpass',
-              freq: 2200 + (i % 5) * 450,
-              snap: true,
-            });
-          }
-          if (opts.mega) this._tone(70, 36, 0.3, 0.08 * m, 0.05, 'sine', 0.001);
+          const loud = opts.mega ? m * 1.2 : m;
+          [0, 0.14, 0.24, 0.32, 0.38].forEach((delay) => {
+            this._tone(330, 460, 0.07, 0.055 * loud, delay, 'sine', 0.004);
+          });
+          this._tone(523, 880, 0.22, 0.07 * loud, 0.44, 'triangle', 0.008);
         },
         gather: () => {
           this._tone(940, 1280, 0.09, 0.035 * m, 0);
@@ -137,6 +129,7 @@ export class CandySounds {
       (voices[name] || voices.match)();
     });
   }
+
 
   _out() {
     return this.bus || this.ctx.destination;
