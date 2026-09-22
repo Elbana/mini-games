@@ -36,22 +36,25 @@
     <div id="screen-fight" class="screen hidden">
       <div class="arena-panel">
         <div class="monster-stage">
+          <div class="monster-aura" aria-hidden="true"></div>
           <div class="monster-sprite" id="monster-sprite">👾</div>
           <div class="monster-shadow"></div>
         </div>
         <div class="battle-hud">
           <div class="fighter player-side">
-            <span>❤️ You</span>
+            <span class="fighter-label">You</span>
             <div class="hp-bar"><div class="hp-fill player" id="player-hp"></div></div>
+            <b class="hp-num" id="player-hp-num">0</b>
           </div>
           <div class="vs-badge">VS</div>
           <div class="fighter monster-side">
-            <span id="monster-name">Monster</span>
+            <span class="fighter-label" id="monster-name">Monster</span>
             <div class="hp-bar"><div class="hp-fill monster" id="monster-hp"></div></div>
+            <b class="hp-num" id="monster-hp-num">0</b>
           </div>
         </div>
       </div>
-      <p class="candy-ammo">🍬 <span id="fight-ammo">0</span> buy-in left · swipe or tap to swap</p>
+      <p class="candy-ammo">🍬 <span id="fight-ammo">0</span> left · swipe to swap</p>
       <div class="specials-legend" aria-label="Special pieces">
         <span class="legend-item"><img src="/candy-battle/assets/special/color-bomb.svg" alt="" width="18" height="18"> Color ball — swap onto a color to zap all of it</span>
         <span class="legend-item"><img src="/candy-battle/assets/special/rocket-h.svg" alt="" width="18" height="18"> Rocket — swap to wipe a whole row or column</span>

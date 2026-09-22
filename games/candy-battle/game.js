@@ -6,6 +6,7 @@ import {
   WRAPPED,
   STRIPE_H,
   STRIPE_V,
+  isNormal,
   isEnergy,
   isWrapped,
   isStripe,
@@ -266,8 +267,15 @@ function showLobby() {
 
 function updateHud(bi) {
   buyIn = bi || buyIn;
-  document.getElementById('player-hp').style.width = `${(fight.playerHp / fight.playerMaxHp) * 100}%`;
-  document.getElementById('monster-hp').style.width = `${(fight.monsterHp / fight.monsterMaxHp) * 100}%`;
+  if (!fight) return;
+  const playerPct = Math.max(0, (fight.playerHp / fight.playerMaxHp) * 100);
+  const monsterPct = Math.max(0, (fight.monsterHp / fight.monsterMaxHp) * 100);
+  document.getElementById('player-hp').style.width = `${playerPct}%`;
+  document.getElementById('monster-hp').style.width = `${monsterPct}%`;
+  const playerNum = document.getElementById('player-hp-num');
+  const monsterNum = document.getElementById('monster-hp-num');
+  if (playerNum) playerNum.textContent = String(Math.max(0, fight.playerHp));
+  if (monsterNum) monsterNum.textContent = String(Math.max(0, fight.monsterHp));
   document.getElementById('fight-ammo').textContent = buyIn[selectedTier] || 0;
 }
 
@@ -298,12 +306,14 @@ function renderBoard() {
     for (let c = 0; c < COLS; c++) {
       const v = grid[r][c];
       const cell = document.createElement('div');
-      cell.className = 'cell';
+      cell.className = `cell ${(r + c) % 2 ? 'well-b' : 'well-a'}`;
       cell.dataset.r = r;
       cell.dataset.c = c;
       if (v != null) {
         const wrap = document.createElement('div');
         wrap.className = pieceClass(v);
+        wrap.style.setProperty('--idle', `${((r * COLS + c) % 7) * 0.16}s`);
+        if (isNormal(v)) wrap.classList.add(`candy-${manifest.candies[v]}`);
         if (isStripe(v) || isWrapped(v)) {
           const base = document.createElement('img');
           base.className = 'piece-base';

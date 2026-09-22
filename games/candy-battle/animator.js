@@ -112,9 +112,9 @@ export class BoardAnimator {
     const br = b.getBoundingClientRect();
     const dx = br.left - ar.left;
     const dy = br.top - ar.top;
-    a.style.transition = b.style.transition = 'transform 0.26s cubic-bezier(0.34,1.56,0.64,1)';
-    a.style.transform = `translate(${dx}px, ${dy}px)`;
-    b.style.transform = `translate(${-dx}px, ${-dy}px)`;
+    a.style.transition = b.style.transition = 'transform 0.28s cubic-bezier(0.22, 1.4, 0.36, 1)';
+    a.style.transform = `translate(${dx}px, ${dy}px) scale(1.12)`;
+    b.style.transform = `translate(${-dx}px, ${-dy}px) scale(0.92)`;
     this.sounds?.play('swap');
     await sleep(270);
     a.style.transition = b.style.transition = '';
@@ -597,7 +597,10 @@ export class BoardAnimator {
     this.board.querySelectorAll('.piece').forEach((img) => {
       img.style.transition = '';
       img.style.transform = '';
+      img.classList.add('piece-land');
     });
+    await sleep(220);
+    this.board.querySelectorAll('.piece-land').forEach((img) => img.classList.remove('piece-land'));
   }
 }
 
