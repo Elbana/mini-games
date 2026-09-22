@@ -129,15 +129,58 @@ export class BoardAnimator {
 
   async popCells(cells, comboIndex) {
     const frames = this.manifest.explosion;
+    let popped = 0;
     for (const { r, c } of cells) {
-      const cell = this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`);
-      if (!cell) continue;
-      const img = cell.querySelector('.piece');
-      if (img) img.classList.add('piece-pop');
-      this._explosionAt(cell, frames);
+      if (this._popCell(r, c, frames, 'any')) popped++;
     }
+    if (!popped) return;
     this.sounds?.play(comboIndex > 1 ? 'cascade' : 'match', { volume: 0.4 + comboIndex * 0.06 });
-    await sleep(340);
+    await sleep(280);
+  }
+
+  _popCell(r, c, frames, which = 'any') {
+    const cell = this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+    const img = cell?.querySelector('.piece');
+    if (!cell || !img || img.classList.contains('piece-pop')) return false;
+    const special = img.classList.contains('piece-dynamite')
+      || img.classList.contains('piece-rocket')
+      || img.classList.contains('piece-color-bomb');
+    if (which === 'special' && !special) return false;
+    if (which === 'normal' && special) return false;
+    img.classList.add('piece-pop');
+    this._explosionAt(cell, frames);
+    return true;
+  }
+
+  _pieceAt(r, c) {
+    return this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`)?.querySelector('.piece');
+  }
+
+  /** Pop candies this blast actually finishes. Leave specials that still have their own step. */
+  _popBlastedCells(fx, frames) {
+    for (const cell of this._cellsForEffect(fx)) {
+      const img = this._pieceAt(cell.r, cell.c);
+      if (!img || img.classList.contains('piece-pop')) continue;
+      const dynamite = img.classList.contains('piece-dynamite');
+      const rocketH = img.classList.contains('rocket-h');
+      const rocketV = img.classList.contains('rocket-v');
+      const colorBall = img.classList.contains('piece-color-bomb');
+      const isOrigin = fx.kind === 'dynamite' && cell.r === fx.row && cell.c === fx.col;
+      let keep = false;
+      if (fx.kind === 'rowBlast') keep = dynamite || rocketV || colorBall;
+      else if (fx.kind === 'colBlast') keep = dynamite || rocketH || colorBall;
+      else if (fx.kind === 'dynamite') keep = !isOrigin && (dynamite || rocketH || rocketV || colorBall);
+      if (keep) continue;
+      this._popCell(cell.r, cell.c, frames, 'any');
+    }
+  }
+
+  _cellsForEffect(fx) {
+    if (fx.kind === 'rowBlast') return this._cellsInRow(fx.row);
+    if (fx.kind === 'colBlast') return this._cellsInCol(fx.col);
+    if (fx.kind === 'dynamite') return this._cellsInArea(fx.row, fx.col, fx.big ? 2 : 1);
+    if (fx.kind === 'colorWipe') return fx.wiped || [];
+    return [];
   }
 
   _explosionAt(cell, frames) {
@@ -368,15 +411,30 @@ export class BoardAnimator {
   }
 
   async playEffects(effects, cells) {
-    for (const fx of effects) {
+    const ordered = [...effects].sort((a, b) => (a.step ?? 0) - (b.step ?? 0));
+    let i = 0;
+    while (i < ordered.length) {
+      const step = ordered[i].step ?? 0;
+      const batch = [];
+      while (i < ordered.length && (ordered[i].step ?? 0) === step) batch.push(ordered[i++]);
+      await this._playEffectStep(batch, cells);
+    }
+  }
+
+  /** One cause at a time: the move you made, then each thing that blast actually hit. */
+  async _playEffectStep(batch, cells) {
+    const frames = this.manifest.explosion;
+    for (const fx of batch) {
       if (fx.kind === 'colorWipe' && fx.wiped?.length) {
         await this.colorBombLightning(fx.wiped, fx.color, fx.origin);
+        for (const cell of fx.wiped) this._popCell(cell.r, cell.c, frames, 'normal');
+        this._popCell(fx.origin?.r, fx.origin?.c, frames, 'special');
       } else if (fx.kind === 'colorBombDouble') {
         await this.colorBombMega(cells, fx.origin);
       }
     }
 
-    const blasts = effects.filter((e) =>
+    const blasts = batch.filter((e) =>
       e.kind === 'dynamite' || e.kind === 'rowBlast' || e.kind === 'colBlast',
     );
     if (!blasts.length) return;
@@ -384,26 +442,22 @@ export class BoardAnimator {
     const ctx = this._beginBoardFxWave();
     if (!ctx) return;
 
-    let playedSound = false;
     for (const fx of blasts) {
       if (fx.kind === 'dynamite') {
         this._spawnDynamiteBlast(fx.row, fx.col, fx.big, ctx);
-        if (!playedSound) {
-          this.sounds?.play('match', { volume: fx.big ? 0.58 : 0.48 });
-          playedSound = true;
-        }
+        this.sounds?.play('match', { volume: fx.big ? 0.58 : 0.48 });
       } else if (fx.kind === 'rowBlast') {
         this._spawnRowColBlast(fx.row, 0, true, ctx);
+        this.sounds?.play('projectile', { volume: 0.48 });
       } else if (fx.kind === 'colBlast') {
         this._spawnRowColBlast(0, fx.col, false, ctx);
+        this.sounds?.play('projectile', { volume: 0.48 });
       }
-    }
-    if (blasts.some((e) => e.kind === 'rowBlast' || e.kind === 'colBlast')) {
-      this.sounds?.play('projectile', { volume: 0.48 });
+      this._popBlastedCells(fx, frames);
     }
 
-    const maxMs = blasts.some((e) => e.kind === 'dynamite' && e.big) ? 620 : 540;
-    await fxSleep(maxMs);
+    const wait = blasts.some((e) => e.kind === 'dynamite') ? 460 : 400;
+    await fxSleep(wait);
     ctx.anchor.remove();
   }
 

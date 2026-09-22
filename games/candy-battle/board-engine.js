@@ -270,13 +270,13 @@ function stripeAxis(v) {
 }
 
 /** Queue a special only when this blast shape covers its cell. */
-function enqueueBlastHit(grid, r, c, queue, triggered) {
+function enqueueBlastHit(grid, r, c, queue, triggered, step, hintColor) {
   const key = `${r},${c}`;
   if (triggered.has(key)) return;
   const v = grid[r][c];
   if (!isWrapped(v) && !stripeAxis(v) && !isEnergy(v)) return;
   if (queue.some((p) => p.r === r && p.c === c)) return;
-  queue.push({ r, c });
+  queue.push({ r, c, step, hintColor: hintColor ?? null });
 }
 
 function forEachInBlastArea(centerR, centerC, radius, fn) {
@@ -287,7 +287,7 @@ function forEachInBlastArea(centerR, centerC, radius, fn) {
   }
 }
 
-function detonateWrapped(grid, r, c, toClear, effects, triggered, queue, big = false) {
+function detonateWrapped(grid, r, c, toClear, effects, triggered, queue, big = false, step = 0) {
   const key = `${r},${c}`;
   if (triggered.has(key)) return;
   triggered.add(key);
@@ -295,12 +295,14 @@ function detonateWrapped(grid, r, c, toClear, effects, triggered, queue, big = f
   const radius = big ? 2 : 1;
   expandAreaNew(toClear, r, c, radius);
   if (!hasEffect(effects, 'dynamite', (e) => e.row === r && e.col === c)) {
-    effects.push({ kind: 'dynamite', row: r, col: c, big });
+    effects.push({ kind: 'dynamite', row: r, col: c, big, step });
   }
-  forEachInBlastArea(r, c, radius, (br, bc) => enqueueBlastHit(grid, br, bc, queue, triggered));
+  forEachInBlastArea(r, c, radius, (br, bc) =>
+    enqueueBlastHit(grid, br, bc, queue, triggered, step + 1, null),
+  );
 }
 
-function detonateStripe(grid, r, c, v, toClear, effects, triggered, queue) {
+function detonateStripe(grid, r, c, v, toClear, effects, triggered, queue, step = 0) {
   const key = `${r},${c}`;
   if (triggered.has(key)) return;
   const axis = stripeAxis(v);
@@ -309,71 +311,47 @@ function detonateStripe(grid, r, c, v, toClear, effects, triggered, queue) {
   toClear.add(key);
   const col = colorOf(v) ?? 0;
   if (axis === 'h') {
+    if (hasEffect(effects, 'rowBlast', (e) => e.row === r)) return;
     expandRowNew(toClear, r);
-    if (!hasEffect(effects, 'rowBlast', (e) => e.row === r)) {
-      effects.push({ kind: 'rowBlast', row: r, color: col });
-    }
-    for (let bc = 0; bc < COLS; bc++) enqueueBlastHit(grid, r, bc, queue, triggered);
+    effects.push({ kind: 'rowBlast', row: r, color: col, step });
+    for (let bc = 0; bc < COLS; bc++) enqueueBlastHit(grid, r, bc, queue, triggered, step + 1, col);
   } else {
+    if (hasEffect(effects, 'colBlast', (e) => e.col === c)) return;
     expandColNew(toClear, c);
-    if (!hasEffect(effects, 'colBlast', (e) => e.col === c)) {
-      effects.push({ kind: 'colBlast', col: c, color: col });
-    }
-    for (let br = 0; br < ROWS; br++) enqueueBlastHit(grid, br, c, queue, triggered);
+    effects.push({ kind: 'colBlast', col: c, color: col, step });
+    for (let br = 0; br < ROWS; br++) enqueueBlastHit(grid, br, c, queue, triggered, step + 1, col);
   }
 }
 
-/** Color ball hit by a blast zaps one color. That wipe does not launch rockets or bombs. */
-function detonateEnergyFromBlast(grid, r, c, toClear, effects, triggered) {
+/** Color ball hit by a colored rocket zaps that rocket's color. A bomb does not pick a random color. */
+function detonateEnergyFromBlast(grid, r, c, toClear, effects, triggered, hintColor, step = 0) {
   const key = `${r},${c}`;
   if (triggered.has(key)) return;
   triggered.add(key);
   toClear.add(key);
-  const origin = [...toClear].map((s) => {
-    const [rr, cc] = s.split(',').map(Number);
-    return { r: rr, c: cc };
-  });
-  const wipeColor = dominantColor(origin, grid) ?? mostCommonColor(grid);
-  const wiped = addColorWipe(grid, toClear, wipeColor);
+  if (hintColor == null) return;
+  const wiped = addColorWipe(grid, toClear, hintColor);
   if (!hasEffect(effects, 'colorWipe', (e) => e.origin?.r === r && e.origin?.c === c)) {
     effects.push({
       kind: 'colorWipe',
-      color: wipeColor,
+      color: hintColor,
       count: wiped.length,
       wiped,
       origin: { r, c },
       bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
       chained: true,
+      step,
     });
   }
 }
 
-function mostCommonColor(grid) {
-  const counts = {};
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const v = grid[r][c];
-      if (isNormal(v)) counts[v] = (counts[v] || 0) + 1;
-    }
-  }
-  let best = 0;
-  let max = -1;
-  for (const [col, n] of Object.entries(counts)) {
-    if (n > max) {
-      max = n;
-      best = Number(col);
-    }
-  }
-  return best;
-}
-
 function processBlastChainQueue(grid, toClear, effects, triggered, queue) {
   while (queue.length) {
-    const { r, c } = queue.shift();
+    const { r, c, step = 0, hintColor = null } = queue.shift();
     const v = grid[r][c];
-    if (isWrapped(v)) detonateWrapped(grid, r, c, toClear, effects, triggered, queue, false);
-    else if (stripeAxis(v)) detonateStripe(grid, r, c, v, toClear, effects, triggered, queue);
-    else if (isEnergy(v)) detonateEnergyFromBlast(grid, r, c, toClear, effects, triggered);
+    if (isWrapped(v)) detonateWrapped(grid, r, c, toClear, effects, triggered, queue, false, step);
+    else if (stripeAxis(v)) detonateStripe(grid, r, c, v, toClear, effects, triggered, queue, step);
+    else if (isEnergy(v)) detonateEnergyFromBlast(grid, r, c, toClear, effects, triggered, hintColor, step);
   }
 }
 
@@ -408,6 +386,7 @@ export function resolveSwapActivation(grid, r0, c0, r1, c1) {
         wiped,
         origin: bomb,
         bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
+        step: 0,
       });
     }
   } else if (isWrapped(a.v) && isWrapped(b.v)) {
@@ -698,9 +677,10 @@ export function expandEffects(grid, groups, opts = {}) {
           wiped,
           origin: { r, c },
           bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
+          step: 0,
         });
       } else if (isWrapped(v) || stripeAxis(v)) {
-        queue.push({ r, c });
+        queue.push({ r, c, step: 0, hintColor: colorOf(v) });
       }
     }
   }
