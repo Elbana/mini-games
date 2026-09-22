@@ -323,26 +323,13 @@ function detonateStripe(grid, r, c, v, toClear, effects, triggered, queue, step 
   }
 }
 
-/** Color ball hit by a colored rocket zaps that rocket's color. A bomb does not pick a random color. */
-function detonateEnergyFromBlast(grid, r, c, toClear, effects, triggered, hintColor, step = 0) {
+/** A blast destroys a color ball it touches. It does not pick a color or launch anything else. */
+function detonateEnergyFromBlast(grid, r, c, toClear, effects, triggered) {
   const key = `${r},${c}`;
   if (triggered.has(key)) return;
   triggered.add(key);
   toClear.add(key);
-  if (hintColor == null) return;
-  const wiped = addColorWipe(grid, toClear, hintColor);
-  if (!hasEffect(effects, 'colorWipe', (e) => e.origin?.r === r && e.origin?.c === c)) {
-    effects.push({
-      kind: 'colorWipe',
-      color: hintColor,
-      count: wiped.length,
-      wiped,
-      origin: { r, c },
-      bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
-      chained: true,
-      step,
-    });
-  }
+  void effects;
 }
 
 function processBlastChainQueue(grid, toClear, effects, triggered, queue) {
@@ -351,7 +338,7 @@ function processBlastChainQueue(grid, toClear, effects, triggered, queue) {
     const v = grid[r][c];
     if (isWrapped(v)) detonateWrapped(grid, r, c, toClear, effects, triggered, queue, false, step);
     else if (stripeAxis(v)) detonateStripe(grid, r, c, v, toClear, effects, triggered, queue, step);
-    else if (isEnergy(v)) detonateEnergyFromBlast(grid, r, c, toClear, effects, triggered, hintColor, step);
+    else if (isEnergy(v)) detonateEnergyFromBlast(grid, r, c, toClear, effects, triggered);
   }
 }
 
@@ -679,7 +666,7 @@ export function expandEffects(grid, groups, opts = {}) {
           bonusDmg: Math.min(22, Math.round(wiped.length * 1.2)),
           step: 0,
         });
-      } else if (isWrapped(v) || stripeAxis(v)) {
+      } else if ((isWrapped(v) || stripeAxis(v)) && allowSpecialActivation(g)) {
         queue.push({ r, c, step: 0, hintColor: colorOf(v) });
       }
     }
