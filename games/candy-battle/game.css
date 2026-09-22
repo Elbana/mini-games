@@ -338,7 +338,6 @@
   inset: 0;
   pointer-events: none;
   z-index: 206;
-  mix-blend-mode: screen;
 }
 
 .electric-screen-flash {
@@ -346,9 +345,8 @@
   inset: 0;
   pointer-events: none;
   z-index: 205;
-  background: radial-gradient(circle at var(--flash-x, 50%) var(--flash-y, 50%), rgba(255,255,255,0.28) 0%, rgba(120,200,255,0.08) 35%, transparent 55%);
-  animation: electric-flash 0.55s ease-out forwards;
-  mix-blend-mode: screen;
+  background: radial-gradient(circle at var(--flash-x, 50%) var(--flash-y, 50%), rgba(255,255,255,0.16) 0%, transparent 28%);
+  animation: electric-flash 0.4s ease-out forwards;
 }
 
 .electric-screen-flash.mega {
@@ -424,13 +422,12 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 120%;
-  height: 3px;
-  margin: -1px 0 0 -60%;
-  background: linear-gradient(90deg, transparent, #fff, rgba(120,200,255,0.9), transparent);
+  width: 70%;
+  height: 1.5px;
+  margin: -1px 0 0 -35%;
+  background: linear-gradient(90deg, transparent, #fff 45%, rgba(170, 230, 255, 0.2));
   transform: rotate(var(--rot, 0deg));
-  animation: cell-arc 0.32s ease-out forwards;
-  box-shadow: 0 0 8px #fff;
+  animation: cell-arc 0.28s ease-out forwards;
 }
 
 @keyframes cell-zap {

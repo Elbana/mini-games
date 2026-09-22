@@ -259,12 +259,7 @@ export class BoardAnimator {
         field.fireBolt(from, { x, y }, 0.95);
         electrifyCell(this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`));
       }
-      if (i > 0) {
-        const prev = targetPoints[i - 1];
-        const cur = batch[0];
-        field.fireBolt({ x: prev.x, y: prev.y }, { x: cur.x, y: cur.y }, 0.4);
-      }
-      await fxSleep(targetPoints.length > 10 ? 28 : 36);
+      await fxSleep(targetPoints.length > 10 ? 42 : 56);
     }
 
     await fxSleep(220);

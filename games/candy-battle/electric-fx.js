@@ -18,13 +18,16 @@ export function buildBoltPoints(x1, y1, x2, y2, displacement) {
 function branchBolt(points, atIndex, length) {
   if (atIndex <= 0 || atIndex >= points.length - 1) return null;
   const p = points[atIndex];
-  const angle = Math.random() * Math.PI * 2;
+  const prev = points[atIndex - 1];
+  const next = points[atIndex + 1];
+  const forward = Math.atan2(next.y - prev.y, next.x - prev.x);
+  const angle = forward + (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 0.5);
   return buildBoltPoints(
     p.x,
     p.y,
     p.x + Math.cos(angle) * length,
     p.y + Math.sin(angle) * length,
-    length * 0.35,
+    length * 0.28,
   );
 }
 
@@ -38,7 +41,9 @@ export class ElectricField {
     this.layer.appendChild(this.canvas);
     this.bolts = [];
     this.arcs = [];
+    this.links = [];
     this.running = false;
+    this._jitterAt = 0;
     this._raf = null;
     this._resize();
     this._onResize = () => this._resize();
@@ -63,62 +68,91 @@ export class ElectricField {
 
   /** Persistent arcs from the color ball to each same-color target only. */
   spawnTargetArcs(from, targetPoints) {
-    this.arcs = targetPoints.map((to) => {
-      const d = dist(from.x, from.y, to.x, to.y);
-      return buildBoltPoints(from.x, from.y, to.x, to.y, Math.min(48, d * 0.2));
+    this.links = targetPoints.map((to) => ({ from, to, kind: 'target' }));
+    this._rebuildArcs();
+  }
+
+  /** Double color-ball: a few spokes inside the board, not a full-screen wash. */
+  spawnFieldArcs(boardRect, count = 10) {
+    const cx = boardRect.left + boardRect.width / 2;
+    const cy = boardRect.top + boardRect.height / 2;
+    const n = Math.min(count, 12);
+    this.focusPoint = { x: cx, y: cy };
+    this.links = [];
+    for (let i = 0; i < n; i++) {
+      const angle = (Math.PI * 2 * i) / n;
+      const reach = 0.28 + (i % 3) * 0.12;
+      this.links.push({
+        from: { x: cx, y: cy },
+        to: {
+          x: cx + Math.cos(angle) * boardRect.width * reach,
+          y: cy + Math.sin(angle) * boardRect.height * reach,
+        },
+        kind: 'field',
+      });
+    }
+    this._rebuildArcs();
+  }
+
+  _rebuildArcs() {
+    this.arcs = this.links.map((link) => {
+      const d = dist(link.from.x, link.from.y, link.to.x, link.to.y);
+      const jag = Math.min(18, d * 0.12);
+      return {
+        points: buildBoltPoints(link.from.x, link.from.y, link.to.x, link.to.y, jag),
+        to: link.to,
+        kind: link.kind,
+      };
     });
   }
 
   fireBolt(from, to, life = 1) {
     const d = dist(from.x, from.y, to.x, to.y);
-    const points = buildBoltPoints(from.x, from.y, to.x, to.y, Math.min(72, d * 0.28));
+    const points = buildBoltPoints(from.x, from.y, to.x, to.y, Math.min(22, d * 0.16));
     const branches = [];
-    if (Math.random() < 0.65 && points.length > 4) {
-      const bi = Math.floor(points.length * (0.25 + Math.random() * 0.35));
-      const br = branchBolt(points, bi, d * (0.12 + Math.random() * 0.12));
+    if (d > 36 && points.length > 4) {
+      const bi = Math.floor(points.length * (0.35 + Math.random() * 0.2));
+      const br = branchBolt(points, bi, Math.min(22, d * 0.18));
       if (br) branches.push(br);
     }
     this.bolts.push({
       points,
       branches,
+      to,
       life,
       maxLife: life,
-      flicker: Math.random() * Math.PI * 2,
     });
   }
 
-  _drawBolt(ctx, points, alpha) {
-    if (points.length < 2) return;
+  _stroke(ctx, points) {
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.stroke();
+  }
+
+  _drawBolt(ctx, points, alpha, end) {
+    if (points.length < 2 || alpha <= 0.02) return;
     ctx.save();
-    ctx.globalAlpha = alpha;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.strokeStyle = '#7ee7ff';
+    ctx.lineWidth = 3.2;
+    this._stroke(ctx, points);
 
-    ctx.shadowBlur = 28;
-    ctx.shadowColor = 'rgba(140, 230, 255, 0.98)';
-    ctx.strokeStyle = 'rgba(200, 245, 255, 0.65)';
-    ctx.lineWidth = 7;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-    ctx.stroke();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#f4fbff';
+    ctx.lineWidth = 1.35;
+    this._stroke(ctx, points);
 
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = '#ffffff';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
-    ctx.lineWidth = 3.5;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(220, 245, 255, 1)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-    ctx.stroke();
+    if (end) {
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -128,33 +162,35 @@ export class ElectricField {
     const h = window.innerHeight;
     ctx.clearRect(0, 0, w, h);
 
-    const pulse = 0.5 + Math.sin(t * 0.055) * 0.22;
-    if (this.focusPoint) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      const fx = this.focusPoint.x;
-      const fy = this.focusPoint.y;
-      const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, 72);
-      grad.addColorStop(0, `rgba(255, 255, 255, ${0.2 * pulse})`);
-      grad.addColorStop(0.35, `rgba(160, 230, 255, ${0.08 * pulse})`);
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h);
-      ctx.restore();
+    if (t - this._jitterAt > 70) {
+      this._jitterAt = t;
+      this._rebuildArcs();
     }
 
-    this.arcs.forEach((arc, i) => {
-      const flick = 0.28 + Math.abs(Math.sin(t * 0.06 + i * 2.1)) * 0.52;
-      if (Math.random() < 0.88) this._drawBolt(ctx, arc, flick);
-    });
+    if (this.focusPoint) {
+      const fx = this.focusPoint.x;
+      const fy = this.focusPoint.y;
+      const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, 28);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+      grad.addColorStop(0.45, 'rgba(140, 220, 255, 0.35)');
+      grad.addColorStop(1, 'rgba(140, 220, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(fx, fy, 28, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (const arc of this.arcs) {
+      const flick = arc.kind === 'field' ? 0.4 : 0.34;
+      this._drawBolt(ctx, arc.points, flick, arc.to);
+    }
 
     this.bolts = this.bolts.filter((b) => b.life > 0);
     for (const bolt of this.bolts) {
-      bolt.life -= 0.04;
-      bolt.flicker += 0.6;
-      const a = Math.min(1, bolt.life / bolt.maxLife) * (0.65 + Math.abs(Math.sin(bolt.flicker)) * 0.35);
-      this._drawBolt(ctx, bolt.points, a);
-      for (const br of bolt.branches) this._drawBolt(ctx, br, a * 0.7);
+      bolt.life -= 0.045;
+      const a = Math.max(0, bolt.life / bolt.maxLife);
+      this._drawBolt(ctx, bolt.points, 0.45 + a * 0.55, bolt.to);
+      for (const br of bolt.branches) this._drawBolt(ctx, br, a * 0.45);
     }
   }
 
