@@ -99,11 +99,17 @@
 }
 
 .piece-dynamite {
+  animation: dynamite-fuse 0.85s ease-in-out infinite;
   filter: drop-shadow(0 0 10px rgba(249, 115, 22, 0.85));
 }
 
 .piece-rocket {
   filter: drop-shadow(0 0 8px rgba(255, 230, 100, 0.7));
+}
+
+@keyframes dynamite-fuse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05) rotate(-2deg); }
 }
 
 @keyframes color-bomb-charge {
