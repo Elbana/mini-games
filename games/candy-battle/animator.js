@@ -591,26 +591,26 @@ export class BoardAnimator {
   }
 
   /** Dynamite — flash + shockwave sized to the 3×3 blast area. */
-  _spawnDynamiteBlast(row, col, big, ctx) {
+  _spawnDynamiteBlast(row, col, big, ctx, punch = false) {
     const { anchor, boardRect, cell } = ctx;
     const cs = cell.size;
     const radius = big ? 2 : 1;
+    const showBig = big || punch;
     const { x, y } = this._cellLocal(row, col, boardRect);
     const hitCells = this._cellsInArea(row, col, radius);
-    this._pulseCells(hitCells, 'cell-area-blast', big ? 620 : 500);
-
-    anchor.style.setProperty('--ring-scale', `${(cs * (radius * 2 + 1.1)) / 24}`);
+    this._pulseCells(hitCells, 'cell-area-blast', showBig ? 560 : 420);
 
     const flash = document.createElement('div');
-    flash.className = `dynamite-flash${big ? ' big' : ''}`;
+    flash.className = `dynamite-flash${showBig ? ' big' : ''}`;
     flash.style.left = `${x}px`;
     flash.style.top = `${y}px`;
     anchor.appendChild(flash);
 
     const ring = document.createElement('div');
-    ring.className = `dynamite-shockwave${big ? ' big' : ''}`;
+    ring.className = `dynamite-shockwave${showBig ? ' big' : ''}`;
     ring.style.left = `${x}px`;
     ring.style.top = `${y}px`;
+    ring.style.setProperty('--ring-scale', `${(cs * (radius * 2 + (punch ? 1.8 : 1.1))) / 24}`);
     anchor.appendChild(ring);
 
     const smoke = document.createElement('div');
@@ -619,8 +619,8 @@ export class BoardAnimator {
     smoke.style.top = `${y}px`;
     anchor.appendChild(smoke);
 
-    const count = big ? 22 : 14;
-    const distBase = cs * (big ? 1.35 : 0.95);
+    const count = big ? 22 : punch ? 10 : 14;
+    const distBase = cs * (big ? 1.35 : punch ? 1.15 : 0.95);
     for (let i = 0; i < count; i++) {
       const debris = document.createElement('div');
       debris.className = 'dynamite-debris';
@@ -635,12 +635,69 @@ export class BoardAnimator {
     }
   }
 
+  _dynamiteTouches(a, b) {
+    const radius = a.big ? 2 : 1;
+    return Math.max(Math.abs(a.row - b.row), Math.abs(a.col - b.col)) <= radius;
+  }
+
+  /** Dynamite caught in another dynamite's blast, including the next sticks in that chain. */
+  _pullDynamiteCluster(start, pending) {
+    const cluster = [start];
+    let i = 0;
+    while (i < pending.length) {
+      const other = pending[i];
+      const linked = other.kind === 'dynamite' && cluster.some(
+        (bomb) => this._dynamiteTouches(bomb, other) || this._dynamiteTouches(other, bomb),
+      );
+      if (!linked) {
+        i += 1;
+        continue;
+      }
+      cluster.push(pending.splice(i, 1)[0]);
+      i = 0;
+    }
+    return cluster;
+  }
+
+  async _playDynamiteCluster(cluster) {
+    const frames = this.manifest.explosion;
+    const ctx = this._beginBoardFxWave();
+    if (!ctx) return;
+    const punch = cluster.length > 1 || cluster.some((fx) => fx.big);
+    for (const fx of cluster) this._spawnDynamiteBlast(fx.row, fx.col, fx.big, ctx, punch);
+    this.sounds?.play('dynamite', { big: punch });
+    this._popDynamiteCluster(cluster, frames);
+    await fxSleep(punch ? 520 : 420);
+    ctx.anchor.remove();
+  }
+
+  _popDynamiteCluster(cluster, frames) {
+    const origins = new Set(cluster.map((fx) => `${fx.row},${fx.col}`));
+    const seen = new Set();
+    for (const fx of cluster) {
+      for (const cell of this._cellsForEffect(fx)) {
+        const key = `${cell.r},${cell.c}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const img = this._pieceAt(cell.r, cell.c);
+        if (!img || img.classList.contains('piece-pop')) continue;
+        const rocket = img.classList.contains('rocket-h') || img.classList.contains('rocket-v');
+        const dynamite = img.classList.contains('piece-dynamite');
+        if (rocket) continue;
+        if (dynamite && !origins.has(key)) continue;
+        this._popCell(cell.r, cell.c, frames, 'any');
+      }
+    }
+  }
+
   async playEffects(effects, cells) {
-    const ordered = [...effects].sort(
+    const pending = [...effects].sort(
       (a, b) => (a.step ?? 0) - (b.step ?? 0) || (a.row ?? a.origin?.r ?? 0) - (b.row ?? b.origin?.r ?? 0) || (a.col ?? a.origin?.c ?? 0) - (b.col ?? b.origin?.c ?? 0),
     );
-    for (const fx of ordered) {
-      await this._playOneEffect(fx, cells);
+    while (pending.length) {
+      const fx = pending.shift();
+      if (fx.kind === 'dynamite') await this._playDynamiteCluster(this._pullDynamiteCluster(fx, pending));
+      else await this._playOneEffect(fx, cells);
     }
   }
 
