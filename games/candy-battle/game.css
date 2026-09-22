@@ -422,10 +422,11 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 70%;
-  height: 1.5px;
-  margin: -1px 0 0 -35%;
-  background: linear-gradient(90deg, transparent, #fff 45%, rgba(170, 230, 255, 0.2));
+  width: 78%;
+  height: 2.5px;
+  margin: -1px 0 0 -39%;
+  background: linear-gradient(90deg, transparent, #fff 40%, rgba(140, 230, 255, 0.85));
+  box-shadow: 0 0 6px rgba(160, 230, 255, 0.95);
   transform: rotate(var(--rot, 0deg));
   animation: cell-arc 0.28s ease-out forwards;
 }

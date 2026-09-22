@@ -136,22 +136,33 @@ export class ElectricField {
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = alpha * 0.55;
-    ctx.strokeStyle = '#7ee7ff';
-    ctx.lineWidth = 3.2;
+    ctx.globalAlpha = alpha * 0.45;
+    ctx.strokeStyle = '#3ecfff';
+    ctx.lineWidth = 6.5;
+    this._stroke(ctx, points);
+
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.strokeStyle = '#9aefff';
+    ctx.lineWidth = 3.6;
     this._stroke(ctx, points);
 
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = '#f4fbff';
-    ctx.lineWidth = 1.35;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.1;
     this._stroke(ctx, points);
 
     if (end) {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(end.x, end.y, 3.2, 0, Math.PI * 2);
+      ctx.arc(end.x, end.y, 5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = alpha * 0.7;
+      ctx.strokeStyle = '#7ee7ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 8, 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -170,27 +181,27 @@ export class ElectricField {
     if (this.focusPoint) {
       const fx = this.focusPoint.x;
       const fy = this.focusPoint.y;
-      const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, 28);
-      grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
-      grad.addColorStop(0.45, 'rgba(140, 220, 255, 0.35)');
+      const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, 42);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      grad.addColorStop(0.4, 'rgba(140, 220, 255, 0.55)');
       grad.addColorStop(1, 'rgba(140, 220, 255, 0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(fx, fy, 28, 0, Math.PI * 2);
+      ctx.arc(fx, fy, 42, 0, Math.PI * 2);
       ctx.fill();
     }
 
     for (const arc of this.arcs) {
-      const flick = arc.kind === 'field' ? 0.4 : 0.34;
+      const flick = arc.kind === 'field' ? 0.72 : 0.62;
       this._drawBolt(ctx, arc.points, flick, arc.to);
     }
 
     this.bolts = this.bolts.filter((b) => b.life > 0);
     for (const bolt of this.bolts) {
-      bolt.life -= 0.045;
+      bolt.life -= 0.03;
       const a = Math.max(0, bolt.life / bolt.maxLife);
-      this._drawBolt(ctx, bolt.points, 0.45 + a * 0.55, bolt.to);
-      for (const br of bolt.branches) this._drawBolt(ctx, br, a * 0.45);
+      this._drawBolt(ctx, bolt.points, 0.7 + a * 0.3, bolt.to);
+      for (const br of bolt.branches) this._drawBolt(ctx, br, a * 0.7);
     }
   }
 
