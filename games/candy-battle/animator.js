@@ -14,6 +14,10 @@ export class BoardAnimator {
 
   destroy() {
     this._destroyed = true;
+    if (this._drag) {
+      this._dropLifted([this._drag, this._drag.neighbor]);
+      this._drag = null;
+    }
     this.releaseSwapHold();
     this._electricField?.destroy();
     this._electricField = null;
@@ -104,19 +108,24 @@ export class BoardAnimator {
     return out;
   }
 
-  _liftPiece(r, c, z) {
-    const piece = this.board.querySelector(`[data-r="${r}"][data-c="${c}"] .piece`);
-    const cell = piece?.closest('.cell');
-    if (!piece || !cell || !this.fxLayer) return null;
+  _slotRect(r, c) {
+    const cell = this.board.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+    if (!cell) return null;
     const cellRect = cell.getBoundingClientRect();
     const width = cellRect.width * 0.92;
     const height = cellRect.height * 0.92;
-    const rect = {
+    return {
       left: cellRect.left + (cellRect.width - width) / 2,
       top: cellRect.top + (cellRect.height - height) / 2,
       width,
       height,
     };
+  }
+
+  _liftPiece(r, c, z) {
+    const piece = this.board.querySelector(`[data-r="${r}"][data-c="${c}"] .piece`);
+    const rect = this._slotRect(r, c);
+    if (!piece || !rect || !this.fxLayer) return null;
     const ghost = piece.cloneNode(true);
     ghost.classList.add('piece-swap-ghost');
     ghost.style.animation = 'none';
@@ -135,13 +144,163 @@ export class BoardAnimator {
     return { piece, ghost, rect };
   }
 
-  async _glide(ghost, left, top, scale, ms) {
-    ghost.style.transition = `left ${ms}ms cubic-bezier(0.22, 0.8, 0.24, 1), top ${ms}ms cubic-bezier(0.22, 0.8, 0.24, 1), transform ${ms}ms cubic-bezier(0.22, 0.8, 0.24, 1)`;
-    void ghost.offsetWidth;
+  _place(ghost, left, top, scale) {
+    ghost.getAnimations().forEach((anim) => anim.cancel());
+    ghost.style.transition = 'none';
     ghost.style.left = `${left}px`;
     ghost.style.top = `${top}px`;
     ghost.style.transform = `scale(${scale})`;
-    await sleep(ms);
+  }
+
+  async _glide(ghost, left, top, scale, ms) {
+    if (!ghost?.isConnected) return;
+    const fromLeft = ghost.style.left || '0px';
+    const fromTop = ghost.style.top || '0px';
+    const fromScale = /scale\(([^)]+)\)/.exec(ghost.style.transform)?.[1] || '1';
+    ghost.style.transition = 'none';
+    ghost.getAnimations().forEach((anim) => anim.cancel());
+    const anim = ghost.animate(
+      [
+        { left: fromLeft, top: fromTop, transform: `scale(${fromScale})` },
+        { left: `${left}px`, top: `${top}px`, transform: `scale(${scale})` },
+      ],
+      { duration: ms, easing: 'cubic-bezier(0.33, 0, 0.2, 1)', fill: 'forwards' },
+    );
+    try {
+      await anim.finished;
+    } catch (_) {
+      return;
+    }
+    if (!ghost.isConnected) return;
+    ghost.style.left = `${left}px`;
+    ghost.style.top = `${top}px`;
+    ghost.style.transform = `scale(${scale})`;
+    anim.cancel();
+  }
+
+  grabPiece(r, c) {
+    if (this._drag || this._motionLock) return false;
+    const lifted = this._liftPiece(r, c, 8);
+    if (!lifted) return false;
+    this._drag = { ...lifted, r, c, neighbor: null };
+    return true;
+  }
+
+  dragPiece(dx, dy) {
+    const d = this._drag;
+    if (!d) return;
+    const stride = this._stride();
+    const horizontal = Math.abs(dx) >= Math.abs(dy);
+    const ox = horizontal ? clamp(dx, -stride.x, stride.x) : 0;
+    const oy = horizontal ? 0 : clamp(dy, -stride.y, stride.y);
+    this._place(d.ghost, d.rect.left + ox, d.rect.top + oy, 1.05);
+    const stepC = !horizontal ? 0 : ox > 8 ? 1 : ox < -8 ? -1 : 0;
+    const stepR = horizontal ? 0 : oy > 8 ? 1 : oy < -8 ? -1 : 0;
+    this._setDragNeighbor(d, d.r + stepR, d.c + stepC, -ox, -oy);
+  }
+
+  _stride() {
+    const a = this.board.querySelector('[data-r="0"][data-c="0"]')?.getBoundingClientRect();
+    const b = this.board.querySelector('[data-r="0"][data-c="1"]')?.getBoundingClientRect();
+    const c = this.board.querySelector('[data-r="1"][data-c="0"]')?.getBoundingClientRect();
+    return {
+      x: a && b ? b.left - a.left : 52,
+      y: a && c ? c.top - a.top : 52,
+    };
+  }
+
+  inputLocked() {
+    return !!(this._motionLock || this._drag);
+  }
+
+  _setDragNeighbor(d, r, c, ox, oy) {
+    if (r === d.r && c === d.c) {
+      if (d.neighbor) {
+        const old = d.neighbor;
+        d.neighbor = null;
+        this._glide(old.ghost, old.rect.left, old.rect.top, 1, 140).then(() => {
+          if (this._drag?.neighbor !== old) this._dropLifted([old]);
+        });
+      }
+      return;
+    }
+    const same = d.neighbor && d.neighbor.r === r && d.neighbor.c === c;
+    if (!same && d.neighbor) {
+      const old = d.neighbor;
+      d.neighbor = null;
+      this._glide(old.ghost, old.rect.left, old.rect.top, 1, 140).then(() => {
+        if (this._drag?.neighbor !== old) this._dropLifted([old]);
+      });
+    }
+    const slot = this._slotRect(r, c);
+    const hasPiece = this.board.querySelector(`[data-r="${r}"][data-c="${c}"] .piece`);
+    if (!slot || !hasPiece) return;
+    if (!d.neighbor) {
+      const lifted = this._liftPiece(r, c, 7);
+      if (!lifted) return;
+      d.neighbor = { ...lifted, r, c };
+    }
+    this._place(d.neighbor.ghost, d.neighbor.rect.left + ox, d.neighbor.rect.top + oy, 1);
+  }
+
+  async cancelDrag(playInvalid = false) {
+    const d = this._drag;
+    if (!d) return;
+    this._drag = null;
+    this._motionLock = true;
+    try {
+      const moved = Math.hypot(
+        (parseFloat(d.ghost.style.left) || d.rect.left) - d.rect.left,
+        (parseFloat(d.ghost.style.top) || d.rect.top) - d.rect.top,
+      );
+      if (moved < 3 && !d.neighbor) {
+        this._dropLifted([d]);
+        return;
+      }
+      if (playInvalid) this.sounds?.play('invalid');
+      await Promise.all([
+        this._glide(d.ghost, d.rect.left, d.rect.top, 1, 230),
+        d.neighbor ? this._glide(d.neighbor.ghost, d.neighbor.rect.left, d.neighbor.rect.top, 1, 230) : null,
+      ].filter(Boolean));
+      this._dropLifted([d, d.neighbor]);
+    } finally {
+      this._motionLock = false;
+    }
+  }
+
+  /** Finish a finger swipe into the neighbor cell. Ghosts stay until releaseSwapHold. */
+  async finishDrag(r1, c1) {
+    const d = this._drag;
+    if (!d) return false;
+    this._drag = null;
+    this._motionLock = true;
+    try {
+      const target = this._slotRect(r1, c1);
+      if (!target) {
+        await this._glide(d.ghost, d.rect.left, d.rect.top, 1, 180);
+        this._dropLifted([d, d.neighbor]);
+        return false;
+      }
+      if (!d.neighbor || d.neighbor.r !== r1 || d.neighbor.c !== c1) {
+        if (d.neighbor) {
+          const old = d.neighbor;
+          d.neighbor = null;
+          await this._glide(old.ghost, old.rect.left, old.rect.top, 1, 100);
+          this._dropLifted([old]);
+        }
+        const lifted = this._liftPiece(r1, c1, 7);
+        if (lifted) d.neighbor = { ...lifted, r: r1, c: c1 };
+      }
+      this.sounds?.play('swap');
+      await Promise.all([
+        this._glide(d.ghost, target.left, target.top, 1.04, 150),
+        d.neighbor ? this._glide(d.neighbor.ghost, d.rect.left, d.rect.top, 1, 150) : null,
+      ].filter(Boolean));
+      this._swapHold = [d, d.neighbor].filter(Boolean);
+      return true;
+    } finally {
+      this._motionLock = false;
+    }
   }
 
   _dropLifted(items) {
@@ -191,9 +350,10 @@ export class BoardAnimator {
       this._glide(b.ghost, a.rect.left, a.rect.top, 1, 170),
     ]);
     this.sounds?.play('invalid');
+    await sleep(70);
     await Promise.all([
-      this._glide(a.ghost, a.rect.left, a.rect.top, 1, 200),
-      this._glide(b.ghost, b.rect.left, b.rect.top, 1, 200),
+      this._glide(a.ghost, a.rect.left, a.rect.top, 1, 240),
+      this._glide(b.ghost, b.rect.left, b.rect.top, 1, 240),
     ]);
     this._dropLifted([a, b]);
   }
@@ -733,4 +893,8 @@ export class BoardAnimator {
 
 function sleep(ms) {
   return fxSleep(ms);
+}
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
 }

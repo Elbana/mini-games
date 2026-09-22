@@ -108,7 +108,7 @@ function setupSoundToggle() {
 
 function setupBoardInput(board) {
   board.addEventListener('pointerdown', (e) => {
-    if (busy || !fight?.active) return;
+    if (busy || !fight?.active || animator?.inputLocked()) return;
     const cell = e.target.closest('.cell');
     if (!cell) return;
     dragStart = {
@@ -116,10 +116,23 @@ function setupBoardInput(board) {
       c: Number(cell.dataset.c),
       x: e.clientX,
       y: e.clientY,
+      grabbed: false,
     };
     try {
       board.setPointerCapture(e.pointerId);
     } catch (_) {}
+  });
+
+  board.addEventListener('pointermove', (e) => {
+    if (!dragStart || busy || !fight?.active) return;
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    if (!dragStart.grabbed) {
+      if (Math.hypot(dx, dy) < 6) return;
+      dragStart.grabbed = animator.grabPiece(dragStart.r, dragStart.c);
+      if (!dragStart.grabbed) return;
+    }
+    animator.dragPiece(dx, dy);
   });
 
   board.addEventListener('pointerup', (e) => {
@@ -130,7 +143,7 @@ function setupBoardInput(board) {
     const dx = e.clientX - dragStart.x;
     const dy = e.clientY - dragStart.y;
     const dist = Math.hypot(dx, dy);
-    const { r: r0, c: c0 } = dragStart;
+    const { r: r0, c: c0, grabbed } = dragStart;
     dragStart = null;
 
     if (dist >= 24) {
@@ -141,16 +154,26 @@ function setupBoardInput(board) {
       selectedCell = null;
       highlightSelected();
       if (r1 >= 0 && r1 < ROWS && c1 >= 0 && c1 < COLS) {
-        attemptSwap(r0, c0, r1, c1);
+        attemptSwap(r0, c0, r1, c1, { fromDrag: grabbed });
+      } else if (grabbed) {
+        animator.cancelDrag(false);
       }
       return;
     }
 
+    if (grabbed) {
+      animator.cancelDrag(false).then(() => {
+        if (!busy && fight?.active) onCellTap(r0, c0);
+      });
+      return;
+    }
     onCellTap(r0, c0);
   });
 
   board.addEventListener('pointercancel', () => {
+    const grabbed = dragStart?.grabbed;
     dragStart = null;
+    if (grabbed) animator.cancelDrag(false);
   });
 }
 
@@ -312,7 +335,6 @@ function renderBoard() {
       if (v != null) {
         const wrap = document.createElement('div');
         wrap.className = pieceClass(v);
-        wrap.style.setProperty('--idle', `${((r * COLS + c) % 7) * 0.16}s`);
         if (isNormal(v)) wrap.classList.add(`candy-${manifest.candies[v]}`);
         if (isStripe(v) || isWrapped(v)) {
           const base = document.createElement('img');
@@ -363,18 +385,20 @@ function highlightSelected() {
     document.querySelector(`[data-r="${selectedCell.r}"][data-c="${selectedCell.c}"]`)?.classList.add('selected');
 }
 
-async function attemptSwap(r0, c0, r1, c1) {
+async function attemptSwap(r0, c0, r1, c1, { fromDrag = false } = {}) {
   busy = true;
   selectedCell = null;
   highlightSelected();
 
   if (!isValidSwap(grid, r0, c0, r1, c1)) {
-    await animator.invalidSwap(r0, c0, r1, c1);
+    if (fromDrag) await animator.cancelDrag(true);
+    else await animator.invalidSwap(r0, c0, r1, c1);
     busy = false;
     return;
   }
 
-  await animator.swapAnimate(r0, c0, r1, c1);
+  if (fromDrag) await animator.finishDrag(r1, c1);
+  else await animator.swapAnimate(r0, c0, r1, c1);
   swapCells(grid, r0, c0, r1, c1);
   renderBoard();
   animator.releaseSwapHold();

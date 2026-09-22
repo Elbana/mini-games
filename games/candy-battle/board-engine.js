@@ -124,12 +124,16 @@ function cellInMatch(grid, r, c) {
   return findTurnResult(grid).groups.some((g) => g.cells.some((p) => p.r === r && p.c === c));
 }
 
-/** Valid swap: creates a match OR activates a special piece. */
+/** Valid swap: the moved candies join a match, or a special is activated. */
 export function isValidSwap(grid, r0, c0, r1, c1) {
   swapCells(grid, r0, c0, r1, c1);
-  const hasMatch = findTurnResult(grid, { includeSpecialLines: true }).groups.length > 0;
+  const touched = findTurnResult(grid, {
+    includeSpecialLines: true,
+    swap: { r0, c0, r1, c1 },
+  }).groups.some((g) => g.cells.some((p) =>
+    (p.r === r0 && p.c === c0) || (p.r === r1 && p.c === c1)));
   swapCells(grid, r0, c0, r1, c1);
-  if (hasMatch) return true;
+  if (touched) return true;
   return canActivateBySwap(grid[r0][c0], grid[r1][c1]);
 }
 

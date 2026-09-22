@@ -43,19 +43,12 @@
   justify-content: center;
   position: relative;
   will-change: transform;
-  animation: candy-idle 2.6s ease-in-out infinite;
-  animation-delay: var(--idle, 0s);
   filter: drop-shadow(0 4px 3px rgba(40, 0, 30, 0.45));
 }
 
 .piece-swap-ghost {
   animation: none !important;
   will-change: left, top, transform;
-}
-
-@keyframes candy-idle {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-1.5px) scale(1.035); }
 }
 
 .piece-land {
@@ -97,7 +90,6 @@
 }
 
 .piece-color-bomb {
-  animation: color-bomb-idle 2.2s ease-in-out infinite;
   filter: drop-shadow(0 0 16px rgba(140, 220, 255, 0.85));
 }
 
@@ -107,7 +99,6 @@
 }
 
 .piece-dynamite {
-  animation: dynamite-fuse 0.85s ease-in-out infinite;
   filter: drop-shadow(0 0 10px rgba(249, 115, 22, 0.85));
 }
 
@@ -115,19 +106,9 @@
   filter: drop-shadow(0 0 8px rgba(255, 230, 100, 0.7));
 }
 
-@keyframes color-bomb-idle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.04); }
-}
-
 @keyframes color-bomb-charge {
   0%, 100% { transform: scale(1.05); }
   50% { transform: scale(1.18); }
-}
-
-@keyframes dynamite-fuse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05) rotate(-2deg); }
 }
 
 .piece-pop {
