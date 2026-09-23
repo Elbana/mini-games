@@ -742,7 +742,7 @@ export class BoardAnimator {
     el.className = 'combo-word';
     el.textContent = word;
     this.comboLayer.appendChild(el);
-    setTimeout(() => el.remove(), 900);
+    setTimeout(() => el.remove(), 2100);
   }
 
   async energyStrike(sourceCells, damage, monsterEl, big = false) {

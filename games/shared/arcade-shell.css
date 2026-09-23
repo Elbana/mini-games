@@ -240,17 +240,24 @@ body {
 
 .toast {
   position: fixed;
-  bottom: 80px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0,0,0,0.85);
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.88);
   border: 1px solid var(--arcade-border);
-  border-radius: 12px;
-  padding: 12px 20px;
+  border-radius: 16px;
+  padding: 16px 22px;
   font-weight: 700;
-  z-index: 100;
-  animation: pop-in 0.3s ease;
+  text-align: center;
+  max-width: min(320px, 86vw);
+  z-index: 420;
+  animation: toast-pop 0.28s ease;
   pointer-events: none;
+}
+
+@keyframes toast-pop {
+  from { transform: translate(-50%, -50%) scale(0.72); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
 .toast.win { border-color: var(--arcade-green); color: var(--arcade-green); }
