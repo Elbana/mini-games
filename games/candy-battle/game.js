@@ -28,12 +28,13 @@ import { CandySounds } from './sounds.js';
 let config = null;
 let manifest = null;
 let grid = [];
-let selectedTier = 'sugar';
-let selectedLevel = 1;
+let selectedLevel = Number(sessionStorage.getItem('candy-level')) || 1;
+let toolStock = { bandage: 0, shield: 0, charge: 0 };
+let season = null;
 let selectedCell = null;
 let busy = false;
+let starting = false;
 let fight = null;
-let buyIn = {};
 let animator = null;
 let sounds = null;
 
@@ -50,16 +51,19 @@ async function init() {
   manifest = await fetch('/candy-battle/assets/manifest.json').then((r) => r.json());
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/candy-battle/config');
-  if (config.dailyMood?.headline) {
-    document.getElementById('lobby-title').textContent = config.dailyMood.headline;
-  }
-  buildTierPicker();
-  buildLevelPicker();
+  renderDiffPicker();
+  renderTools();
+  showMonster(currentLevel());
+  const sell = document.getElementById('result-sell');
+  const marketUrl = new URL('/play/market', location.origin);
+  marketUrl.searchParams.set('token', Arcade.token);
+  marketUrl.searchParams.set('player', Arcade.player);
+  if (new URLSearchParams(location.search).get('host')) marketUrl.searchParams.set('host', 'riko');
+  sell.href = marketUrl.pathname + marketUrl.search;
 
-  document.getElementById('btn-start').addEventListener('click', startFight);
   document.getElementById('btn-continue').addEventListener('click', () => {
     document.getElementById('overlay-result').classList.add('hidden');
-    showLobby();
+    startRound(selectedLevel);
   });
 
   const board = document.getElementById('board');
@@ -67,6 +71,8 @@ async function init() {
   board.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
   animator = new BoardAnimator(board, manifest, sounds);
   setupBoardInput(board);
+  grid = createBoard();
+  renderBoard();
 
   await refreshState();
 
@@ -177,129 +183,209 @@ function setupBoardInput(board) {
   });
 }
 
-async function refreshState() {
-  const st = await Arcade.get('/api/candy-battle/state');
-  buyIn = st.buyInCandies || {};
-  document.getElementById('ammo-count').textContent = Object.values(buyIn).reduce((a, b) => a + b, 0);
-  document.getElementById('btn-start').disabled = (buyIn[selectedTier] || 0) < 3;
-
-  if (st.fight?.active) {
-    resumeFight(st.fight, buyIn);
-  }
+function levels() {
+  return config?.levels?.length
+    ? config.levels
+    : [1, 2, 3, 4, 5, 6].map((level) => ({
+        level,
+        name: ['Gummy Slime', 'Jelly Bat', 'Caramel Golem', 'Licorice Dragon', 'Marshmallow King', 'Dark Fudge Titan'][level - 1],
+        candyName: level >= 5 ? 'Royal Candy' : level >= 3 ? 'Crystal Candy' : 'Sugar Candy',
+        tools: [
+          { id: 'bandage', name: 'Bandage', icon: '🩹', packSize: 4, price: 10 * level },
+          { id: 'shield', name: 'Shield', icon: '🛡️', packSize: 3, price: 14 * level },
+          { id: 'charge', name: 'Charge', icon: '⚡', packSize: 3, price: 18 * level },
+        ],
+      }));
 }
 
-function resumeFight(activeFight, bi) {
-  fight = activeFight;
-  selectedLevel = fight.level;
-  selectedTier = fight.tierId;
-  document.getElementById('screen-lobby').classList.add('hidden');
-  document.getElementById('screen-fight').classList.remove('hidden');
-  document.getElementById('monster-name').textContent = fight.monsterName;
-  const emoji = MONSTER_EMOJI[selectedLevel - 1] || '👾';
-  document.getElementById('monster-sprite').textContent = emoji;
-  grid = createBoard();
-  seedTestSpecials(grid, 6);
-  renderBoard();
-  updateHud(bi);
+function currentLevel() {
+  return levels().find((d) => d.level === selectedLevel) || levels()[0];
 }
 
-function buildTierPicker() {
-  const el = document.getElementById('tier-picker');
-  el.innerHTML =
-    Object.values(config.tiers)
-      .map(
-        (t) =>
-          `<button type="button" class="tier-btn ${t.id === selectedTier ? 'selected' : ''}" data-tier="${t.id}">
-        ${t.name}<br><small>${buyIn[t.id] || 0} owned</small>
-      </button>`
-      )
-      .join('') +
-    `<button type="button" class="btn btn-gold btn-sm" id="btn-buy-pack" style="width:100%;margin-top:8px">Buy Candy Pack</button>`;
-  el.querySelectorAll('.tier-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      selectedTier = btn.dataset.tier;
-      buildTierPicker();
-      document.getElementById('btn-start').disabled = (buyIn[selectedTier] || 0) < 3;
-    });
-  });
-  document.getElementById('btn-buy-pack')?.addEventListener('click', () => buyPack(selectedTier));
-}
-
-function buildLevelPicker() {
-  const el = document.getElementById('level-picker');
-  el.innerHTML = config.monsters
+function renderDiffPicker() {
+  const html = levels()
     .map(
-      (m, i) =>
-        `<button class="level-btn ${m.level === selectedLevel ? 'selected' : ''}" data-level="${m.level}">
-        Lv${m.level} ${MONSTER_EMOJI[i] || '👾'}
+      (d) =>
+        `<button type="button" class="diff-btn ${d.level === selectedLevel ? 'selected' : ''}" data-level="${d.level}">
+          ${MONSTER_EMOJI[d.level - 1] || '👾'} ${d.level}
+        </button>`
+    )
+    .join('');
+  for (const id of ['diff-picker', 'result-diff']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.innerHTML = html;
+    el.classList.toggle('locked', id === 'diff-picker' && !!fight?.active);
+    el.querySelectorAll('.diff-btn').forEach((btn) => {
+      btn.addEventListener('click', () => onPickLevel(Number(btn.dataset.level)));
+    });
+  }
+  renderSeasonLine();
+}
+
+function renderSeasonLine() {
+  const el = document.getElementById('season-line');
+  if (!el) return;
+  const lv = currentLevel();
+  const s = season || { number: 1, stretchWins: 0, stretchLosses: 0, stretchHaul: {} };
+  const candy = haulText(s.stretchHaul);
+  el.textContent = `Lv${lv.level} ${lv.name} · season ${s.number} · ${s.stretchWins || 0} wins ${s.stretchLosses || 0} losses${candy ? ` · ${candy}` : ''}`;
+}
+
+function haulText(haul) {
+  if (!haul) return '';
+  const names = { candy_sugar: 'sugar', candy_crystal: 'crystal', candy_royal: 'royal' };
+  return Object.entries(haul)
+    .filter(([, n]) => n > 0)
+    .map(([id, n]) => `${n} ${names[id] || 'candy'}`)
+    .join(', ');
+}
+
+function renderTools() {
+  const row = document.getElementById('tool-row');
+  if (!row) return;
+  const defs = currentLevel().tools || [];
+  row.innerHTML = defs
+    .map(
+      (t) => `<button type="button" class="tool-btn tool-${t.id}" data-tool="${t.id}">
+        <span class="tool-gem">${t.icon}</span>
+        <span class="tool-name">${t.name}</span>
+        <span class="tool-price"><b>${t.price}</b></span>
       </button>`
     )
     .join('');
-  el.querySelectorAll('.level-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      selectedLevel = Number(btn.dataset.level);
-      buildLevelPicker();
-      document.getElementById('btn-start').disabled = (buyIn[selectedTier] || 0) < 3;
-    });
+  row.querySelectorAll('.tool-btn').forEach((btn) => {
+    btn.addEventListener('click', () => useTool(btn.dataset.tool));
   });
 }
 
-async function buyPack(tierId) {
-  selectedTier = tierId;
-  buildTierPicker();
-  try {
-    const r = await Arcade.post('/api/candy-battle/buy-candies', { tierId, packs: 1 });
-    buyIn = r.buyInCandies;
-    document.getElementById('ammo-count').textContent = Object.values(buyIn).reduce((a, b) => a + b, 0);
-    document.getElementById('btn-start').disabled = (buyIn[selectedTier] || 0) < 3;
-    Arcade.toast(`+${r.added} buy-in candies!`, 'win');
-    Arcade.refreshBalance(document.getElementById('balance'));
-  } catch (e) {
-    Arcade.toast(e.message, 'lose');
-  }
+function showMonster(levelInfo) {
+  const level = levelInfo?.level || fight?.level || selectedLevel;
+  document.getElementById('monster-name').textContent = fight?.monsterName || levelInfo?.name || 'Monster';
+  document.getElementById('monster-sprite').textContent = MONSTER_EMOJI[level - 1] || '👾';
 }
 
-async function startFight() {
+function onPickLevel(level) {
+  const overlayOpen = !document.getElementById('overlay-result').classList.contains('hidden');
+  if (fight?.active && !overlayOpen) {
+    Arcade.toast('Finish this fight, then switch level.', 'lose');
+    return;
+  }
+  selectedLevel = level;
+  sessionStorage.setItem('candy-level', String(level));
+  renderDiffPicker();
+  renderTools();
+  if (!fight?.active) showMonster(currentLevel());
+  if (!overlayOpen) startRound(level);
+}
+
+async function refreshState() {
+  const st = await Arcade.get('/api/candy-battle/state');
+  toolStock = st.tools || toolStock;
+  season = st.season || season;
+  renderTools();
+  renderSeasonLine();
+  const active = st.fight?.active ? st.fight : null;
+  if (active && active.monsterMaxHp >= 70) {
+    resumeFight(active);
+    return;
+  }
+  if (active) {
+    await Arcade.post('/api/candy-battle/abandon', {}).catch(() => {});
+  }
+  await startRound(selectedLevel);
+}
+
+function resumeFight(activeFight) {
+  fight = activeFight;
+  selectedLevel = fight.level || selectedLevel;
+  sessionStorage.setItem('candy-level', String(selectedLevel));
+  renderDiffPicker();
+  renderTools();
+  showMonster(currentLevel());
+  grid = createBoard();
+  seedTestSpecials(grid, 1);
+  renderBoard();
+  updateHud();
+}
+
+async function startRound(level) {
+  if (starting) return;
+  starting = true;
+  busy = true;
+  selectedLevel = level;
+  sessionStorage.setItem('candy-level', String(level));
+  renderDiffPicker();
+  showMonster(currentLevel());
   try {
-    const r = await Arcade.post('/api/candy-battle/start-fight', {
-      level: selectedLevel,
-      tierId: selectedTier,
-    });
+    const r = await Arcade.post('/api/candy-battle/start-fight', { level });
     fight = r.fight;
-    document.getElementById('screen-lobby').classList.add('hidden');
-    document.getElementById('screen-fight').classList.remove('hidden');
-    document.getElementById('monster-name').textContent = fight.monsterName;
-    const emoji = MONSTER_EMOJI[selectedLevel - 1] || '👾';
-    document.getElementById('monster-preview').textContent = emoji;
-    document.getElementById('monster-sprite').textContent = emoji;
-    updateHud(r.buyInCandies || buyIn);
+    if (r.season) season = r.season;
+    if (r.tools) toolStock = r.tools;
+    renderDiffPicker();
+    renderTools();
+    showMonster(currentLevel());
+    updateHud();
     grid = createBoard();
-    seedTestSpecials(grid, 6);
+    seedTestSpecials(grid, 1);
     renderBoard();
   } catch (e) {
+    fight = null;
+    renderDiffPicker();
+    updateHud();
+    Arcade.toast(e.message, 'lose');
+  } finally {
+    starting = false;
+    busy = false;
+  }
+}
+
+async function useTool(toolId) {
+  if (busy || !fight?.active) return;
+  const btn = document.querySelector(`.tool-btn[data-tool="${toolId}"]`);
+  btn?.classList.add('tool-pressed');
+  setTimeout(() => btn?.classList.remove('tool-pressed'), 280);
+  const voice = toolId === 'bandage' ? 'heal' : toolId === 'shield' ? 'shield' : 'charge';
+  const blocked =
+    (toolId === 'bandage' && fight.playerHp >= fight.playerMaxHp) ||
+    (toolId === 'shield' && fight.shield) ||
+    (toolId === 'charge' && fight.charge);
+  sounds.play(toolId === 'shield' || !blocked ? voice : 'invalid');
+  if (blocked && toolId === 'bandage') {
+    Arcade.toast('Health is already full', 'lose');
+    return;
+  }
+  try {
+    const r = await Arcade.post('/api/candy-battle/use-tool', { toolId });
+    const prevHp = fight.playerHp;
+    fight = r.fight;
+    updateHud();
+    Arcade.refreshBalance(document.getElementById('balance'));
+    if (r.used?.heal) playHeal(prevHp, fight.playerHp, r.used.heal);
+    else if (r.used?.shield) playShield();
+  } catch (e) {
+    if (!blocked) sounds.play('invalid');
     Arcade.toast(e.message, 'lose');
   }
 }
 
-function showLobby() {
-  document.getElementById('screen-fight').classList.add('hidden');
-  document.getElementById('screen-lobby').classList.remove('hidden');
-  refreshState();
-  Arcade.refreshBalance(document.getElementById('balance'));
-}
-
-function updateHud(bi) {
-  buyIn = bi || buyIn;
-  if (!fight) return;
+function updateHud() {
+  renderSeasonLine();
+  if (!fight) {
+    document.getElementById('player-hp').style.width = '100%';
+    document.getElementById('monster-hp').style.width = '100%';
+    document.getElementById('player-hp-num').textContent = '—';
+    document.getElementById('monster-hp-num').textContent = '—';
+    return;
+  }
   const playerPct = Math.max(0, (fight.playerHp / fight.playerMaxHp) * 100);
   const monsterPct = Math.max(0, (fight.monsterHp / fight.monsterMaxHp) * 100);
-  document.getElementById('player-hp').style.width = `${playerPct}%`;
+  const playerFill = document.getElementById('player-hp');
+  playerFill.style.width = `${playerPct}%`;
+  playerFill.classList.toggle('shielded', !!fight.shield);
   document.getElementById('monster-hp').style.width = `${monsterPct}%`;
-  const playerNum = document.getElementById('player-hp-num');
-  const monsterNum = document.getElementById('monster-hp-num');
-  if (playerNum) playerNum.textContent = String(Math.max(0, fight.playerHp));
-  if (monsterNum) monsterNum.textContent = String(Math.max(0, fight.monsterHp));
-  document.getElementById('fight-ammo').textContent = buyIn[selectedTier] || 0;
+  document.getElementById('player-hp-num').textContent = String(Math.max(0, fight.playerHp));
+  document.getElementById('monster-hp-num').textContent = String(Math.max(0, fight.monsterHp));
 }
 
 function pieceClass(v) {
@@ -322,38 +408,54 @@ function specialOverlaySrc(v) {
   return null;
 }
 
+function buildPiece(v) {
+  const wrap = document.createElement('div');
+  wrap.className = pieceClass(v);
+  if (isNormal(v)) wrap.classList.add(`candy-${manifest.candies[v]}`);
+  if (isStripe(v) || isWrapped(v)) {
+    const base = document.createElement('img');
+    base.className = 'piece-base';
+    base.draggable = false;
+    base.src = candySrc(v);
+    base.alt = '';
+    wrap.appendChild(base);
+  }
+  const overlay = specialOverlaySrc(v);
+  const img = document.createElement('img');
+  img.className = isStripe(v) || isWrapped(v) ? 'piece-overlay' : 'piece-candy';
+  img.draggable = false;
+  img.src = overlay || candySrc(v);
+  img.alt = '';
+  wrap.appendChild(img);
+  return wrap;
+}
+
 function renderBoard() {
   const board = document.getElementById('board');
-  board.innerHTML = '';
+  if (board.childElementCount !== ROWS * COLS) {
+    board.replaceChildren();
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = document.createElement('div');
+        cell.className = `cell ${(r + c) % 2 ? 'well-b' : 'well-a'}`;
+        cell.dataset.r = String(r);
+        cell.dataset.c = String(c);
+        board.appendChild(cell);
+      }
+    }
+  }
+  let i = 0;
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
+      const cell = board.children[i++];
       const v = grid[r][c];
-      const cell = document.createElement('div');
-      cell.className = `cell ${(r + c) % 2 ? 'well-b' : 'well-a'}`;
-      cell.dataset.r = r;
-      cell.dataset.c = c;
-      if (v != null) {
-        const wrap = document.createElement('div');
-        wrap.className = pieceClass(v);
-        if (isNormal(v)) wrap.classList.add(`candy-${manifest.candies[v]}`);
-        if (isStripe(v) || isWrapped(v)) {
-          const base = document.createElement('img');
-          base.className = 'piece-base';
-          base.draggable = false;
-          base.src = candySrc(v);
-          base.alt = '';
-          wrap.appendChild(base);
-        }
-        const overlay = specialOverlaySrc(v);
-        const img = document.createElement('img');
-        img.className = isStripe(v) || isWrapped(v) ? 'piece-overlay' : 'piece-candy';
-        img.draggable = false;
-        img.src = overlay || candySrc(v);
-        img.alt = '';
-        wrap.appendChild(img);
-        cell.appendChild(wrap);
-      }
-      board.appendChild(cell);
+      const sig = v == null ? '' : String(v);
+      const piece = cell.querySelector('.piece');
+      const missing = !piece || piece.classList.contains('piece-pop') || piece.style.visibility === 'hidden';
+      if (cell.dataset.sig === sig && !missing) continue;
+      cell.dataset.sig = sig;
+      piece?.remove();
+      if (v != null) cell.appendChild(buildPiece(v));
     }
   }
 }
@@ -408,6 +510,41 @@ async function attemptSwap(r0, c0, r1, c1, { fromDrag = false } = {}) {
   busy = false;
 }
 
+function playHeal(fromHp, toHp, amount) {
+  const fill = document.getElementById('player-hp');
+  const num = document.getElementById('player-hp-num');
+  const max = Math.max(1, fight?.playerMaxHp || 1);
+  fill.classList.add('hp-heal');
+  fill.style.transition = 'none';
+  fill.style.width = `${(fromHp / max) * 100}%`;
+  num.textContent = String(fromHp);
+  const rect = fill.getBoundingClientRect();
+  ArcadeFX.floatText(rect.left + rect.width / 2, rect.top - 6, `+${amount}`, '#5dffb0');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fill.style.transition = 'width 0.7s cubic-bezier(0.22, 1, 0.36, 1)';
+      fill.style.width = `${(toHp / max) * 100}%`;
+    });
+  });
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - start) / 700);
+    const hp = Math.round(fromHp + (toHp - fromHp) * (1 - (1 - t) ** 3));
+    num.textContent = String(hp);
+    if (t < 1) requestAnimationFrame(tick);
+    else fill.classList.remove('hp-heal');
+  }
+  requestAnimationFrame(tick);
+}
+
+function playShield() {
+  const fill = document.getElementById('player-hp');
+  const bar = fill.parentElement;
+  fill.classList.add('shielded');
+  bar.classList.add('shield-pop');
+  setTimeout(() => bar.classList.remove('shield-pop'), 700);
+}
+
 function estimateDamage(size, combo, bonus = 0) {
   const s = size >= 6 ? 6 : size >= 5 ? 5 : size >= 4 ? 4 : 3;
   const base = { 3: 4, 4: 7, 5: 12, 6: 18 }[s] || s * 3;
@@ -424,6 +561,7 @@ async function runCascadeWave({
   monsterEl,
   allowBombActivation = false,
   forceBombActivation = false,
+  charged = false,
 }) {
   if (combo >= 2 && groups?.length) {
     animator.showComboWord(combo, Math.max(...groups.map((g) => g.size)));
@@ -475,7 +613,7 @@ async function runCascadeWave({
   }
 
   const strikeFx =
-    waveDamage > 0 ? animator.energyStrike(cells, waveDamage, monsterEl, strikeBig) : Promise.resolve();
+    waveDamage > 0 ? animator.energyStrike(cells, waveDamage, monsterEl, strikeBig, charged) : Promise.resolve();
   await Promise.all([animator.popCells(cells, combo), strikeFx]);
 
   const createKeys = new Set((creates || []).map((c) => `${c.r},${c.c}`));
@@ -493,6 +631,7 @@ async function runFullCascadeTurn(r0, c0, r1, c1) {
   if (window.__arcadePaused) return;
   const waves = [];
   let combo = 0;
+  const chargedHit = !!fight?.charge;
   const monsterEl = document.getElementById('monster-sprite');
 
   let swapSpecialFired = false;
@@ -510,6 +649,7 @@ async function runFullCascadeTurn(r0, c0, r1, c1) {
         waves,
         monsterEl,
         forceBombActivation: true,
+        charged: chargedHit,
       });
     }
   }
@@ -541,6 +681,7 @@ async function runFullCascadeTurn(r0, c0, r1, c1) {
       monsterEl,
       allowBombActivation: playerStep,
       forceBombActivation: false,
+      charged: chargedHit,
     });
   }
 
@@ -550,21 +691,27 @@ async function runFullCascadeTurn(r0, c0, r1, c1) {
     const r = await Arcade.post('/api/candy-battle/turn', { waves });
     if (window.__arcadePaused) return;
     fight = r.fight;
-    updateHud(r.buyInCandies);
+    if (r.season) season = r.season;
+    updateHud();
+    renderDiffPicker();
+    renderTools();
 
     if (r.misfortune?.message) {
       Arcade.toast(r.misfortune.message, 'lose');
     }
 
-    document.getElementById('battle-msg').textContent =
-      `${waves.length} hit${waves.length > 1 ? 's' : ''} → ${r.totalDamage} dmg!` +
-      (r.monsterAttack ? ` Monster -${r.monsterAttack}` : '') +
-      (r.bonusCandies ? ` +${r.bonusCandies} bonus` : '');
-
     if (r.monsterAttack) {
       sounds.play('hurt');
       ArcadeFX.shake(document.getElementById('app'));
-      ArcadeFX.floatText(window.innerWidth / 2, 100, `-${r.monsterAttack}`, '#ff5a7a');
+      const fill = document.getElementById('player-hp');
+      if (r.shieldSoak) {
+        fill.classList.add('shield-hit');
+        setTimeout(() => fill.classList.remove('shield-hit'), 480);
+        ArcadeFX.floatText(window.innerWidth / 2 - 28, 88, `-${r.monsterAttack}`, '#d5dbe3');
+        ArcadeFX.floatText(window.innerWidth / 2 + 36, 112, `blocked ${r.shieldSoak}`, '#9aa3ad');
+      } else {
+        ArcadeFX.floatText(window.innerWidth / 2, 100, `-${r.monsterAttack}`, '#ff5a7a');
+      }
     }
     if (r.won || r.lost || r.ended) showResult(r);
   } catch (e) {
@@ -573,21 +720,45 @@ async function runFullCascadeTurn(r0, c0, r1, c1) {
 }
 
 function showResult(r) {
-  document.getElementById('overlay-result').classList.remove('hidden');
-  if (r.won) {
+  const overlay = document.getElementById('overlay-result');
+  const detail = document.getElementById('result-detail');
+  overlay.classList.remove('hidden');
+  renderDiffPicker();
+  const monsterName = r.fight?.monsterName || currentLevel().name || 'Monster';
+  if (r.checkpoint) {
+    document.getElementById('result-icon').textContent = '🍬';
+    document.getElementById('result-title').textContent = `Season ${r.checkpoint.number}`;
+    const haul = haulText(r.checkpoint.haul);
+    detail.textContent = haul
+      ? `${r.checkpoint.wins} wins, ${r.checkpoint.losses} losses. Haul: ${haul}. Sell it, or keep going.`
+      : `${r.checkpoint.wins} wins, ${r.checkpoint.losses} losses. No candy this stretch. Keep going.`;
+    if (r.won) sounds.play('win', { volume: 0.5 });
+  } else if (r.won) {
     document.getElementById('result-icon').textContent = '🏆';
-    document.getElementById('result-title').textContent = 'Monster Defeated!';
-    document.getElementById('result-detail').textContent = r.rewards?.length
-      ? `Loot: ${r.rewards.map((x) => x.qty + '× ' + x.itemId).join(', ')}`
-      : 'You earned loot!';
+    document.getElementById('result-title').textContent = `${monsterName} defeated`;
+    const qty = Number(r.loot?.qty) || 0;
+    const lootName = r.loot?.name || 'Candy';
+    detail.textContent = `+0 ${lootName}`;
+    countUp(detail, qty, '+', ` ${lootName}`);
     sounds.play('win', { volume: 0.5 });
     ArcadeFX.confetti(30);
   } else {
     document.getElementById('result-icon').textContent = '💀';
-    document.getElementById('result-title').textContent =
-      r.reason === 'out_of_candies' ? 'Out of Candies!' : 'Defeated';
-    document.getElementById('result-detail').textContent = 'Buy more candies and try again.';
+    document.getElementById('result-title').textContent = 'Defeated';
+    detail.textContent = `${monsterName} got you. The season keeps going.`;
   }
+}
+
+function countUp(el, to, prefix, suffix) {
+  const start = performance.now();
+  const dur = 900;
+  function tick(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - (1 - t) * (1 - t);
+    el.textContent = `${prefix}${Math.round(to * eased)}${suffix}`;
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
 
 function sleep(ms) {

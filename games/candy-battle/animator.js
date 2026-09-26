@@ -145,7 +145,10 @@ export class BoardAnimator {
   }
 
   _place(ghost, left, top, scale) {
-    ghost.getAnimations().forEach((anim) => anim.cancel());
+    if (ghost._gliding) {
+      ghost.getAnimations().forEach((anim) => anim.cancel());
+      ghost._gliding = false;
+    }
     ghost.style.transition = 'none';
     ghost.style.left = `${left}px`;
     ghost.style.top = `${top}px`;
@@ -159,6 +162,7 @@ export class BoardAnimator {
     const fromScale = /scale\(([^)]+)\)/.exec(ghost.style.transform)?.[1] || '1';
     ghost.style.transition = 'none';
     ghost.getAnimations().forEach((anim) => anim.cancel());
+    ghost._gliding = true;
     const anim = ghost.animate(
       [
         { left: fromLeft, top: fromTop, transform: `scale(${fromScale})` },
@@ -183,13 +187,14 @@ export class BoardAnimator {
     const lifted = this._liftPiece(r, c, 8);
     if (!lifted) return false;
     this._drag = { ...lifted, r, c, neighbor: null };
+    this._strideCache = this._stride();
     return true;
   }
 
   dragPiece(dx, dy) {
     const d = this._drag;
     if (!d) return;
-    const stride = this._stride();
+    const stride = this._strideCache || { x: 52, y: 52 };
     const horizontal = Math.abs(dx) >= Math.abs(dy);
     const ox = horizontal ? clamp(dx, -stride.x, stride.x) : 0;
     const oy = horizontal ? 0 : clamp(dy, -stride.y, stride.y);
@@ -745,8 +750,9 @@ export class BoardAnimator {
     setTimeout(() => el.remove(), 2100);
   }
 
-  async energyStrike(sourceCells, damage, monsterEl, big = false) {
+  async energyStrike(sourceCells, damage, monsterEl, big = false, charged = false) {
     if (!this.fxLayer || !monsterEl || !sourceCells?.length) return;
+    if (charged) this.fxLayer.classList.add('fx-charged');
 
     const toRect = monsterEl.getBoundingClientRect();
     const target = {
@@ -775,9 +781,10 @@ export class BoardAnimator {
     setTimeout(() => monsterEl.classList.remove('monster-hit'), 420);
     this.sounds?.play('hit', { volume: 0.45 });
     if (window.ArcadeFX) {
-      ArcadeFX.floatText(target.x, target.y - 24, `-${damage}`, '#e8f4ff');
+      ArcadeFX.floatText(target.x, target.y - 24, `-${damage}`, charged ? '#ff4d5a' : '#e8f4ff');
     }
     await sleep(big ? 60 : 40);
+    this.fxLayer.classList.remove('fx-charged');
   }
 
   _sampleCells(cells, max) {
@@ -886,7 +893,7 @@ export class BoardAnimator {
     ring.style.top = `${y}px`;
     this.fxLayer.appendChild(ring);
 
-    const count = big ? 16 : 10;
+    const count = big ? 8 : 5;
     for (let i = 0; i < count; i++) {
       const shard = document.createElement('div');
       shard.className = 'silver-shard';

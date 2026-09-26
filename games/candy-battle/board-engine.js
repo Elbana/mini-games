@@ -34,8 +34,8 @@ export function isSpecial(v) {
   return isEnergy(v) || isBuyin(v) || isWrapped(v) || isStripe(v);
 }
 
-/** Chance for new refill candies to spawn as a special (testing / juice). */
-export const TEST_SPECIAL_RATE = 0.35;
+/** Chance a new candy is a special. High enough to matter, low enough that a fight lasts. */
+export const TEST_SPECIAL_RATE = 0.08;
 
 export function createBoard() {
   const grid = emptyGrid();

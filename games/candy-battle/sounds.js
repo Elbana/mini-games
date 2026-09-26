@@ -125,6 +125,20 @@ export class CandySounds {
         ui: () => {
           this._tone(720, 960, 0.05, 0.035 * m, 0);
         },
+        heal: () => {
+          this._tone(520, 780, 0.16, 0.05 * m, 0, 'triangle');
+          this._tone(780, 1040, 0.18, 0.04 * m, 0.08, 'sine');
+        },
+        shield: () => {
+          this._noise(0.05, 0.12 * m, 0, { type: 'highpass', freq: 2200, snap: true });
+          this._tone(980, 620, 0.18, 0.09 * m, 0, 'triangle', 0.003);
+          this._tone(1480, 880, 0.14, 0.06 * m, 0.012, 'sine', 0.003);
+        },
+        charge: () => {
+          this._noise(0.06, 0.05 * m, 0, { type: 'highpass', freq: 1800, snap: true });
+          this._tone(420, 980, 0.12, 0.045 * m, 0.02, 'sawtooth', 0.004);
+          this._tone(880, 1460, 0.1, 0.03 * m, 0.06, 'triangle');
+        },
       };
       (voices[name] || voices.match)();
     });

@@ -10,6 +10,8 @@ import {
   handleGetCandyState,
   handleBuyCandies,
   handleStartFight,
+  handleBuyTool,
+  handleUseTool,
   handleCandyTurn,
   handleCandyMatch,
   handleAbandonFight,
@@ -72,6 +74,8 @@ app.get('/api/candy-battle/config', handleGetCandyConfig);
 app.get('/api/candy-battle/state', handleGetCandyState);
 app.post('/api/candy-battle/buy-candies', handleBuyCandies);
 app.post('/api/candy-battle/start-fight', handleStartFight);
+app.post('/api/candy-battle/buy-tool', handleBuyTool);
+app.post('/api/candy-battle/use-tool', handleUseTool);
 app.post('/api/candy-battle/turn', handleCandyTurn);
 app.post('/api/candy-battle/match', handleCandyMatch);
 app.post('/api/candy-battle/abandon', handleAbandonFight);

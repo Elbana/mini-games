@@ -22,18 +22,7 @@
       </div>
     </header>
 
-    <div id="screen-lobby" class="screen">
-      <div class="card lobby-card">
-        <div class="monster-preview" id="monster-preview">👾</div>
-        <h2 id="lobby-title">Buy candies. Fight monsters.</h2>
-        <p class="ammo-display">Buy-in: <strong id="ammo-count">0</strong> candies</p>
-        <div class="tier-picker" id="tier-picker"></div>
-        <div class="level-picker" id="level-picker"></div>
-        <button class="btn btn-primary" id="btn-start" disabled>Start Battle</button>
-      </div>
-    </div>
-
-    <div id="screen-fight" class="screen hidden">
+    <div id="screen-fight" class="screen">
       <div class="arena-panel">
         <div class="monster-stage">
           <div class="monster-aura" aria-hidden="true"></div>
@@ -54,16 +43,12 @@
           </div>
         </div>
       </div>
-      <p class="candy-ammo">🍬 <span id="fight-ammo">0</span> left · swipe to swap</p>
-      <div class="specials-legend" aria-label="Special pieces">
-        <span class="legend-item"><img src="/candy-battle/assets/special/color-bomb.svg" alt="" width="18" height="18"> Color ball — swap onto a color to zap all of it</span>
-        <span class="legend-item"><img src="/candy-battle/assets/special/rocket-h.svg" alt="" width="18" height="18"> Rocket — swap to wipe a whole row or column</span>
-        <span class="legend-item"><img src="/candy-battle/assets/special/dynamite.svg" alt="" width="18" height="18"> Dynamite — swap to explode nearby tiles</span>
-      </div>
+      <div class="diff-picker" id="diff-picker"></div>
+      <p class="candy-ammo" id="season-line">Season 1</p>
       <div class="board-wrap">
         <div id="board" class="board"></div>
       </div>
-      <div id="battle-msg" class="battle-msg"></div>
+      <div class="tool-row" id="tool-row"></div>
     </div>
 
     <div id="fx-layer" aria-hidden="true"></div>
@@ -74,7 +59,9 @@
         <div class="result-icon" id="result-icon">🏆</div>
         <h2 id="result-title">Victory!</h2>
         <p id="result-detail"></p>
-        <button class="btn btn-gold" id="btn-continue">Continue</button>
+        <div class="diff-picker" id="result-diff"></div>
+        <a class="btn btn-ghost" id="result-sell" href="/play/market" target="_blank" rel="noopener">Sell candy ↗</a>
+        <button class="btn btn-gold" id="btn-continue">Next fight</button>
       </div>
     </div>
   </div>
