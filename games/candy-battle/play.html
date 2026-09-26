@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Candy Battle</title>
   <link rel="stylesheet" href="/shared/arcade-shell.css">
-  <link rel="stylesheet" href="/candy-battle/game.css">
+  <link rel="stylesheet" href="/candy-battle/game.css?v=world2">
   <script src="/shared/arcade-api.js"></script>
   <script src="/shared/profile.js"></script>
   <script src="/shared/fx.js"></script>
-  <script type="module" src="/candy-battle/game.js"></script>
+  <script type="module" src="/candy-battle/game.js?v=clean"></script>
 </head>
 <body>
   <div class="arcade-shell candy-world" id="app">
     <div class="candy-bg" aria-hidden="true"></div>
-    <header class="top-bar">
-      <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
-      <h1>Candy Battle</h1>
+    <header class="top-bar candy-top">
+      <a class="hub-pill" href="/"><span aria-hidden="true">⌂</span> Hub</a>
+      <h1 class="candy-logo"><span>Candy</span><span>Battle</span></h1>
       <div class="top-bar-actions">
         <button type="button" class="player-chip" id="player-chip" hidden></button>
         <button type="button" class="btn btn-ghost btn-sm sound-toggle" id="btn-sound" aria-pressed="false" aria-label="Sound on">🔊</button>

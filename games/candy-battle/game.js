@@ -21,7 +21,7 @@ import {
   clearCells,
   applyGravity,
   applyCreates,
-} from './board-engine.js';
+} from './board-engine.js?v=bomb';
 import { BoardAnimator } from './animator.js';
 import { CandySounds } from './sounds.js';
 
@@ -48,7 +48,7 @@ async function init() {
   setupSoundToggle();
   document.body.addEventListener('pointerdown', () => sounds.unlock(), { once: true });
 
-  manifest = await fetch('/candy-battle/assets/manifest.json').then((r) => r.json());
+  manifest = await fetch('/candy-battle/assets/manifest.json?v=clean').then((r) => r.json());
   await Arcade.refreshBalance(document.getElementById('balance'));
   config = await Arcade.get('/api/candy-battle/config');
   renderDiffPicker();
@@ -412,14 +412,6 @@ function buildPiece(v) {
   const wrap = document.createElement('div');
   wrap.className = pieceClass(v);
   if (isNormal(v)) wrap.classList.add(`candy-${manifest.candies[v]}`);
-  if (isStripe(v) || isWrapped(v)) {
-    const base = document.createElement('img');
-    base.className = 'piece-base';
-    base.draggable = false;
-    base.src = candySrc(v);
-    base.alt = '';
-    wrap.appendChild(base);
-  }
   const overlay = specialOverlaySrc(v);
   const img = document.createElement('img');
   img.className = isStripe(v) || isWrapped(v) ? 'piece-overlay' : 'piece-candy';

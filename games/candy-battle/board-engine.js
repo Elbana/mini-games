@@ -1,7 +1,7 @@
 /** Candy Crush–style board with specials, cascades, color wipes. */
 export const COLS = 7;
 export const ROWS = 7;
-export const COLORS = 6;
+export const COLORS = 7;
 
 export const ENERGY = 10;
 export const BUYIN = 11;

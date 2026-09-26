@@ -1,13 +1,13 @@
 {
   "source": "OpenGameArt CC0 — yaycandies jelly pack + MELLE candy match background",
-  "candies": ["red", "blue", "yellow", "green", "purple", "orange"],
-  "candyPath": "/candy-battle/assets/candies/{color}.png",
+  "candies": ["red", "orange", "yellow", "green", "blue", "heart", "star"],
+  "candyPath": "/candy-battle/assets/candies/{color}.png?v=bomb",
   "special": {
-    "energy": "/candy-battle/assets/special/color-bomb.svg",
-    "colorBomb": "/candy-battle/assets/special/color-bomb.svg",
-    "rocketH": "/candy-battle/assets/special/rocket-h.svg",
-    "rocketV": "/candy-battle/assets/special/rocket-v.svg",
-    "dynamite": "/candy-battle/assets/special/dynamite.svg"
+    "energy": "/candy-battle/assets/candies/choco.png?v=bomb",
+    "colorBomb": "/candy-battle/assets/candies/choco.png?v=bomb",
+    "rocketH": "/candy-battle/assets/sheet/rocket-h.png?v=clean",
+    "rocketV": "/candy-battle/assets/sheet/rocket-v.png?v=clean",
+    "dynamite": "/candy-battle/assets/sheet/dynamite.png?v=edge"
   },
   "background": "/candy-battle/assets/bg-board.png",
   "explosion": [

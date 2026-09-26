@@ -3,17 +3,66 @@
   font-family: 'Fredoka', 'Nunito', sans-serif;
 }
 
+body {
+  background: #7ec8ff url('/candy-battle/assets/bg-world.jpg?v=world2') center 40% / cover no-repeat fixed;
+}
+
 .candy-bg {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background:
-    linear-gradient(180deg, rgba(22, 8, 36, 0.42), rgba(12, 4, 22, 0.72)),
-    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255, 120, 200, 0.4), transparent 60%),
-    radial-gradient(ellipse 50% 30% at 100% 80%, rgba(120, 80, 255, 0.32), transparent 55%),
-    url('/candy-battle/assets/bg-board.png') center/cover;
-  opacity: 1;
+  background: linear-gradient(180deg, rgba(8, 20, 60, 0.28) 0%, transparent 16%, transparent 80%, rgba(20, 8, 40, 0.16) 100%);
   pointer-events: none;
+}
+
+.candy-top {
+  padding: 8px 10px 4px;
+  background: transparent;
+}
+
+.hub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.72rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #7a4dff, #4b22c8);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 3px 0 #2d1280, inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.candy-logo {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.82;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 #5a1a78, 0 4px 0 #2a0840;
+}
+
+.candy-logo span:first-child { color: #ffe14a; }
+.candy-logo span:last-child { color: #5ecbff; }
+
+.candy-world .balance-pill {
+  background: linear-gradient(180deg, #ffe08a, #f0a020);
+  color: #3a2200;
+  border-color: #fff3c4;
+  box-shadow: 0 3px 0 #a86208;
+  padding: 5px 10px;
+}
+
+.candy-world .player-chip {
+  background: linear-gradient(180deg, #7d4dff, #5426d0);
+  border-color: rgba(255, 255, 255, 0.4);
+  max-width: 92px;
 }
 
 .candy-world > *:not(.candy-bg) { position: relative; z-index: 1; }
@@ -672,16 +721,17 @@
 .diff-btn {
   flex: 1;
   min-width: 0;
-  border: 2px solid rgba(255, 214, 120, 0.25);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.28));
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, #4a3d62, #2c243c);
   color: #fff;
-  border-radius: 12px;
-  padding: 5px 2px;
+  border-radius: 999px;
+  padding: 6px 2px;
   font-family: inherit;
   font-weight: 800;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   cursor: pointer;
   line-height: 1.15;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 3px 0 #1a1424;
 }
 
 .tool-row {
@@ -777,12 +827,12 @@
 .tool-bandage.tool-pressed { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 0 #06724a; }
 
 .tool-shield {
-  background: radial-gradient(circle at 50% 0%, #fff, transparent 55%), linear-gradient(180deg, #e7edf2, #8e99a4);
-  color: #1c242c;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 3px 0 #5c6770;
+  background: radial-gradient(circle at 50% 0%, #d7ecff, transparent 55%), linear-gradient(180deg, #6eb6ff, #2f6dff);
+  color: #041428;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 3px 0 #1a3ea8;
 }
 .tool-shield:active,
-.tool-shield.tool-pressed { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 0 #5c6770; }
+.tool-shield.tool-pressed { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 0 #1a3ea8; }
 
 .tool-charge {
   background: radial-gradient(circle at 50% 0%, #ffe7c4, transparent 55%), linear-gradient(180deg, #ffb15a, #ff4d3a);
@@ -906,9 +956,9 @@
 }
 
 .diff-btn.selected {
-  border-color: #ffd56e;
-  background: linear-gradient(180deg, rgba(255, 107, 203, 0.45), rgba(124, 58, 237, 0.35));
-  box-shadow: 0 0 14px rgba(255, 107, 203, 0.4);
+  border-color: #e7d4ff;
+  background: linear-gradient(180deg, #b06bff, #6a2bff);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 3px 0 #3d12a0, 0 0 12px rgba(160, 80, 255, 0.55);
 }
 
 .diff-picker.locked .diff-btn {
@@ -970,15 +1020,19 @@
 #btn-start:disabled { opacity: 0.4; }
 
 .arena-panel {
+  position: relative;
   background:
-    radial-gradient(circle at 50% 0%, rgba(255, 140, 200, 0.28), transparent 58%),
-    linear-gradient(180deg, rgba(48, 12, 40, 0.82), rgba(22, 8, 32, 0.72));
-  border-radius: 18px;
-  border: 2px solid rgba(255, 214, 120, 0.4);
-  padding: 6px 10px 8px;
-  margin-bottom: 6px;
+    radial-gradient(circle at 50% 0%, rgba(255, 120, 210, 0.35), transparent 46%),
+    linear-gradient(180deg, #3a1878 0%, #24104a 100%);
+  border-radius: 22px;
+  border: 3px solid #ff8ad4;
+  padding: 4px 12px 8px;
+  margin: 8px 2px 6px;
   flex-shrink: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 18px rgba(0, 0, 0, 0.28);
+  box-shadow:
+    0 0 0 2px rgba(255, 210, 90, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 10px 18px rgba(20, 0, 40, 0.35);
 }
 
 .monster-stage {
@@ -986,7 +1040,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 64px;
+  height: 46px;
+  margin-top: -18px;
   justify-content: flex-end;
 }
 
@@ -1044,8 +1099,11 @@
   align-items: center;
 }
 
-.fighter {
-  min-width: 0;
+.candy-world .hp-bar {
+  height: 12px;
+  background: #1a1028;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
 .fighter-label {
@@ -1074,27 +1132,31 @@
 }
 
 .vs-badge {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
   font-weight: 900;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  color: #1a0a00;
-  background: linear-gradient(180deg, #ffe9a8, #ffb020);
-  border-radius: 999px;
-  padding: 4px 8px;
-  box-shadow: 0 3px 0 #b45309, 0 6px 12px rgba(0, 0, 0, 0.3);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: #3a2200;
+  background: radial-gradient(circle at 35% 30%, #fff6c8, #ffc22e 55%, #f08a00);
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 3px 0 #b45309, 0 6px 10px rgba(0, 0, 0, 0.28);
 }
 
 .candy-ammo {
   text-align: center;
   font-size: 0.72rem;
   font-weight: 800;
-  margin: 0 auto 4px;
-  color: #ffe7f6;
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 214, 120, 0.28);
-  border-radius: 999px;
-  padding: 3px 12px;
-  width: fit-content;
+  margin: 2px auto 4px;
+  color: #fff;
+  background: none;
+  border: 0;
+  padding: 0;
+  width: auto;
+  text-shadow: 0 2px 0 rgba(40, 0, 60, 0.45);
 }
 
 .board-wrap {
@@ -1159,15 +1221,15 @@
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.16), transparent 42%),
-    linear-gradient(180deg, #6a2d86 0%, #3a184c 48%, #24102f 100%);
-  border-radius: 22px;
-  border: 3px solid #ffd56e;
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, #2a1458 0%, #1a0c38 100%);
+  border-radius: 26px;
+  border: 4px solid #ff7ad4;
   box-shadow:
-    0 0 0 3px #7a2ea8,
-    inset 0 2px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -8px 16px rgba(0, 0, 0, 0.28),
-    0 14px 28px rgba(0, 0, 0, 0.4);
+    0 0 0 3px #7a3cff,
+    0 0 18px rgba(255, 120, 210, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.16),
+    0 12px 24px rgba(0, 0, 0, 0.35);
 }
 
 .cell {
@@ -1185,11 +1247,11 @@
 }
 
 .cell.well-a {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(20, 6, 24, 0.35));
+  background: linear-gradient(180deg, #3a2468, #241448);
 }
 
 .cell.well-b {
-  background: linear-gradient(180deg, rgba(255, 180, 220, 0.08), rgba(12, 4, 18, 0.42));
+  background: linear-gradient(180deg, #321e5c, #1c103c);
 }
 
 .cell.selected {
