@@ -323,6 +323,20 @@ function initOceanAmbient() {
   }
 }
 
+function cssToPx(value) {
+  const n = parseFloat(value);
+  const unit = String(value);
+  if (unit.includes('vw')) return (n * window.innerWidth) / 100;
+  if (unit.includes('vh')) return (n * window.innerHeight) / 100;
+  return n;
+}
+
+/** The shadow's nose points left when unrotated, so aim that nose along the travel. */
+function faceAlongTravel(dx, dy) {
+  const rad = Math.atan2(cssToPx(dy), cssToPx(dx));
+  return `${(rad * 180) / Math.PI - 180}deg`;
+}
+
 function spawnFishShadow(container, { big = false, underBoat = true, delayRatio = Math.random() } = {}) {
   const el = document.createElement('div');
   el.className = big ? 'fish-shadow big' : 'fish-shadow';
@@ -335,46 +349,44 @@ function spawnFishShadow(container, { big = false, underBoat = true, delayRatio 
   let y0;
   let dx;
   let dy;
-  let rot;
 
   if (underBoat) {
     const mode = Math.floor(Math.random() * 4);
     if (mode === 0) {
       const lane = (Math.random() - 0.5) * 130;
-      rot = '0deg';
       x0 = `${-45 - Math.random() * 15}vw`;
       y0 = `${lane}px`;
       dx = `${90 + Math.random() * 30}vw`;
       dy = `${(Math.random() - 0.5) * 20}px`;
     } else if (mode === 1) {
       const lane = (Math.random() - 0.5) * 130;
-      rot = '180deg';
       x0 = `${45 + Math.random() * 15}vw`;
       y0 = `${lane}px`;
       dx = `${-90 - Math.random() * 30}vw`;
       dy = `${(Math.random() - 0.5) * 20}px`;
     } else if (mode === 2) {
       const lane = (Math.random() - 0.5) * 100;
-      rot = '90deg';
       x0 = `${lane}px`;
       y0 = `${35 + Math.random() * 12}vh`;
       dx = `${(Math.random() - 0.5) * 24}px`;
       dy = `${-55 - Math.random() * 20}vh`;
     } else {
       const lane = (Math.random() - 0.5) * 100;
-      rot = '-90deg';
       x0 = `${lane}px`;
       y0 = `${-35 - Math.random() * 12}vh`;
       dx = `${(Math.random() - 0.5) * 24}px`;
       dy = `${55 + Math.random() * 20}vh`;
     }
   } else {
-    rot = `${Math.random() * 360}deg`;
-    x0 = `${(Math.random() - 0.5) * 80}vw`;
-    y0 = `${(Math.random() - 0.5) * 60}vh`;
-    dx = `${(Math.random() - 0.5) * 50}vw`;
-    dy = `${(Math.random() - 0.5) * 40}vh`;
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 46 + Math.random() * 24;
+    x0 = `${-Math.cos(ang) * 42}vw`;
+    y0 = `${-Math.sin(ang) * 32}vh`;
+    dx = `${Math.cos(ang) * dist}vw`;
+    dy = `${Math.sin(ang) * dist}vh`;
   }
+
+  const rot = faceAlongTravel(dx, dy);
 
   el.style.setProperty('--fish-w', `${w}px`);
   el.style.setProperty('--fish-h', `${w * 0.32}px`);

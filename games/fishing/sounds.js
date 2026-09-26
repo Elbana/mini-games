@@ -133,11 +133,15 @@ export class FishingSounds {
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
-      src.playbackRate.value = 1.15;
+      // The file itself speeds up. Loop one steady slice so a long, heavy fight stays even.
+      const loopEnd = Math.min(1.7, Math.max(0.6, buf.duration * 0.08));
+      src.loopStart = 0.25;
+      src.loopEnd = loopEnd;
+      src.playbackRate.value = 1;
       const g = this.ctx.createGain();
       g.gain.value = 2.6;
       src.connect(g).connect(this.ctx.destination);
-      src.start(0);
+      src.start(0, src.loopStart);
       this._reelLoop = { src, g };
     }
   }

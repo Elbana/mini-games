@@ -3,7 +3,7 @@
   "description": "Swap any file below (same filename) to update Deep Cast art and sounds without code changes.",
   "baseUrl": "/fishing/assets",
   "background": {
-    "water": "/fishing/assets/images/water.png"
+    "water": "/fishing/assets/images/water.jpg"
   },
   "ui": {
     "bobber": "/fishing/assets/images/bobber.svg",
