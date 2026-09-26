@@ -200,4 +200,5 @@
 .leaderboard li:nth-child(2) .rank { background: linear-gradient(135deg, #c0c0c0, #808080); color: #1a1a1a; }
 .leaderboard li:nth-child(3) .rank { background: linear-gradient(135deg, #cd7f32, #8b4513); }
 
+.leaderboard .lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .leaderboard .score { margin-left: auto; font-weight: 800; color: var(--arcade-gold); }

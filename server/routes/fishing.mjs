@@ -14,6 +14,7 @@ import {
 } from '../games/fishing-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
+import { displayName, readProfile } from '../profile.mjs';
 import { rollFishingMisfortune } from '../economy/unfair-loss.mjs';
 import {
   getDailyFishingMood,
@@ -138,8 +139,9 @@ export function handleReel(req, res) {
       catchQty = rollFishingDoubleCatch(dailyMood) ? 2 : 1;
       addInventory(session, fish.id, catchQty);
       session.arcade.stats.fishCaught += catchQty;
-      addScore(SLUG, ctx.playerId, ctx.playerId, result.grade === 'perfect' ? 30 : 15, {
+      addScore(SLUG, ctx.playerId, displayName(session), result.grade === 'perfect' ? 30 : 15, {
         win: result.grade === 'perfect',
+        avatar: readProfile(session).avatar,
       });
     }
   }

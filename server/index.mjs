@@ -37,6 +37,7 @@ import {
   handleReel,
 } from './routes/fishing.mjs';
 import { handleGetLeaderboard } from './routes/leaderboard.mjs';
+import { handleGetProfile, handleSaveProfile } from './routes/profile.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -69,6 +70,8 @@ app.get('/api/v1/balance', handleGetBalance);
 app.get('/api/v1/market', handleGetMarket);
 app.post('/api/v1/market/sell', handleMarketSell);
 app.get('/api/v1/leaderboard/:game', handleGetLeaderboard);
+app.get('/api/v1/profile', handleGetProfile);
+app.post('/api/v1/profile', handleSaveProfile);
 
 app.get('/api/candy-battle/config', handleGetCandyConfig);
 app.get('/api/candy-battle/state', handleGetCandyState);
@@ -111,6 +114,8 @@ function injectPlatform(html, req) {
   if (req.query.token) qs.set('token', req.query.token);
   if (req.query.player) qs.set('player', req.query.player);
   if (req.query.host) qs.set('host', req.query.host);
+  if (req.query.name) qs.set('name', String(req.query.name).slice(0, 16));
+  if (req.query.avatar) qs.set('avatar', String(req.query.avatar).slice(0, 300));
   const inject = qs.size
     ? `<script>window.__ARCADE__=${JSON.stringify(Object.fromEntries(qs))};</script>`
     : '';

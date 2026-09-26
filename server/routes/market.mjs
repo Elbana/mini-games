@@ -3,6 +3,7 @@ import { buildContext, extractPlayerId } from '../auth/player-context.mjs';
 import { createWalletForOperator } from '../wallet/wallet-adapter.mjs';
 import { getMarketSnapshot, recordSale, MARKET_ITEMS } from '../economy/black-market.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
+import { displayName, readProfile } from '../profile.mjs';
 import { getPlayerData, savePlayerData, removeInventory, txId } from '../store/player-store.mjs';
 
 function liveItemPrice(itemId) {
@@ -50,7 +51,7 @@ export async function handleSell(req, res) {
   });
   session.arcade.stats.marketEarnings += total;
   savePlayerData(ctx, session);
-  addScore('market', playerId, playerId, total);
+  addScore('market', playerId, displayName(session), total, { avatar: readProfile(session).avatar });
   res.json({
     ok: true,
     total,

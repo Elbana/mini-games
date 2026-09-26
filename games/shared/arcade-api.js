@@ -3,6 +3,8 @@
   const platform = window.__ARCADE__ || {};
   const token = platform.token || params.get('token') || 'op_demo';
   const player = platform.player || params.get('player') || 'guest';
+  const hintedName = platform.name || params.get('name') || '';
+  const hintedAvatar = platform.avatar || params.get('avatar') || '';
 
   if (params.get('host') === 'riko') {
     document.documentElement.dataset.arcadeEmbed = '1';
@@ -62,6 +64,8 @@
   window.Arcade = {
     token,
     player,
+    hintedName,
+    hintedAvatar,
     get: (p) => api(p),
     post: (p, body) => api(p, { method: 'POST', body }),
     toast(msg, type = '') {

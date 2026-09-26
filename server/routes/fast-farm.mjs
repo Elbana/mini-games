@@ -25,6 +25,7 @@ import {
 } from '../games/fast-farm-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
+import { displayName, readProfile } from '../profile.mjs';
 import { getDailyFarmMood, rollFarmHarvestYield, MIN_HARVEST_YIELD } from '../economy/daily-variance.mjs';
 
 const SLUG = 'fast-farm';
@@ -285,8 +286,9 @@ export function handleHarvest(req, res) {
   const amount = Math.max(MIN_HARVEST_YIELD, harvestRoll.amount);
   addInventory(session, seed.marketItem, amount);
   session.arcade.stats.farmHarvests += 1;
-  addScore(SLUG, ctx.playerId, ctx.playerId, Math.min(500, Math.round(seed.price / 50)), {
+  addScore(SLUG, ctx.playerId, displayName(session), Math.min(500, Math.round(seed.price / 50)), {
     win: true,
+    avatar: readProfile(session).avatar,
   });
 
   farm.plots[plot_index] = emptyPlot(plot_index);

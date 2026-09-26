@@ -35,12 +35,40 @@ export function addScore(game, playerId, displayName, delta, meta = {}) {
   row.score += delta;
   if (meta.win) row.wins = (row.wins || 0) + 1;
   if (displayName) row.displayName = displayName;
+  if (meta.avatar) row.avatar = String(meta.avatar).slice(0, 300);
   row.updatedAt = Date.now();
   entries.sort((a, b) => b.score - a.score);
   saveBoard(game, entries.slice(0, 100));
 }
 
+export function applyProfile(playerId, displayName, avatar) {
+  for (const game of GAMES) {
+    const entries = loadBoard(game);
+    let changed = false;
+    for (const row of entries) {
+      if (row.playerId !== playerId) continue;
+      row.displayName = displayName;
+      row.avatar = avatar;
+      changed = true;
+    }
+    if (changed) saveBoard(game, entries);
+  }
+}
+
+function publicName(row) {
+  const name = String(row.displayName || '').trim();
+  if (!name || name === row.playerId) return 'Player';
+  return name;
+}
+
 export function getLeaderboard(game, limit = 20) {
   const entries = loadBoard(game);
-  return entries.slice(0, limit).map((e, i) => ({ rank: i + 1, ...e }));
+  return entries.slice(0, limit).map((e, i) => ({
+    rank: i + 1,
+    playerId: e.playerId,
+    displayName: publicName(e),
+    avatar: e.avatar || 'star',
+    score: e.score,
+    wins: e.wins || 0,
+  }));
 }

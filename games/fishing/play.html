@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/shared/arcade-shell.css">
   <link rel="stylesheet" href="/fishing/game.css">
   <script src="/shared/arcade-api.js"></script>
+  <script src="/shared/profile.js"></script>
   <script src="/shared/fx.js" defer></script>
   <script type="module" src="/fishing/game.js"></script>
 </head>
@@ -17,6 +18,7 @@
         <a class="btn btn-ghost btn-sm" href="/">← Hub</a>
         <h1>Deep Cast</h1>
         <div class="fish-top-actions">
+          <button type="button" class="player-chip" id="player-chip" hidden></button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-help" aria-label="How to play">?</button>
           <button type="button" class="btn btn-ghost btn-sm sound-toggle" id="btn-sound" aria-pressed="false" aria-label="Sound on">🔊</button>
         </div>

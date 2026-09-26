@@ -13,7 +13,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             .map(
               (e) => `<li>
           <span class="rank">${e.rank}</span>
-          <span>${e.displayName}</span>
+          <span class="lb-face" data-avatar="${String(e.avatar || 'star').replace(/"/g, '')}">${window.ArcadeFaces ? ArcadeFaces.html(e.avatar || 'star') : ''}</span>
+          <span class="lb-name">${String(e.displayName || 'Player').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</span>
           <span class="score">${Arcade.formatCoins(e.score)}</span>
         </li>`
             )

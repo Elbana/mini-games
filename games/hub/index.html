@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="/shared/arcade-shell.css">
   <link rel="stylesheet" href="/hub/hub.css">
   <script src="/shared/arcade-api.js"></script>
+  <script src="/shared/profile.js"></script>
   <script src="/shared/fx.js" defer></script>
   <script src="/hub/hub.js" defer></script>
 </head>
@@ -16,7 +17,10 @@
         <p class="hub-tag">Voice Room Arcade</p>
         <h1 class="glow-text">Playground</h1>
       </div>
-      <div class="balance-pill" id="balance">…</div>
+      <div class="top-bar-actions">
+        <button type="button" class="player-chip" id="player-chip" hidden></button>
+        <div class="balance-pill" id="balance">…</div>
+      </div>
     </header>
 
     <div class="content-scroll">

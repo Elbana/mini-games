@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/shared/arcade-shell.css">
   <link rel="stylesheet" href="/fast-farm/game.css">
   <script src="/shared/arcade-api.js"></script>
+  <script src="/shared/profile.js"></script>
   <script src="/fast-farm/farm-sounds.js" defer></script>
   <script src="/fast-farm/game.js" defer></script>
 </head>
@@ -27,6 +28,7 @@
           <a class="farm-back-btn" id="btn-hub" href="/" aria-label="Back to hub">‹</a>
           <button type="button" class="farm-icon-btn" id="btn-help" aria-label="How to play">?</button>
           <button type="button" class="farm-icon-btn sound-toggle" id="btn-sound" aria-pressed="false" aria-label="Sound on">🔊</button>
+          <button type="button" class="player-chip" id="player-chip" hidden></button>
         </div>
       </header>
       <div id="farm-crop-stack" class="farm-crop-stack" aria-label="Harvested crops"></div>

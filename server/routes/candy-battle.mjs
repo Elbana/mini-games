@@ -17,6 +17,7 @@ import {
 } from '../games/candy-battle-engine.mjs';
 import { getPlayerData, savePlayerData, addInventory, txId } from '../store/player-store.mjs';
 import { addScore } from '../economy/leaderboard.mjs';
+import { displayName, readProfile } from '../profile.mjs';
 import { rollCandyMisfortune } from '../economy/unfair-loss.mjs';
 import { getDailyCandyMood, rollCandyRewardQty } from '../economy/daily-variance.mjs';
 
@@ -338,7 +339,7 @@ function grantRoundLoot(session, ctx, fight, mood) {
   const qty = rollCandyRewardQty(tier, mood) + extra;
   addInventory(session, tier.rewardItem, qty);
   session.arcade.stats.candyWins += 1;
-  addScore(SLUG, ctx.playerId, ctx.playerId, qty * 20, { win: true });
+  addScore(SLUG, ctx.playerId, displayName(session), qty * 20, { win: true, avatar: readProfile(session).avatar });
   return { itemId: tier.rewardItem, name: tier.name, qty };
 }
 
